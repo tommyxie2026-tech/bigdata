@@ -1,0 +1,8 @@
+{
+  "description": "Packaging, testing, and deployment resources for the Apache Hadoop ecosystem.",
+  "directory": "apache-bigtop",
+  "github_url": "https://github.com/apache/bigtop",
+  "issue": 1,
+  "name": "Apache Bigtop",
+  "project_url": "https://bigtop.apache.org/"
+}

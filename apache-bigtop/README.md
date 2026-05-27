@@ -1,12 +1,12 @@
 # Apache Bigtop
 
-Apache Bigtop is an Apache project for packaging, testing, and deploying big data ecosystem components.
+Apache Bigtop is an upstream project reference used by this repository.
 
 ## Upstream Repository
 
 * GitHub: https://github.com/apache/bigtop
-* Apache project page: https://bigtop.apache.org/
+* Project page: https://bigtop.apache.org/
 
 ## Purpose
 
-This directory tracks the Apache Bigtop upstream reference for this repository. Keep local notes, experiments, or integration documentation here instead of copying upstream source code directly.
+Keep local notes, experiments, or integration documentation here instead of copying upstream source code directly.
