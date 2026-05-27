@@ -1,0 +1,18 @@
+{
+  "type": "yarn-site",
+  "tag": "recommended",
+  "properties": {
+    "yarn.resourcemanager.hostname": "${RESOURCEMANAGER_HOST}",
+    "yarn.nodemanager.resource.memory-mb": "8192",
+    "yarn.nodemanager.resource.cpu-vcores": "4",
+    "yarn.scheduler.minimum-allocation-mb": "512",
+    "yarn.scheduler.maximum-allocation-mb": "8192",
+    "yarn.log-aggregation-enable": "true",
+    "yarn.nodemanager.aux-services": "mapreduce_shuffle"
+  },
+  "notes": {
+    "yarn.nodemanager.resource.memory-mb": "根据节点实际内存调整，建议预留系统内存。",
+    "yarn.scheduler.maximum-allocation-mb": "不能超过 NodeManager 可分配内存。",
+    "yarn.log-aggregation-enable": "建议开启，便于任务日志集中查看。"
+  }
+}
