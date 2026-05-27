@@ -1,0 +1,18 @@
+{
+  "type": "hdfs-site",
+  "tag": "recommended",
+  "properties": {
+    "dfs.replication": "3",
+    "dfs.blocksize": "134217728",
+    "dfs.namenode.name.dir": "/hadoop/hdfs/namenode",
+    "dfs.datanode.data.dir": "/hadoop/hdfs/data",
+    "dfs.permissions.enabled": "true",
+    "dfs.client.read.shortcircuit": "true",
+    "dfs.domain.socket.path": "/var/lib/hadoop-hdfs/dn_socket"
+  },
+  "notes": {
+    "dfs.replication": "生产环境建议为 3；单节点测试环境可改为 1。",
+    "dfs.blocksize": "默认 128MB，适合大文件场景。",
+    "dfs.permissions.enabled": "生产环境建议开启权限控制。"
+  }
+}
