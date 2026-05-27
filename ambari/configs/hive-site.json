@@ -1,0 +1,20 @@
+{
+  "type": "hive-site",
+  "tag": "recommended",
+  "properties": {
+    "javax.jdo.option.ConnectionURL": "jdbc:mysql://${MYSQL_HOST}:3306/hive?createDatabaseIfNotExist=true",
+    "javax.jdo.option.ConnectionDriverName": "com.mysql.jdbc.Driver",
+    "javax.jdo.option.ConnectionUserName": "hive",
+    "javax.jdo.option.ConnectionPassword": "${HIVE_METASTORE_PASSWORD}",
+    "hive.metastore.uris": "thrift://${HIVE_METASTORE_HOST}:9083",
+    "hive.server2.thrift.port": "10000",
+    "hive.execution.engine": "tez",
+    "hive.exec.dynamic.partition": "true",
+    "hive.exec.dynamic.partition.mode": "nonstrict"
+  },
+  "notes": {
+    "ConnectionURL": "生产环境建议使用外部高可用 MySQL 或兼容数据库。",
+    "hive.metastore.uris": "供 Spark、HiveServer2、Trino 等组件访问 Hive Metastore。",
+    "hive.execution.engine": "HDP 场景下通常使用 Tez。"
+  }
+}
