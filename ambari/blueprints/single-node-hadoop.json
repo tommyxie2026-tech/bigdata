@@ -1,0 +1,53 @@
+{
+  "Blueprints": {
+    "blueprint_name": "single-node-hadoop",
+    "stack_name": "HDP",
+    "stack_version": "3.1"
+  },
+  "host_groups": [
+    {
+      "name": "master",
+      "cardinality": "1",
+      "components": [
+        { "name": "NAMENODE" },
+        { "name": "SECONDARY_NAMENODE" },
+        { "name": "DATANODE" },
+        { "name": "RESOURCEMANAGER" },
+        { "name": "NODEMANAGER" },
+        { "name": "HISTORYSERVER" },
+        { "name": "ZOOKEEPER_SERVER" },
+        { "name": "HIVE_SERVER" },
+        { "name": "HIVE_METASTORE" },
+        { "name": "MYSQL_SERVER" },
+        { "name": "SPARK2_JOBHISTORYSERVER" }
+      ]
+    }
+  ],
+  "configurations": [
+    {
+      "core-site": {
+        "properties": {
+          "fs.defaultFS": "hdfs://%HOSTGROUP::master%:8020"
+        }
+      }
+    },
+    {
+      "hdfs-site": {
+        "properties": {
+          "dfs.replication": "1",
+          "dfs.namenode.name.dir": "/hadoop/hdfs/namenode",
+          "dfs.datanode.data.dir": "/hadoop/hdfs/data"
+        }
+      }
+    },
+    {
+      "yarn-site": {
+        "properties": {
+          "yarn.resourcemanager.hostname": "%HOSTGROUP::master%",
+          "yarn.nodemanager.resource.memory-mb": "4096",
+          "yarn.scheduler.minimum-allocation-mb": "512"
+        }
+      }
+    }
+  ]
+}
