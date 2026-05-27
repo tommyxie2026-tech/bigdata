@@ -66,7 +66,13 @@ Serving Layer
 
 说明本地环境、测试环境、生产环境的部署方式，后续可补充 Kubernetes、Helm、Bigtop、Ansible 或 Terraform 等工程化方案。
 
-## 5. 目录规划
+## 5. 管理面设计
+
+本项目第一阶段以 Apache Ambari 作为 Hadoop 生态集群管理面，负责集群安装、服务配置、组件启停、健康检查、监控告警和自动化运维入口。
+
+详见：[Apache Ambari 管理面设计](ambari-management-plane.md)
+
+## 6. 目录规划
 
 建议仓库后续按如下结构组织：
 
@@ -75,16 +81,22 @@ bigdata/
 ├── README.md
 ├── docs/
 │   ├── technical-design.md
+│   ├── ambari-management-plane.md
 │   ├── architecture.md
 │   ├── deployment.md
 │   └── operations.md
 ├── apache-bigtop/
+├── ambari/
+│   ├── blueprints/
+│   ├── configs/
+│   ├── scripts/
+│   └── runbooks/
 ├── examples/
 ├── scripts/
 └── tests/
 ```
 
-## 6. 提交规范
+## 7. 提交规范
 
 建议采用以下提交信息格式：
 
@@ -95,10 +107,13 @@ fix: correct xxx configuration
 chore: update repository structure
 ```
 
-## 7. 后续待办
+## 8. 后续待办
 
 - [ ] 补充当前大数据平台的目标场景与边界
 - [ ] 明确核心组件版本与兼容性矩阵
 - [ ] 补充部署架构图与网络拓扑
 - [ ] 补充数据链路、任务调度与监控方案
 - [ ] 补充本地开发、测试与 CI 流程
+- [ ] 补充 Ambari Blueprint 示例
+- [ ] 补充 Ambari REST API 自动化脚本
+- [ ] 补充 Ambari 与 Apache Bigtop 集成说明
