@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<metainfo>
+  <schemaVersion>2.0</schemaVersion>
+  <services>
+    <service>
+      <name>HIVE</name>
+      <displayName>Hive</displayName>
+      <comment>SQL data warehouse service for the Bigdata stack.</comment>
+      <version>3.x</version>
+      <components>
+        <component>
+          <name>HIVE_METASTORE</name>
+          <displayName>Hive Metastore</displayName>
+          <category>MASTER</category>
+          <cardinality>1+</cardinality>
+          <commandScript>
+            <script>scripts/hive_metastore.py</script>
+            <scriptType>PYTHON</scriptType>
+            <timeout>600</timeout>
+          </commandScript>
+        </component>
+        <component>
+          <name>HIVE_SERVER</name>
+          <displayName>HiveServer2</displayName>
+          <category>MASTER</category>
+          <cardinality>1+</cardinality>
+          <commandScript>
+            <script>scripts/hive_server.py</script>
+            <scriptType>PYTHON</scriptType>
+            <timeout>600</timeout>
+          </commandScript>
+        </component>
+        <component>
+          <name>HIVE_CLIENT</name>
+          <displayName>Hive Client</displayName>
+          <category>CLIENT</category>
+          <cardinality>0+</cardinality>
+        </component>
+      </components>
+      <commandScript>
+        <script>scripts/service_check.py</script>
+        <scriptType>PYTHON</scriptType>
+        <timeout>300</timeout>
+      </commandScript>
+      <configuration-dependencies>
+        <config-type>hive-site</config-type>
+      </configuration-dependencies>
+      <requiredServices>
+        <service>HDFS</service>
+        <service>YARN</service>
+      </requiredServices>
+    </service>
+  </services>
+</metainfo>
