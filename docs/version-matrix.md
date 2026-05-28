@@ -72,11 +72,17 @@
 | Spark | 3.5.8 | 3.4.x | Spark 3.5.x 作为 Phase 1 稳定主线；Spark 4.1.x 作为未来升级评估，面向后续 Spark on Kubernetes 和新生态兼容 | 已确认候选，不冻结，待 Bigtop 3.5.0 构建、Ambari 3.0.0 管理、Hadoop 3.5.0、JDK 8、Hive Metastore 4.2.0 兼容性验证 |
 | Spark Upgrade Evaluation | 4.1.x | N/A | 作为未来升级评估，不进入 Phase 1 主线 | 已确认升级评估项 |
 
+### 4.5 宽表存储
+
+| 组件 | Phase 1 优先候选 | 兼容/回退候选 | 升级策略 | 状态 |
+|---|---:|---:|---|---|
+| HBase | 2.5.14 | 2.5.13 | HBase 2.5.x 作为 Phase 1 稳定主线；2.6.5 作为未来升级评估；3.0.0-beta-1 仅作为远期技术观察 | 已确认候选，不冻结，待 Bigtop 3.5.0 构建、Ambari 3.0.0 管理、Hadoop 3.5.0、ZooKeeper 3.9.5、JDK 8 兼容性验证 |
+| HBase Upgrade Evaluation | 2.6.5 | N/A | 作为未来升级评估，不进入 Phase 1 主线 | 已确认升级评估项 |
+| HBase Technical Watch | 3.0.0-beta-1 | N/A | Beta 版本，仅远期技术观察 | 不进入 Phase 1 |
+
 ## 5. 待确认版本组
 
-后续按依赖顺序逐组确认：
-
-1. HBase
+所有 Phase 1 P0 组件候选版本已完成逐组确认，当前均为候选或升级评估状态，尚未冻结。
 
 ## 6. 版本矩阵
 
@@ -92,7 +98,9 @@
 | Tez | 0.10.5 | 0.10.4 / 0.10.3 | 必须验证 | 必须验证 | 评估 | 是/可选 | 是/可选 | Hive 执行引擎候选，随 Hive 4.2.0 验证 |
 | Spark | 3.5.8 | 3.4.x | 必须验证 | 必须验证 | 评估 | 是 | 是 | Phase 1 优先候选，不冻结；需验证 Hadoop 3.5.0、Hive Metastore 4.2.0、JDK 8、Ambari/Bigtop 适配 |
 | Spark Upgrade Evaluation | 4.1.x | N/A | 评估 | 可能不适用 | 评估 | 评估 | 评估 | 未来升级评估，不进入 Phase 1 主线 |
-| HBase | TBD | TBD | 必须验证 | 必须验证 | 评估 | 是 | 是 | 宽表存储 |
+| HBase | 2.5.14 | 2.5.13 | 必须验证 | 必须验证 | 评估 | 是 | 是 | Phase 1 优先候选，不冻结；需验证 Hadoop 3.5.0、ZooKeeper 3.9.5、JDK 8、Ambari/Bigtop 适配 |
+| HBase Upgrade Evaluation | 2.6.5 | N/A | 评估 | 评估 | 评估 | 评估 | 评估 | 未来升级评估，不进入 Phase 1 主线 |
+| HBase Technical Watch | 3.0.0-beta-1 | N/A | 不要求 | 不要求 | 观察 | 不要求 | 不要求 | Beta 版本，仅远期技术观察 |
 
 ## 7. 兼容性评估维度
 
@@ -173,6 +181,18 @@ Spark 3.5.8 作为 Phase 1 优先候选，但不立即冻结，必须额外验�
 - Spark 在 JDK 8 下是否稳定运行
 - Spark 4.1.x 作为未来升级评估时，对 JDK、Hadoop、Hive Metastore 和 Kubernetes 的要求
 
+### 7.8 HBase 特别验证项
+
+HBase 2.5.14 作为 Phase 1 优先候选，但不立即冻结，必须额外验证：
+
+- Bigtop 3.5.0 是否支持 HBase 2.5.14 构建
+- Ambari 3.0.0 是否能安装、配置、启停和检查 HBase 2.5.14
+- HBase 2.5.14 是否兼容 Hadoop 3.5.0
+- HBase 2.5.14 是否兼容 ZooKeeper 3.9.5
+- HBase 2.5.14 在 JDK 8 下是否稳定运行
+- HBase Master / RegionServer HA 是否可验证
+- HBase 2.6.5 作为未来升级评估时，对 Hadoop、ZooKeeper、JDK 和 Ambari 的要求
+
 ## 8. 版本确认流程
 
 ```text
@@ -216,6 +236,6 @@ Spark 3.5.8 作为 Phase 1 优先候选，但不立即冻结，必须额外验�
 - [x] 确认 Hadoop / ZooKeeper 候选版本，状态为待验证不冻结
 - [x] 确认 Hive / Tez 候选版本，状态为待验证不冻结
 - [x] 确认 Spark 候选版本，状态为待验证不冻结
-- [ ] 确认 HBase 候选版本
+- [x] 确认 HBase 候选版本，状态为待验证不冻结
 - [ ] 补充 JDK 17 兼容性评估结果
 - [ ] 冻结 Phase 1 版本矩阵
