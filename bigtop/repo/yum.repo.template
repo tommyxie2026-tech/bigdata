@@ -1,0 +1,13 @@
+[bigdata-bigtop]
+name=Bigdata Bigtop Repository
+baseurl=http://${REPO_HOST}/bigdata/bigtop/${OS_TARGET}/$basearch
+enabled=1
+gpgcheck=0
+priority=1
+
+[bigdata-bigtop-noarch]
+name=Bigdata Bigtop Noarch Repository
+baseurl=http://${REPO_HOST}/bigdata/bigtop/${OS_TARGET}/noarch
+enabled=1
+gpgcheck=0
+priority=1
