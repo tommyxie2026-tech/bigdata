@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<metainfo>
+  <schemaVersion>2.0</schemaVersion>
+  <services>
+    <service>
+      <name>SPARK</name>
+      <displayName>Spark</displayName>
+      <comment>Batch and distributed compute engine for the Bigdata stack.</comment>
+      <version>3.x</version>
+      <components>
+        <component>
+          <name>SPARK_HISTORYSERVER</name>
+          <displayName>Spark History Server</displayName>
+          <category>MASTER</category>
+          <cardinality>1</cardinality>
+          <commandScript>
+            <script>scripts/spark_historyserver.py</script>
+            <scriptType>PYTHON</scriptType>
+            <timeout>600</timeout>
+          </commandScript>
+        </component>
+        <component>
+          <name>SPARK_CLIENT</name>
+          <displayName>Spark Client</displayName>
+          <category>CLIENT</category>
+          <cardinality>0+</cardinality>
+        </component>
+      </components>
+      <commandScript>
+        <script>scripts/service_check.py</script>
+        <scriptType>PYTHON</scriptType>
+        <timeout>300</timeout>
+      </commandScript>
+      <configuration-dependencies>
+        <config-type>spark-defaults</config-type>
+      </configuration-dependencies>
+      <requiredServices>
+        <service>HDFS</service>
+        <service>YARN</service>
+      </requiredServices>
+    </service>
+  </services>
+</metainfo>
