@@ -35,6 +35,7 @@
 | ZooKeeper | Phase 1 | 是 | HA 协调服务 |
 | Hadoop / HDFS / YARN | Phase 1 | 是 | 存储与资源管理底座 |
 | Hive | Phase 1 | 是 | Metastore 与 HiveServer2 |
+| Hive Standalone Metastore | Phase 1 | 是 | 元数据服务候选形态，随 Hive 版本验证 |
 | Spark | Phase 1 | 是 | 批处理与离线 SQL 补充 |
 | HBase | Phase 1 | 是 | 宽表存储，进入真实验证范围 |
 | Tez | Phase 1 | 待定 | Hive 执行引擎，按 Hive 版本决定 |
@@ -56,13 +57,20 @@
 | Hadoop | 3.5.0 | 3.4.3 / 3.3.6 | 以 3.5.x 作为未来主线；如 Bigtop/Ambari 适配不通过，回退到 3.4.3 或 3.3.6 | 已确认候选，不冻结，待 Bigtop 3.5.0 构建与 Ambari 3.0.0 管理验证 |
 | ZooKeeper | 3.9.5 | 3.8.6 | 以 3.9.x 作为未来主线；如兼容性不足，回退到 3.8.6 | 已确认候选，不冻结，待 Bigtop 3.5.0 构建与 Ambari 3.0.0 管理验证 |
 
+### 4.3 数仓 SQL 与执行引擎
+
+| 组件 | Phase 1 优先候选 | 兼容/回退候选 | 升级策略 | 状态 |
+|---|---:|---:|---|---|
+| Hive | 4.2.0 | Hive 4.1.x / 3.x 兼容线待评估 | 以 Hive 4.x 作为未来主线；如 Ambari/Bigtop/JDK/Hadoop 适配不通过，回退到 4.1.x 或 3.x 兼容线 | 已确认候选，不冻结，待 Bigtop 3.5.0 构建、Ambari 3.0.0 管理、Hadoop 3.5.0 和 JDK 8 兼容性验证 |
+| Hive Standalone Metastore | 4.2.0 | 3.0.0 | 随 Hive 4.2.0 优先验证；3.0.0 作为兼容回退评估 | 已确认候选，不冻结，待 Spark SQL 访问 Metastore 兼容性验证 |
+| Tez | 0.10.5 | 0.10.4 / 0.10.3 | 以 0.10.5 作为优先候选，随 Hive 4.2.0 验证；必要时回退到 0.10.4 / 0.10.3 | 已确认候选，不冻结，待 Hive 执行引擎适配验证 |
+
 ## 5. 待确认版本组
 
 后续按依赖顺序逐组确认：
 
-1. Hive + Tez
-2. Spark
-3. HBase
+1. Spark
+2. HBase
 
 ## 6. 版本矩阵
 
@@ -73,10 +81,11 @@
 | Bigtop | 3.5.0 | 3.4.0 | 必须验证 | 必须验证 | 评估 | 是 | 否 | 真实构建体系；已确认，待验证 |
 | Hadoop | 3.5.0 | 3.4.3 / 3.3.6 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 社区最新稳定优先候选，不冻结；需验证 Bigtop 3.5.0 构建与 Ambari 3.0.0 管理适配 |
 | ZooKeeper | 3.9.5 | 3.8.6 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 社区最新稳定优先候选，不冻结；需验证 Bigtop 3.5.0 构建与 Ambari 3.0.0 管理适配 |
-| Hive | TBD | TBD | 必须验证 | 必须验证 | 评估 | 是 | 是 | Metastore / HS2 |
+| Hive | 4.2.0 | 4.1.x / 3.x 兼容线待评估 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 社区最新稳定优先候选，不冻结；需验证 Bigtop 3.5.0、Ambari 3.0.0、Hadoop 3.5.0、JDK 8 兼容性 |
+| Hive Standalone Metastore | 4.2.0 | 3.0.0 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 随 Hive 4.2.0 优先验证；需验证 Spark SQL 访问 Metastore 兼容性 |
+| Tez | 0.10.5 | 0.10.4 / 0.10.3 | 必须验证 | 必须验证 | 评估 | 是/可选 | 是/可选 | Hive 执行引擎候选，随 Hive 4.2.0 验证 |
 | Spark | TBD | TBD | 必须验证 | 必须验证 | 评估 | 是 | 是 | 批处理 |
 | HBase | TBD | TBD | 必须验证 | 必须验证 | 评估 | 是 | 是 | 宽表存储 |
-| Tez | TBD | TBD | 视 Hive 决定 | 视 Hive 决定 | 评估 | 是/可选 | 是/可选 | Hive 执行引擎 |
 
 ## 7. 兼容性评估维度
 
@@ -134,6 +143,18 @@ Hadoop 3.5.0 与 ZooKeeper 3.9.5 作为社区最新稳定优先候选，但不�
 - ZooKeeper 与 HDFS/YARN/HBase 的协调关系是否稳定
 - 与 Hive、Spark、HBase 后续候选版本是否存在依赖冲突
 
+### 7.6 Hive / Metastore / Tez 特别验证项
+
+Hive 4.2.0、Hive Standalone Metastore 4.2.0 与 Tez 0.10.5 作为社区最新稳定优先候选，但不立即冻结，必须额外验证：
+
+- Bigtop 3.5.0 是否支持 Hive 4.2.0、Metastore 4.2.0、Tez 0.10.5 构建
+- Ambari 3.0.0 是否能安装、配置、启停和检查 Hive 4.2.0
+- Hive 4.2.0 与 Hadoop 3.5.0 的兼容性
+- Hive 4.2.0 在 JDK 8 下的运行兼容性
+- HiveServer2 与 Hive Metastore 多实例部署是否稳定
+- Spark SQL 访问 Hive Standalone Metastore 4.2.0 是否兼容
+- Tez 0.10.5 是否适合作为 Hive 执行引擎
+
 ## 8. 版本确认流程
 
 ```text
@@ -175,7 +196,7 @@ Hadoop 3.5.0 与 ZooKeeper 3.9.5 作为社区最新稳定优先候选，但不�
 - [x] 确认 Ambari 候选版本
 - [x] 确认 Bigtop 候选版本或分支
 - [x] 确认 Hadoop / ZooKeeper 候选版本，状态为待验证不冻结
-- [ ] 确认 Hive / Tez 候选版本
+- [x] 确认 Hive / Tez 候选版本，状态为待验证不冻结
 - [ ] 确认 Spark 候选版本
 - [ ] 确认 HBase 候选版本
 - [ ] 补充 JDK 17 兼容性评估结果
