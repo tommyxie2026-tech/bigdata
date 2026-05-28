@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Bigtop package build script skeleton.
-# This script is a placeholder for standardizing component package builds.
+# Bigtop package build wrapper.
+# Set BIGTOP_GRADLE_TASK_TEMPLATE to the real Gradle task pattern before use.
 
 BIGTOP_HOME="${BIGTOP_HOME:-/opt/bigtop}"
 COMPONENTS="${COMPONENTS:-hadoop hive spark}"
 OS_TARGET="${OS_TARGET:-rocky8}"
 OUTPUT_DIR="${OUTPUT_DIR:-$(pwd)/output}"
+BIGTOP_GRADLE_TASK_TEMPLATE="${BIGTOP_GRADLE_TASK_TEMPLATE:-}"
 
 mkdir -p "${OUTPUT_DIR}"
 
@@ -26,14 +27,25 @@ if [[ ! -d "${BIGTOP_HOME}" ]]; then
   exit 1
 fi
 
+if [[ -z "${BIGTOP_GRADLE_TASK_TEMPLATE}" ]]; then
+  cat >&2 <<EOF
+Bigtop build command is not configured.
+
+Set BIGTOP_GRADLE_TASK_TEMPLATE to a real Gradle task template before running.
+The token {component} will be replaced for each component.
+
+Example:
+  BIGTOP_GRADLE_TASK_TEMPLATE='{component}-rpm' $0
+EOF
+  exit 2
+fi
+
 cd "${BIGTOP_HOME}"
 
 for component in ${COMPONENTS}; do
-  echo "Build component package: ${component}"
-  # TODO: Replace with the real Bigtop build command for the target OS.
-  # Example placeholder:
-  # ./gradlew "${component}-rpm" -PparentDir="${OUTPUT_DIR}"
-  echo "TODO build ${component} for ${OS_TARGET}"
+  task="${BIGTOP_GRADLE_TASK_TEMPLATE//\{component\}/${component}}"
+  echo "Build component package: ${component} with Gradle task ${task}"
+  ./gradlew "${task}" -PparentDir="${OUTPUT_DIR}"
 done
 
 echo "Build completed. Check output directory: ${OUTPUT_DIR}"

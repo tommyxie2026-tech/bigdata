@@ -1,8 +1,8 @@
 {
   "Blueprints": {
     "blueprint_name": "single-node-hadoop",
-    "stack_name": "HDP",
-    "stack_version": "3.1"
+    "stack_name": "BIGDATA",
+    "stack_version": "1.0"
   },
   "host_groups": [
     {
@@ -10,16 +10,16 @@
       "cardinality": "1",
       "components": [
         { "name": "NAMENODE" },
-        { "name": "SECONDARY_NAMENODE" },
         { "name": "DATANODE" },
+        { "name": "HDFS_CLIENT" },
         { "name": "RESOURCEMANAGER" },
         { "name": "NODEMANAGER" },
-        { "name": "HISTORYSERVER" },
-        { "name": "ZOOKEEPER_SERVER" },
+        { "name": "YARN_CLIENT" },
         { "name": "HIVE_SERVER" },
         { "name": "HIVE_METASTORE" },
-        { "name": "MYSQL_SERVER" },
-        { "name": "SPARK2_JOBHISTORYSERVER" }
+        { "name": "HIVE_CLIENT" },
+        { "name": "SPARK_HISTORYSERVER" },
+        { "name": "SPARK_CLIENT" }
       ]
     }
   ],
