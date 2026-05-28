@@ -2,9 +2,9 @@
 
 ## 1. 平台定位
 
-Bigdata Platform 是一套面向企业级数据处理场景的大数据平台方案，目标是同时支持传统数仓和实时数据湖两类核心场景，并能够在不同基础设施环境中灵活部署与交付。
+Bigdata Platform 是一套面向企业级数据处理场景的、可部署的私有化大数据平台方案，目标是同时支持传统数仓和实时数据湖两类核心场景，并能够在不同基础设施环境中灵活部署与交付。
 
-平台第一阶段以物理机和传统 Hadoop 生态为主要落地方向，使用 Apache Ambari 作为集群管理面，使用 Apache Bigtop 作为组件构建、版本管理和包发行的参考体系。后续阶段逐步扩展到虚拟机、容器平台和云原生运行环境。
+平台第一阶段以物理机和传统 Hadoop 生态为主要落地方向，使用 Apache Ambari 作为传统大数据平台的长期管理面，使用 Apache Bigtop 作为真实组件构建、版本管理和包发行体系。后续阶段逐步扩展到虚拟机、容器平台和云原生运行环境。
 
 平台最终目标是形成一套可扩展、可组合、可交付的大数据平台体系：
 
@@ -16,6 +16,7 @@ Bigdata Platform 是一套面向企业级数据处理场景的大数据平台方
 - 支持大数据组件按需组合
 - 支持组件自定义扩展
 - 支持标准化安装、配置、监控、运维和验证
+- 支持私有化交付和生产级 HA 拓扑
 
 ## 2. 核心目标
 
@@ -25,10 +26,10 @@ Bigdata Platform 是一套面向企业级数据处理场景的大数据平台方
 
 | 架构类型 | 核心能力 | 典型组件 |
 |---|---|---|
-| 传统数仓 | 批量接入、离线计算、分层建模、SQL 分析 | HDFS、YARN、Hive、Spark、MapReduce |
-| 实时数据湖 | CDC 接入、流式处理、湖仓表格式、近实时查询 | Kafka、Flink、Spark、Iceberg/Hudi、Trino |
+| 传统数仓 | 批量接入、离线计算、分层建模、SQL 分析、宽表服务 | HDFS、YARN、Hive、Spark、HBase、ZooKeeper |
+| 实时数据湖 | CDC 接入、流式处理、湖仓表格式、近实时查询 | Kafka、Flink、Iceberg、Hudi、Trino、S3/Object Storage |
 
-第一阶段优先完成传统数仓底座，后续逐步扩展实时数据湖能力。
+第一阶段优先完成传统数仓物理机底座，并要求完成 HA 生产拓扑设计与验证目标；后续逐步扩展实时数据湖能力。
 
 ### 2.2 支持多种部署形态
 
@@ -36,7 +37,7 @@ Bigdata Platform 是一套面向企业级数据处理场景的大数据平台方
 
 | 阶段 | 部署形态 | 说明 |
 |---|---|---|
-| 第一阶段 | 物理机 | 适合传统 Hadoop 集群、稳定资源池、私有化交付 |
+| 第一阶段 | 物理机 | 适合传统 Hadoop 集群、稳定资源池、私有化交付、HA 生产拓扑 |
 | 第二阶段 | 虚拟机 | 适合资源隔离、弹性扩展、测试/生产多环境部署 |
 | 第三阶段 | 容器平台 | 适合云原生组件、Operator、弹性计算和平台化交付 |
 
@@ -48,11 +49,14 @@ Bigdata Platform 是一套面向企业级数据处理场景的大数据平台方
 最小离线数仓组合：
 HDFS + YARN + Hive + Spark + ZooKeeper
 
+生产级传统数仓组合：
+Ambari + Bigtop + ZooKeeper + HDFS HA + YARN HA + Hive + Spark + HBase
+
 实时接入组合：
 Kafka + Flink + CDC Connector + HDFS/Object Storage
 
 实时数据湖组合：
-Kafka + Flink + Iceberg/Hudi + Trino + Hive Metastore
+Kafka + Flink + Iceberg + Trino + Hive Metastore + S3/Object Storage
 
 安全治理组合：
 Kerberos + Ranger + Knox + Atlas
@@ -67,6 +71,7 @@ Kerberos + Ranger + Knox + Atlas
 │                管理面 / 控制面              │
 │                                            │
 │  Ambari / REST API / Blueprint / Runbook   │
+│  Kubernetes / Operator，远期云原生协同       │
 └────────────────────────────────────────────┘
                     |
                     v
@@ -80,8 +85,8 @@ Kerberos + Ranger + Knox + Atlas
 ┌────────────────────────────────────────────┐
 │                数据平台能力层               │
 │                                            │
-│  HDFS / YARN / Hive / Spark / Kafka / Flink │
-│  Iceberg / Hudi / Trino / HBase / ZooKeeper │
+│  HDFS / YARN / Hive / Spark / HBase         │
+│  Kafka / Flink / Iceberg / Hudi / Trino     │
 └────────────────────────────────────────────┘
                     |
                     v
@@ -89,6 +94,7 @@ Kerberos + Ranger + Knox + Atlas
 │                基础设施运行层               │
 │                                            │
 │  Bare Metal / VM / Container Platform       │
+│  HDFS / Object Storage / S3 Compatible      │
 └────────────────────────────────────────────┘
 ```
 
@@ -96,7 +102,7 @@ Kerberos + Ranger + Knox + Atlas
 
 ### 4.1 先稳定，后扩展
 
-第一阶段优先确保传统 Hadoop 数仓底座可靠可交付，再扩展实时数据湖和云原生能力。
+第一阶段优先确保传统 Hadoop 数仓底座可靠可交付，并纳入 HA 生产拓扑设计，再扩展实时数据湖和云原生能力。
 
 ### 4.2 先文档，后工程
 
@@ -108,29 +114,31 @@ Kerberos + Ranger + Knox + Atlas
 
 ### 4.4 部署形态可演进
 
-平台第一阶段基于物理机和 Ambari 管理传统 Hadoop 集群；后续支持虚拟机部署；远期通过 Kubernetes / Operator 管理云原生数据组件。
+平台第一阶段基于物理机和 Ambari 管理传统 Hadoop 集群；后续支持虚拟机部署；远期通过 Kubernetes / Operator 管理云原生数据组件。Ambari 作为传统大数据平台长期管理面，不被简单替代，而是在云原生阶段与 Kubernetes 形成混合管理面。
 
 ### 4.5 交付闭环
 
 每个阶段都必须形成完整闭环：
 
 ```text
-设计文档 -> 版本矩阵 -> 部署方案 -> 配置模板 -> 验证方案 -> 运维手册
+设计文档 -> 版本矩阵 -> Bigtop 构建 -> 包仓库 -> 部署方案 -> 配置模板 -> 验证方案 -> 运维手册
 ```
 
 ## 5. 第一阶段范围
 
-第一阶段聚焦传统数仓底座，目标是在物理机环境中形成可安装、可管理、可验证的大数据平台基础版本。
+第一阶段聚焦传统数仓物理机底座，目标是在物理机环境中形成可安装、可管理、可验证、支持 HA 生产拓扑的大数据平台基础版本。
 
 ### 5.1 第一阶段核心组件
 
+- Ambari
+- Bigtop 真实构建体系
+- ZooKeeper
 - HDFS
 - YARN
-- Hive
+- Hive Metastore
+- HiveServer2
 - Spark
-- ZooKeeper
-- Ambari
-- Bigtop 参考构建体系
+- HBase
 
 ### 5.2 第一阶段暂缓组件
 
@@ -160,6 +168,7 @@ Kerberos + Ranger + Knox + Atlas
 
 - 企业内部 Hadoop 集群建设
 - 离线数仓底座交付
+- HBase 宽表能力交付
 - 实时数据湖平台规划
 - 私有化大数据平台交付
 - 多组件大数据平台方案沉淀
@@ -172,7 +181,7 @@ Kerberos + Ranger + Knox + Atlas
 - 立即实现完整商业化管理控制台
 - 立即实现所有大数据组件的一键安装
 - 立即实现全量 Kubernetes 云原生架构
-- 立即维护完整自定义大数据发行版
+- 立即维护完整自定义 Ambari Stack 生产实现
 - 立即覆盖所有安全治理和元数据治理能力
 
 这些能力应进入后续路线图，避免第一阶段过重。
@@ -182,7 +191,7 @@ Kerberos + Ranger + Knox + Atlas
 平台最终应形成如下能力：
 
 ```text
-可构建：通过 Bigtop 或等价体系构建组件包
+可构建：通过 Bigtop 构建组件包
 可安装：通过 Ambari / Blueprint / 自动化流程安装集群
 可组合：按场景选择数仓、数据湖、实时、治理组件
 可管理：统一管理服务、配置、状态、告警和生命周期
