@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<metainfo>
+  <versions>
+    <active>true</active>
+  </versions>
+  <extends>common-services</extends>
+  <minJdk>1.8</minJdk>
+  <maxJdk>11</maxJdk>
+</metainfo>
