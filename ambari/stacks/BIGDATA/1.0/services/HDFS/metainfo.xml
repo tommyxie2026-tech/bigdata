@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<metainfo>
+  <schemaVersion>2.0</schemaVersion>
+  <services>
+    <service>
+      <name>HDFS</name>
+      <displayName>HDFS</displayName>
+      <comment>Distributed file system for the Bigdata stack.</comment>
+      <version>3.x</version>
+      <components>
+        <component>
+          <name>NAMENODE</name>
+          <displayName>NameNode</displayName>
+          <category>MASTER</category>
+          <cardinality>1+</cardinality>
+          <commandScript>
+            <script>scripts/namenode.py</script>
+            <scriptType>PYTHON</scriptType>
+            <timeout>600</timeout>
+          </commandScript>
+        </component>
+        <component>
+          <name>DATANODE</name>
+          <displayName>DataNode</displayName>
+          <category>SLAVE</category>
+          <cardinality>1+</cardinality>
+          <commandScript>
+            <script>scripts/datanode.py</script>
+            <scriptType>PYTHON</scriptType>
+            <timeout>600</timeout>
+          </commandScript>
+        </component>
+        <component>
+          <name>HDFS_CLIENT</name>
+          <displayName>HDFS Client</displayName>
+          <category>CLIENT</category>
+          <cardinality>0+</cardinality>
+        </component>
+      </components>
+      <commandScript>
+        <script>scripts/service_check.py</script>
+        <scriptType>PYTHON</scriptType>
+        <timeout>300</timeout>
+      </commandScript>
+      <configuration-dependencies>
+        <config-type>core-site</config-type>
+        <config-type>hdfs-site</config-type>
+      </configuration-dependencies>
+    </service>
+  </services>
+</metainfo>
