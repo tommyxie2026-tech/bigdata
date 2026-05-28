@@ -10,11 +10,11 @@
 
 | 阶段 | 部署形态 | 主要目标 | 管理方式 |
 |---|---|---|---|
-| Phase 1 | 物理机 | 传统数仓底座稳定交付 | Ambari |
+| Phase 1 | 物理机 | 传统数仓底座、HA 生产拓扑、私有化交付 | Ambari |
 | Phase 4 | 虚拟机 | 多环境复制、资源隔离、交付标准化 | Ambari + 自动化初始化 |
-| Phase 5 | 容器平台 | 云原生实时数据湖与弹性计算 | Kubernetes / Operator |
+| Phase 5 | 容器平台 | 云原生实时数据湖与弹性计算 | Kubernetes / Operator + Ambari 协同 |
 
-第一阶段优先支持物理机部署，后续扩展虚拟机和容器平台。
+第一阶段优先支持物理机部署，并要求完成 HA 生产拓扑设计与验证目标。
 
 ## 3. 第一阶段：物理机部署模型
 
@@ -28,13 +28,13 @@
 
 | 节点 | 角色 | 组件 |
 |---|---|---|
-| master-01 | 管理与主控 | Ambari Server、NameNode、ResourceManager、Hive Metastore、HiveServer2、Spark History Server、ZooKeeper |
-| worker-01 | 数据与计算 | DataNode、NodeManager |
-| worker-02 | 数据与计算 | DataNode、NodeManager |
+| master-01 | 管理与主控 | Ambari Server、NameNode、ResourceManager、Hive Metastore、HiveServer2、Spark History Server、HBase Master、ZooKeeper |
+| worker-01 | 数据与计算 | DataNode、NodeManager、HBase RegionServer |
+| worker-02 | 数据与计算 | DataNode、NodeManager、HBase RegionServer |
 
-### 3.2 生产推荐集群
+### 3.2 第一阶段 HA 生产推荐集群
 
-用于第一版生产化设计参考。
+用于第一阶段生产化设计基线。
 
 ```text
 3 Master + N Worker + M Gateway
@@ -42,24 +42,27 @@
 
 | 节点类型 | 数量 | 主要职责 |
 |---|---:|---|
-| Master | 3 | 管理服务、主控服务、元数据服务、高可用组件 |
-| Worker | N | 数据存储、计算执行、任务运行 |
+| Master | 3 | Ambari、ZooKeeper、NameNode HA、ResourceManager HA、Hive Metastore、HiveServer2、HBase Master |
+| Worker | N | HDFS DataNode、YARN NodeManager、HBase RegionServer、计算执行 |
 | Gateway | M | 客户端接入、作业提交、SQL 访问、运维入口 |
 
-### 3.3 生产角色分布建议
+### 3.3 HA 角色分布建议
 
 | 组件 | Master | Worker | Gateway |
 |---|---|---|---|
-| Ambari Server | 是 | 否 | 否 |
+| Ambari Server | 是，主实例 | 否 | 否 |
 | Ambari Agent | 是 | 是 | 是 |
-| ZooKeeper | 是 | 可选 | 否 |
-| HDFS NameNode | 是 | 否 | 否 |
+| ZooKeeper | 是，3 节点 | 否 | 否 |
+| HDFS NameNode | 是，Active/Standby | 否 | 否 |
+| HDFS JournalNode | 是，3 节点 | 否 | 否 |
 | HDFS DataNode | 否 | 是 | 否 |
-| YARN ResourceManager | 是 | 否 | 否 |
+| YARN ResourceManager | 是，Active/Standby | 否 | 否 |
 | YARN NodeManager | 否 | 是 | 否 |
-| Hive Metastore | 是 | 否 | 可选 |
-| HiveServer2 | 是/网关 | 否 | 是 |
+| Hive Metastore | 是，多实例 | 否 | 可选 |
+| HiveServer2 | 是/网关，多实例 | 否 | 是 |
 | Spark History Server | 是 | 否 | 可选 |
+| HBase Master | 是，Active/Standby | 否 | 否 |
+| HBase RegionServer | 否 | 是 | 否 |
 | Client 工具 | 可选 | 可选 | 是 |
 
 ## 4. 网络设计
@@ -69,7 +72,7 @@
 建议逻辑上区分：
 
 - 管理网络：Ambari、SSH、监控、运维访问
-- 数据网络：HDFS 数据传输、Shuffle、服务间通信
+- 数据网络：HDFS 数据传输、Shuffle、HBase Region 访问、服务间通信
 - 访问网络：SQL、BI、API、任务提交入口
 
 第一阶段可以共用物理网络，但文档和配置上应保留分区设计。
@@ -81,6 +84,7 @@
 - 节点间必要端口互通
 - 管理节点可访问所有 Agent 节点
 - Gateway 节点可访问集群服务入口
+- Master 节点之间网络稳定，满足 HA 组件心跳和选主需求
 
 ## 5. 存储设计
 
@@ -101,16 +105,26 @@ Worker 节点承载 HDFS DataNode。生产环境建议：
 /data3/hdfs/data
 ```
 
-### 5.2 元数据存储
+### 5.2 HBase 存储
 
-NameNode、Hive Metastore、Ambari Server 等元数据服务应独立规划磁盘与备份策略。
+HBase 基于 HDFS 存储数据，但需要额外关注：
 
-### 5.3 实时数据湖存储演进
+- RegionServer 数据访问延迟
+- HDFS 与 HBase Region 分布
+- HBase WAL 写入性能
+- ZooKeeper 稳定性
+- Region 热点与 split 策略
+
+### 5.3 元数据存储
+
+NameNode、Hive Metastore、Ambari Server、HBase Master 等元数据服务应独立规划磁盘与备份策略。
+
+### 5.4 实时数据湖存储演进
 
 实时数据湖阶段需要同时支持：
 
 - HDFS
-- 对象存储
+- S3 兼容对象存储
 - 湖仓表格式数据目录
 - Checkpoint / Savepoint 存储
 
@@ -132,10 +146,13 @@ NameNode、Hive Metastore、Ambari Server 等元数据服务应独立规划磁�
   -> OS 初始化
   -> 网络与主机名配置
   -> 时间同步
+  -> Bigtop 构建组件包
+  -> 发布内部 yum/apt 仓库
   -> Ambari Server / Agent 安装
   -> Repository 配置
   -> Blueprint / Install Wizard
   -> 服务安装与启动
+  -> HA 配置与验证
   -> Service Check
   -> Smoke Test
   -> 运维验收
@@ -143,18 +160,29 @@ NameNode、Hive Metastore、Ambari Server 等元数据服务应独立规划磁�
 
 ## 8. 与 Ambari 的关系
 
-第一阶段由 Ambari 承担部署管理面职责：
+第一阶段由 Ambari 承担传统大数据管理面职责：
 
 - 主机注册
 - 组件安装
 - 配置分发
 - 服务启停
+- HA 配置管理
 - 服务检查
 - 告警与状态展示
 
+Ambari 不是短期过渡工具，而是传统 Hadoop / 物理机 / 虚拟机部署形态下的长期管理面。
+
 ## 9. 与 Bigtop 的关系
 
-Bigtop 或等价构建体系用于提供组件包、版本矩阵和仓库来源。Ambari 通过 Repository 配置消费这些包。
+Bigtop 作为真实构建体系，用于提供组件包、版本矩阵和仓库来源。Ambari 通过 Repository 配置消费这些包。
+
+第一阶段 Bigtop 需要覆盖：
+
+- Hadoop
+- Hive
+- Spark
+- HBase
+- ZooKeeper 相关依赖
 
 ## 10. 后续演进
 
@@ -181,6 +209,7 @@ Kubernetes 管理实时计算与云原生服务
 - [ ] 补充物理机规格推荐
 - [ ] 补充端口清单
 - [ ] 补充磁盘容量规划模板
-- [ ] 补充 HA 部署拓扑
+- [ ] 补充 HA 部署拓扑细节
+- [ ] 补充 HBase 部署与运维设计
 - [ ] 补充虚拟机部署设计
 - [ ] 补充容器平台部署设计
