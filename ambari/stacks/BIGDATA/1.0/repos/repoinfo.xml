@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<reposinfo>
+  <os family="redhat8">
+    <repo>
+      <baseurl>http://repo.example.com/bigdata/bigtop/rocky8/$basearch</baseurl>
+      <repoid>BIGDATA-1.0</repoid>
+      <reponame>Bigdata Stack 1.0 Repository</reponame>
+      <unique>true</unique>
+    </repo>
+    <repo>
+      <baseurl>http://repo.example.com/bigdata/bigtop/rocky8/noarch</baseurl>
+      <repoid>BIGDATA-1.0-noarch</repoid>
+      <reponame>Bigdata Stack 1.0 Noarch Repository</reponame>
+      <unique>true</unique>
+    </repo>
+  </os>
+</reposinfo>
