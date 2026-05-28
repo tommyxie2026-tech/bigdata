@@ -65,12 +65,18 @@
 | Hive Standalone Metastore | 4.2.0 | 3.0.0 | 随 Hive 4.2.0 优先验证；3.0.0 作为兼容回退评估 | 已确认候选，不冻结，待 Spark SQL 访问 Metastore 兼容性验证 |
 | Tez | 0.10.5 | 0.10.4 / 0.10.3 | 以 0.10.5 作为优先候选，随 Hive 4.2.0 验证；必要时回退到 0.10.4 / 0.10.3 | 已确认候选，不冻结，待 Hive 执行引擎适配验证 |
 
+### 4.4 批处理与离线 SQL 引擎
+
+| 组件 | Phase 1 优先候选 | 兼容/回退候选 | 升级策略 | 状态 |
+|---|---:|---:|---|---|
+| Spark | 3.5.8 | 3.4.x | Spark 3.5.x 作为 Phase 1 稳定主线；Spark 4.1.x 作为未来升级评估，面向后续 Spark on Kubernetes 和新生态兼容 | 已确认候选，不冻结，待 Bigtop 3.5.0 构建、Ambari 3.0.0 管理、Hadoop 3.5.0、JDK 8、Hive Metastore 4.2.0 兼容性验证 |
+| Spark Upgrade Evaluation | 4.1.x | N/A | 作为未来升级评估，不进入 Phase 1 主线 | 已确认升级评估项 |
+
 ## 5. 待确认版本组
 
 后续按依赖顺序逐组确认：
 
-1. Spark
-2. HBase
+1. HBase
 
 ## 6. 版本矩阵
 
@@ -84,7 +90,8 @@
 | Hive | 4.2.0 | 4.1.x / 3.x 兼容线待评估 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 社区最新稳定优先候选，不冻结；需验证 Bigtop 3.5.0、Ambari 3.0.0、Hadoop 3.5.0、JDK 8 兼容性 |
 | Hive Standalone Metastore | 4.2.0 | 3.0.0 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 随 Hive 4.2.0 优先验证；需验证 Spark SQL 访问 Metastore 兼容性 |
 | Tez | 0.10.5 | 0.10.4 / 0.10.3 | 必须验证 | 必须验证 | 评估 | 是/可选 | 是/可选 | Hive 执行引擎候选，随 Hive 4.2.0 验证 |
-| Spark | TBD | TBD | 必须验证 | 必须验证 | 评估 | 是 | 是 | 批处理 |
+| Spark | 3.5.8 | 3.4.x | 必须验证 | 必须验证 | 评估 | 是 | 是 | Phase 1 优先候选，不冻结；需验证 Hadoop 3.5.0、Hive Metastore 4.2.0、JDK 8、Ambari/Bigtop 适配 |
+| Spark Upgrade Evaluation | 4.1.x | N/A | 评估 | 可能不适用 | 评估 | 评估 | 评估 | 未来升级评估，不进入 Phase 1 主线 |
 | HBase | TBD | TBD | 必须验证 | 必须验证 | 评估 | 是 | 是 | 宽表存储 |
 
 ## 7. 兼容性评估维度
@@ -155,6 +162,17 @@ Hive 4.2.0、Hive Standalone Metastore 4.2.0 与 Tez 0.10.5 作为社区最新�
 - Spark SQL 访问 Hive Standalone Metastore 4.2.0 是否兼容
 - Tez 0.10.5 是否适合作为 Hive 执行引擎
 
+### 7.7 Spark 特别验证项
+
+Spark 3.5.8 作为 Phase 1 优先候选，但不立即冻结，必须额外验证：
+
+- Bigtop 3.5.0 是否支持 Spark 3.5.8 构建
+- Ambari 3.0.0 是否能安装、配置、启停和检查 Spark 3.5.8
+- Spark on YARN 是否兼容 Hadoop 3.5.0
+- Spark SQL 是否兼容 Hive Standalone Metastore 4.2.0
+- Spark 在 JDK 8 下是否稳定运行
+- Spark 4.1.x 作为未来升级评估时，对 JDK、Hadoop、Hive Metastore 和 Kubernetes 的要求
+
 ## 8. 版本确认流程
 
 ```text
@@ -197,7 +215,7 @@ Hive 4.2.0、Hive Standalone Metastore 4.2.0 与 Tez 0.10.5 作为社区最新�
 - [x] 确认 Bigtop 候选版本或分支
 - [x] 确认 Hadoop / ZooKeeper 候选版本，状态为待验证不冻结
 - [x] 确认 Hive / Tez 候选版本，状态为待验证不冻结
-- [ ] 确认 Spark 候选版本
+- [x] 确认 Spark 候选版本，状态为待验证不冻结
 - [ ] 确认 HBase 候选版本
 - [ ] 补充 JDK 17 兼容性评估结果
 - [ ] 冻结 Phase 1 版本矩阵
