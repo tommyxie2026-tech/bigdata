@@ -1,0 +1,5 @@
+Types: deb
+URIs: http://${REPO_HOST}/bigdata/bigtop/${OS_TARGET}
+Suites: ./
+Components:
+Signed-By: /usr/share/keyrings/bigdata-bigtop.gpg

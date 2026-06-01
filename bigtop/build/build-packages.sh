@@ -6,7 +6,8 @@ set -euo pipefail
 
 BIGTOP_HOME="${BIGTOP_HOME:-/opt/bigtop}"
 COMPONENTS="${COMPONENTS:-hadoop hive spark}"
-OS_TARGET="${OS_TARGET:-rocky8}"
+OS_TARGET="${OS_TARGET:-ubuntu22}"
+PACKAGE_FORMAT="${PACKAGE_FORMAT:-deb}"
 OUTPUT_DIR="${OUTPUT_DIR:-$(pwd)/output}"
 BIGTOP_GRADLE_TASK_TEMPLATE="${BIGTOP_GRADLE_TASK_TEMPLATE:-}"
 
@@ -18,6 +19,7 @@ Bigtop build plan
 BIGTOP_HOME: ${BIGTOP_HOME}
 COMPONENTS : ${COMPONENTS}
 OS_TARGET  : ${OS_TARGET}
+FORMAT     : ${PACKAGE_FORMAT}
 OUTPUT_DIR : ${OUTPUT_DIR}
 EOF
 
@@ -35,7 +37,7 @@ Set BIGTOP_GRADLE_TASK_TEMPLATE to a real Gradle task template before running.
 The token {component} will be replaced for each component.
 
 Example:
-  BIGTOP_GRADLE_TASK_TEMPLATE='{component}-rpm' $0
+  BIGTOP_GRADLE_TASK_TEMPLATE='{component}-${PACKAGE_FORMAT}' $0
 EOF
   exit 2
 fi
