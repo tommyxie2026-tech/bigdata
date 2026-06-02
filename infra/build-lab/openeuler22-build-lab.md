@@ -95,6 +95,15 @@ dnf install -y \
   python3-pip
 ```
 
+Issue #20 还要求确认以下兼容工具：
+
+```bash
+dnf install -y \
+  systemd \
+  chkconfig \
+  initscripts
+```
+
 实际依赖以 Bigtop toolchain 运行结果为准。
 
 ## 6. Directory Layout
@@ -131,6 +140,32 @@ export PATH=$JAVA_HOME/bin:$PATH
 ```
 
 ## 8. Initial Build Workflow
+
+### Step 0: Prepare Workspace And Run Preflight
+
+```bash
+export BIGDATA_RC1_HOME=/opt/bigdata-rc1
+export BIGTOP_JDK=8
+export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk
+export PATH=$JAVA_HOME/bin:$PATH
+
+infra/build-lab/openeuler22-build-lab-preflight.sh \
+  validation/bigtop/openeuler22-toolchain-preflight.md
+```
+
+The preflight script creates the standard workspace layout and records OS, kernel, DNF/RPM, JDK8, build tools, repository tools, service compatibility, and network or mirror access evidence.
+
+If any package name differs on the selected openEuler22 minor release, record the mapping in:
+
+```text
+validation/bigtop/openeuler22-package-name-mapping.md
+```
+
+Record the package installation command output in:
+
+```text
+validation/bigtop/openeuler22-toolchain-install-log.md
+```
 
 ### Step 1: Clone Bigtop
 
@@ -213,11 +248,26 @@ TASK-301 is complete when:
 
 ```yaml
 build_host_ready: PASS
+os_identity_recorded: PASS
 base_dependencies_installed: PASS
-bigtop_source_cloned: PASS
-rc1_adaptation_branch_created: PASS
-first_component_build_started: PASS
-log_archive_path_ready: PASS
+jdk8_runtime_available: PASS
+jdk8_compiler_available: PASS
+dnf_available: PASS
+rpm_available: PASS
+rpmbuild_available: PASS
+createrepo_c_available: PASS
+workspace_created: PASS
+network_or_mirror_access_verified: PASS
+```
+
+The following items are intentionally outside Issue #20 and belong to downstream M2 issues:
+
+```yaml
+bigtop_source_cloned: downstream
+rc1_adaptation_branch_created: downstream
+first_component_build_started: downstream
+component_rpm_built: downstream
+rpm_repository_created: downstream
 ```
 
 ## 11. Risks
