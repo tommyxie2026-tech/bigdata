@@ -5,7 +5,7 @@ set -euo pipefail
 
 PACKAGE_DIR="${PACKAGE_DIR:-$(pwd)/packages}"
 REPO_DIR="${REPO_DIR:-$(pwd)/repo}"
-PACKAGE_FORMAT="${PACKAGE_FORMAT:-deb}"
+PACKAGE_FORMAT="${PACKAGE_FORMAT:-rpm}"
 
 if [[ ! -d "${PACKAGE_DIR}" ]]; then
   echo "Package directory not found: ${PACKAGE_DIR}" >&2
