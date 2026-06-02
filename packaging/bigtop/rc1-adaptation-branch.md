@@ -40,16 +40,22 @@ runtime: JDK8
 在 Build Lab 中执行：
 
 ```bash
-cd /opt/bigdata-rc1/src/bigtop
+export BIGDATA_RC1_HOME=/opt/bigdata-rc1
+export BIGTOP_BASE_REF=<bigtop-3.5.0-tag-or-commit>
 
-git checkout -b bigdata-1.0-rc1-openeuler22-rpm
+packaging/bigtop/create-rc1-adaptation-branch.sh \
+  validation/bigtop/rc1-adaptation-branch.md
 ```
 
-如果基于指定 release tag：
+该脚本会完成：
 
-```bash
-git checkout <bigtop-3.5.0-tag-or-commit>
-git checkout -b bigdata-1.0-rc1-openeuler22-rpm
+```text
+clone apache/bigtop if needed
+fetch tags
+checkout BIGTOP_BASE_REF if provided
+verify clean working tree before patch
+create or checkout bigdata-1.0-rc1-openeuler22-rpm
+write validation/bigtop/rc1-adaptation-branch.md
 ```
 
 实际 base commit 必须记录到 evidence。
