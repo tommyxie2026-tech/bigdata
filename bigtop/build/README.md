@@ -10,11 +10,12 @@
 
 | 项目 | 值 |
 |---|---|
-| OS | Ubuntu 22.04 |
+| RC1 主线 OS | openEuler22 |
 | JDK | JDK 8 |
 | Bigtop | 3.5.0 |
-| 包格式 | DEB |
-| 仓库类型 | apt |
+| RC1 主线包格式 | RPM |
+| RC1 主线仓库类型 | DNF / Yum-style repo |
+| 兼容评估线 | Ubuntu 22.04 + DEB + apt |
 
 ## 3. 构建范围
 
