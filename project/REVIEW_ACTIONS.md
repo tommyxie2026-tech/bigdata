@@ -41,7 +41,7 @@ Exit Criteria satisfied
 | R-001 | P0 | 统一 RC1 为 openEuler22 + RPM/DNF 唯一事实基线 | IN_PROGRESS | Before M2 execution | TBD |
 | R-002 | P0 | 基于 Bigtop 3.6.0 创建真实 RC1 adaptation branch | OPEN | M2-Prep | `validation/bigtop/rc1-adaptation-branch.md` |
 | R-003 | P0 | 统一 Evidence lifecycle/schema，区分 placeholder 与真实 evidence | OPEN | M2-Wave1 | TBD |
-| R-004 | P1 | 建立 Repository / Build / Release CI 分层 | IN_PROGRESS | M2 | `docs/ci/github-actions-ci-architecture.md`, `.github/workflows/ci-pr.yml`, `.github/workflows/ci-baseline.yml` |
+| R-004 | P1 | 建立 Repository / Build / Test / Release CI 分层 | READY_FOR_REVIEW | M2 | `docs/ci/github-actions-ci-architecture.md`, `docs/ci/component-cicd-release-plan.md`, `.github/workflows/build-component.yml`, `.github/workflows/test-ci.yml`, `.github/workflows/release-ci.yml` |
 | R-005 | P2 | 重写 README 对齐 Reference Distribution 定位 | OPEN | Before RC1 public review | TBD |
 | R-006 | P2 | 2.0/3.0 收敛到 backlog，不阻塞 RC1 | OPEN | Immediate | Roadmap update |
 | R-007 | P1 | 按 Wave 0~5 执行组件构建适配 | OPEN | M2/M3 | Component evidence |
@@ -49,7 +49,8 @@ Exit Criteria satisfied
 | R-009 | P2 | 用 Evidence Coverage 替代主观项目百分比 | OPEN | M2+ | Program Board |
 | R-010 | P0 | 在 BOM Delta Review 后跑通选定 ZooKeeper 版本 Build→RPM→Repo→DNF→Runtime→Smoke | OPEN | M2-Wave1 | ZooKeeper build/install/runtime evidence |
 | R-011 | P0 | 完成 Bigtop 3.6.0 upstream BOM 与 BIGDATA target BOM 差异评审 | OPEN | Before R-010 | `docs/adr/ADR-018-ambari-bigtop-stable-baseline.md` |
-| R-012 | P1 | 建立 GitHub Actions 分层 CI：L0 GitHub-hosted，L1-L4 trusted environments | IN_PROGRESS | M2 | `docs/ci/github-actions-ci-architecture.md` |
+| R-012 | P1 | 建立 GitHub Actions hosted-first 分层 CI | READY_FOR_REVIEW | M2 | `docs/ci/github-actions-ci-architecture.md` |
+| R-013 | P1 | 建立 Ambari 3.0.0 ↔ Bigtop 3.6.0 组件兼容性 Gate | OPEN | Before full RC repo | `docs/ci/component-cicd-release-plan.md` |
 
 ## 4. Execution Order
 
@@ -143,15 +144,15 @@ CI-1:
   first_target: zookeeper-3.8.4-on-bigtop-3.6.0
 
 CI-2:
-  rpm_repo_validation: NOT_STARTED
-  runtime_smoke: NOT_STARTED
+  rpm_repo_validation: IMPLEMENTED_IN_TEST_CI
+  runtime_smoke: IMPLEMENTED_IN_TEST_CI
 
 CI-3:
   multi_component_waves: NOT_STARTED
 
 CI-4:
   cluster_ha_validation: NOT_STARTED
-  release_gate: NOT_STARTED
+  release_gate: IMPLEMENTED_AS_RC_BUNDLE
 ```
 
 
@@ -179,3 +180,25 @@ outputs:
 ```
 
 该 workflow 默认使用 GitHub-hosted runner。内部 PR 可执行组件构建；fork PR 不执行重型组件构建。self-hosted 仅作为资源不足或 systemd/HA 验证的 fallback。
+
+
+## 10. Component CI/CD Expansion
+
+```yaml
+plan: docs/ci/component-cicd-release-plan.md
+waves:
+  wave1: zookeeper-3.8.4
+  wave2: hadoop-3.4.3
+  wave3:
+    - tez-0.10.5
+    - hive-4.0.1
+  wave4: spark-3.5.8
+  wave5: hbase-2.6.5
+ambari:
+  version: 3.0.0
+  embedded_bigtop_stacks:
+    - 3.2.0
+    - 3.3.0
+  target_bigtop: 3.6.0
+  compatibility_gate: REQUIRED
+```
