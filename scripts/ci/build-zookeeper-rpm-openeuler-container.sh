@@ -16,7 +16,7 @@ cat /etc/os-release
 grep -qi "openEuler" /etc/os-release
 
 echo "== install build toolchain =="
-dnf -y install   git curl wget tar unzip zip sudo   make gcc gcc-c++   maven python3   autoconf automake libtool patch cppunit-devel   createrepo_c rpm-build rpmdevtools   java-1.8.0-openjdk-devel   which findutils diffutils procps-ng   ca-certificates
+dnf -y install   git curl wget tar unzip zip sudo hostname   make gcc gcc-c++   maven python3   autoconf automake libtool patch cppunit-devel   createrepo_c rpm-build rpmdevtools   java-1.8.0-openjdk-devel   which findutils diffutils procps-ng   ca-certificates
 
 export JAVA_HOME
 JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
