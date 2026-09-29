@@ -39,19 +39,25 @@ GitHub Actions 适合作为 BIGDATA 的 CI Orchestrator，但不应把所有任�
 ```text
 GitHub Actions
     |
-    +-- L0 GitHub-hosted: fast / untrusted-safe
+    +-- L0 GitHub-hosted: lint / policy
     |
-    +-- L1-L3 trusted self-hosted openEuler build/test runners
+    +-- L1 GitHub-hosted Ubuntu VM + official openEuler container: RPM build
     |
-    +-- L4 dedicated cluster validation environment
+    +-- L2 GitHub-hosted Ubuntu VM + clean openEuler container: repo / DNF install
+    |
+    +-- L3a GitHub-hosted container: process-level smoke
+    |
+    +-- L3b controlled VM: systemd/service integration
+    |
+    +-- L4 dedicated cluster: multi-node / HA
 ```
 
 核心原则：
 
 ```text
 PR checks are cheap and isolated.
-Heavy builds run only for trusted code.
-Runtime/HA tests run only on controlled environments.
+Heavy component builds prefer GitHub-hosted runners when resource limits allow.
+Only host/service integration and multi-node HA require controlled external environments.
 Every heavy run produces auditable evidence.
 ```
 
@@ -120,16 +126,24 @@ required for every PR
 
 ### L1 — Bigtop Compile CI
 
-Runner labels:
+Default runner:
 
 ```yaml
-runs-on:
-  - self-hosted
-  - linux
-  - openeuler22
-  - x64
-  - bigtop-build
+runs-on: ubuntu-latest
+build_environment: openeuler/openeuler:22.03-lts-sp4
 ```
+
+Implementation model:
+
+```text
+GitHub-hosted Ubuntu VM
+  -> Docker
+  -> official openEuler 22.03 LTS SP4 container
+  -> Bigtop build
+  -> RPM artifact
+```
+
+Fallback to self-hosted only when a component exceeds GitHub-hosted CPU/RAM/disk/time limits.
 
 Trigger:
 
@@ -193,12 +207,13 @@ dnf install
 
 > 安装测试不能污染持久化 build runner。
 
-建议使用：
+默认使用：
 
 ```text
-disposable openEuler VM
-or ephemeral self-hosted runner
+fresh openEuler container on GitHub-hosted ubuntu-latest
 ```
+
+仅当 RPM 安装验证需要真实 systemd/kernel/host integration 时切换到 disposable openEuler VM。
 
 输出：
 
@@ -208,7 +223,7 @@ or ephemeral self-hosted runner
 - RPM manifest
 - dependency report
 
-### L3 — Runtime Smoke CI
+### L3a — Process Runtime Smoke CI
 
 Input:
 
@@ -216,15 +231,26 @@ Input:
 validated L2 repository
 ```
 
-Wave 1：
+Wave 1 在 GitHub-hosted openEuler container 中：
 
 ```text
 install ZooKeeper RPM
-  -> systemd start
-  -> systemctl status
+  -> launch ZooKeeper process directly
   -> zkCli basic connectivity
-  -> stop/restart
+  -> stop/restart process
   -> PASS/FAIL evidence
+```
+
+### L3b — Host Service Integration CI
+
+以下内容保留在 controlled openEuler VM：
+
+```text
+systemd unit install
+systemctl start/stop/restart
+boot enablement
+service user / permissions
+host filesystem integration
 ```
 
 后续：
@@ -474,14 +500,14 @@ Release/HA job 不允许自动 cancel。
 建议：
 
 ```text
-GitHub-hosted
+GitHub-hosted ubuntu-latest
   -> L0
+  -> L1 through openEuler container
+  -> L2 through clean openEuler container
+  -> L3a process smoke
 
-openEuler Build Runner
-  -> L1 only
-
-Disposable openEuler Test Runner
-  -> L2 / L3
+Disposable openEuler VM
+  -> L3b systemd/service validation
 
 Validation Cluster Controller
   -> L4
@@ -503,9 +529,10 @@ ci-baseline.yml
 ### CI-1
 
 ```text
-self-hosted openEuler runner
-build-component.yml
-ZooKeeper Wave 1
+ubuntu-latest
+  -> official openEuler 22.03 SP4 container
+  -> build-component.yml
+  -> ZooKeeper Wave 1
 ```
 
 ### CI-2
@@ -535,12 +562,47 @@ release-gate.yml
 decision: GO
 architecture: layered-github-actions
 public_pr_runner: github-hosted-only
-heavy_build_runner: trusted-self-hosted-openeuler
+heavy_build_runner: github-hosted-openeuler-container-first
 cluster_validation: dedicated-environment
 initial_scope:
   - ci-pr
   - ci-baseline
 next_scope:
-  - self-hosted-runner
   - zookeeper-wave1
+  - hosted-rpm-repo-install
+  - hosted-process-smoke
 ```
+
+
+## 16. Hosted Runner Capacity Decision
+
+GitHub standard hosted Linux runner is the default CI execution environment for BIGDATA-1.0 iterative validation.
+
+Current public-repository standard runner capacity is sufficient for initial single-component waves:
+
+```yaml
+runner: ubuntu-latest
+cpu: 4
+memory: 16GB
+disk: 14GB
+architecture: x64
+```
+
+Policy:
+
+```text
+ZooKeeper: hosted first
+Hadoop: hosted first, measure disk/time
+Hive/Tez: hosted first, measure disk/time
+Spark: hosted first, measure disk/time
+HBase: hosted first, measure disk/time
+full-stack parallel build: do not assume hosted capacity
+```
+
+Escalation criteria to larger/self-hosted runners:
+
+- disk pressure threatens build correctness
+- build repeatedly times out
+- memory OOM occurs
+- host kernel/systemd behavior must be validated
+- multi-node topology is required
