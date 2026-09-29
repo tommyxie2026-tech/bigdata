@@ -76,7 +76,7 @@ os: openEuler22
 package: rpm
 manager: dnf
 runtime: JDK8
-bigtop: 3.5.0
+bigtop: 3.5.0  # repository baseline before 2026-09-30 refresh
 ```
 
 主要受影响文档包括：
@@ -97,7 +97,7 @@ BIGDATA-1.0-RC1:
   package_format: RPM
   package_manager: DNF
   runtime: JDK8
-  packaging_engine: Apache Bigtop 3.5.0
+  packaging_engine: Apache Bigtop 3.6.0
 ```
 
 Ubuntu/DEB 降为 compatibility track，不得继续作为 RC1 主线。
@@ -132,7 +132,7 @@ branch_created: UNKNOWN
 
 **Required Action**
 
-在真实 Bigtop 3.5.0 checkout 上执行：
+在真实 Bigtop 3.6.0 stable checkout 上执行：
 
 ```text
 create adaptation branch
@@ -424,7 +424,8 @@ Program Board 的状态以 Gate/Evidence 自动或半自动计算，而非手工
 
 ```text
 openEuler Build Lab
-  -> Bigtop 3.5 checkout
+  -> Bigtop 3.6.0 checkout
+  -> upstream BOM delta review
   -> RC1 adaptation branch
   -> BOM Patch
   -> ZooKeeper 3.9.5 build
@@ -458,9 +459,10 @@ M2-WAVE1:
 ### P0
 
 1. R-001 RC1 基线统一
-2. R-002 真实 Bigtop adaptation branch
-3. R-010 M2 Wave 1 主线
-4. R-003 Evidence 状态治理
+2. R-011 Bigtop 3.6.0 BOM Delta Review
+3. R-002 真实 Bigtop adaptation branch
+4. R-010 M2 Wave 1 主线
+5. R-003 Evidence 状态治理
 
 ### P1
 
@@ -487,3 +489,25 @@ primary_goal: Build -> RPM -> Repo -> DNF -> Runtime -> Evidence
 当前不建议继续扩大架构范围。
 
 后续所有修复与实施应在 `project/REVIEW_ACTIONS.md` 中逐项跟踪关闭。
+
+
+## 6. Stable Version Refresh — 2026-09-30
+
+官方稳定版本重新核对结果：
+
+```yaml
+Apache Ambari: 3.0.0
+Apache Bigtop: 3.6.0
+```
+
+决策：
+
+- Ambari 3.0.0 保持不变。
+- Bigtop 基线由 3.5.0 更新到 3.6.0。
+- 新增 R-011，先比较 Bigtop 3.6.0 upstream BOM 与 BIGDATA 自定义目标 BOM。
+- 后续 adaptation branch 必须基于 Bigtop 3.6.0，而不是 3.5.0。
+- ZooKeeper Wave 1 的最终版本在 BOM Delta Review 后冻结。
+
+关联 ADR：
+
+- `docs/adr/ADR-018-ambari-bigtop-stable-baseline.md`
