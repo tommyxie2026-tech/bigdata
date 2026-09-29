@@ -52,7 +52,7 @@ install_pkgs=("${base_pkg}")
 {
   echo "Installing packages from repo:"
   printf '  %s\n' "${install_pkgs[@]}"
-  dnf -y --repo=bigdata-ci install "${install_pkgs[@]}"
+  dnf -y --enablerepo=bigdata-ci install "${install_pkgs[@]}"
 } 2>&1 | tee "${EVIDENCE_ROOT}/dnf-install.log"
 
 rpm -qa | grep -i zookeeper | sort | tee "${EVIDENCE_ROOT}/installed-packages.txt"
