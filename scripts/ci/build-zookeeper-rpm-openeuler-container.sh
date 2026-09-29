@@ -92,7 +92,7 @@ chkconfig --add %{svc_zookeeper}
 ),
 (
 """%preun server
-if [ $1 = 0 ]; then
+if [ $1 = 0 ] ; then
 \tservice %{svc_zookeeper} stop > /dev/null 2>&1
 \tchkconfig --del %{svc_zookeeper}
 fi
@@ -101,7 +101,7 @@ fi
 %if 0%{?openEuler}
 %systemd_preun zookeeper-server.service
 %else
-if [ $1 = 0 ]; then
+if [ $1 = 0 ] ; then
 \tservice %{svc_zookeeper} stop > /dev/null 2>&1
 \tchkconfig --del %{svc_zookeeper}
 fi
