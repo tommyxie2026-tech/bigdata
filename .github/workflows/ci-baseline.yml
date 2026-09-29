@@ -1,0 +1,90 @@
+name: CI Baseline
+
+on:
+  pull_request:
+    paths:
+      - "docs/version-matrix.md"
+      - "docs/ambari-version-strategy.md"
+      - "docs/adr/**"
+      - "project/**"
+      - ".github/workflows/ci-baseline.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/version-matrix.md"
+      - "docs/ambari-version-strategy.md"
+      - "docs/adr/**"
+      - "project/**"
+      - ".github/workflows/ci-baseline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stable-baseline:
+    name: Stable baseline consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify RC1 stable baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required_files=(
+            "docs/version-matrix.md"
+            "docs/ambari-version-strategy.md"
+            "docs/adr/ADR-018-ambari-bigtop-stable-baseline.md"
+            "project/REVIEW_ACTIONS.md"
+          )
+
+          for f in "${required_files[@]}"; do
+            test -f "$f" || { echo "::error::missing $f"; exit 1; }
+          done
+
+          grep -q "3.0.0" docs/ambari-version-strategy.md             || { echo "::error::Ambari 3.0.0 baseline missing"; exit 1; }
+
+          grep -q "Bigtop.*3.6.0\|bigtop: 3.6.0" docs/version-matrix.md             || { echo "::error::Bigtop 3.6.0 baseline missing from version matrix"; exit 1; }
+
+          grep -q "openEuler 22" docs/version-matrix.md             || { echo "::error::openEuler 22 baseline missing"; exit 1; }
+
+          grep -q "RPM" docs/version-matrix.md             || { echo "::error::RPM baseline missing"; exit 1; }
+
+          grep -q "DNF" docs/version-matrix.md             || { echo "::error::DNF baseline missing"; exit 1; }
+
+      - name: Verify Bigtop upstream BOM delta is documented
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="docs/adr/ADR-018-ambari-bigtop-stable-baseline.md"
+
+          for pair in             "ZooKeeper|3.8.4"             "Hadoop|3.4.3"             "Hive|4.0.1"             "Tez|0.10.5"             "Spark|3.5.8"             "HBase|2.6.5"
+          do
+            component="${pair%%|*}"
+            version="${pair##*|}"
+            grep -q "$component" "$file" || {
+              echo "::error::$component missing from BOM delta ADR"
+              exit 1
+            }
+            grep -q "$version" "$file" || {
+              echo "::error::$component upstream version $version missing from BOM delta ADR"
+              exit 1
+            }
+          done
+
+      - name: Ensure old Bigtop 3.5 is not the active baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -nE '(^|[^0-9])Bigtop 3\.5\.0([^0-9]|$)' project/REVIEW_ACTIONS.md | grep -v -E 'histor|previous|old|3\.6'; then
+            echo "::error::active review tracker still appears to use Bigtop 3.5.0"
+            exit 1
+          fi
