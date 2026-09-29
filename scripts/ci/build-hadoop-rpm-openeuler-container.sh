@@ -11,7 +11,7 @@ grep -qi "openEuler" /etc/os-release
 
 echo "== install core build toolchain =="
 dnf -y install \
-  git curl wget tar unzip zip which findutils diffutils procps-ng \
+  git curl wget tar unzip zip sudo which findutils diffutils procps-ng \
   make gcc gcc-c++ cmake \
   maven python3 \
   autoconf automake libtool patch \
