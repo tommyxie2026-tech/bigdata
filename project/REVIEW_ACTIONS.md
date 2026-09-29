@@ -38,8 +38,8 @@ Exit Criteria satisfied
 
 | ID | Priority | Finding | Status | Target | Evidence |
 |---|---|---|---|---|---|
-| R-001 | P0 | 统一 RC1 为 openEuler22 + RPM/DNF 唯一事实基线 | OPEN | Before M2 execution | TBD |
-| R-002 | P0 | 创建真实 Bigtop RC1 adaptation branch | OPEN | M2-Prep | `validation/bigtop/rc1-adaptation-branch.md` |
+| R-001 | P0 | 统一 RC1 为 openEuler22 + RPM/DNF 唯一事实基线 | IN_PROGRESS | Before M2 execution | TBD |
+| R-002 | P0 | 基于 Bigtop 3.6.0 创建真实 RC1 adaptation branch | OPEN | M2-Prep | `validation/bigtop/rc1-adaptation-branch.md` |
 | R-003 | P0 | 统一 Evidence lifecycle/schema，区分 placeholder 与真实 evidence | OPEN | M2-Wave1 | TBD |
 | R-004 | P1 | 建立 Repository / Build / Release CI 分层 | OPEN | M2 | TBD |
 | R-005 | P2 | 重写 README 对齐 Reference Distribution 定位 | OPEN | Before RC1 public review | TBD |
@@ -47,12 +47,15 @@ Exit Criteria satisfied
 | R-007 | P1 | 按 Wave 0~5 执行组件构建适配 | OPEN | M2/M3 | Component evidence |
 | R-008 | P1 | 修复治理文档引用漂移与 legacy/active/future 分层 | OPEN | M2 | Documentation integrity report |
 | R-009 | P2 | 用 Evidence Coverage 替代主观项目百分比 | OPEN | M2+ | Program Board |
-| R-010 | P0 | 跑通 ZooKeeper 3.9.5 Build→RPM→Repo→DNF→Runtime→Smoke | OPEN | M2-Wave1 | ZooKeeper build/install/runtime evidence |
+| R-010 | P0 | 在 BOM Delta Review 后跑通选定 ZooKeeper 版本 Build→RPM→Repo→DNF→Runtime→Smoke | OPEN | M2-Wave1 | ZooKeeper build/install/runtime evidence |
+| R-011 | P0 | 完成 Bigtop 3.6.0 upstream BOM 与 BIGDATA target BOM 差异评审 | OPEN | Before R-010 | `docs/adr/ADR-018-ambari-bigtop-stable-baseline.md` |
 
 ## 4. Execution Order
 
 ```text
 R-001
+  ↓
+R-011
   ↓
 R-002
   ↓
@@ -71,6 +74,7 @@ R-005 / R-006 / R-009
 M2-WAVE1:
   build_lab: OPEN
   bigtop_branch: OPEN
+  upstream_bom_delta_review: OPEN
   bom_patch: OPEN
   toolchain_preflight: OPEN
   zookeeper_rpm_build: OPEN
@@ -111,9 +115,10 @@ reviewed_at:
 ```text
 M2-Wave1:
 openEuler22
--> Bigtop 3.5
+-> Bigtop 3.6.0
+-> Upstream BOM Delta Review
 -> RC1 Adaptation Branch
--> ZooKeeper 3.9.5 RPM
+-> Selected ZooKeeper RPM
 -> DNF Repository
 -> Runtime Smoke
 -> Evidence PASS
