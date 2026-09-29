@@ -45,11 +45,13 @@ echo "== verify upstream baseline =="
 grep -q 'version = "3.6.0"' bigtop.bom
 grep -A16 "'zookeeper'" bigtop.bom | grep -q "3.8.4"
 
+bigtop_commit="$(git rev-parse HEAD)"
+
 cat > "${WORK_ROOT}/artifacts/evidence/build-metadata.env" <<EOF
 component=zookeeper
 expected_version=3.8.4
 bigtop_ref=${BIGTOP_REF}
-bigtop_commit=$(git rev-parse HEAD)
+bigtop_commit=${bigtop_commit}
 os_image=openeuler/openeuler:22.03-lts-sp4
 jdk=8
 EOF
@@ -82,7 +84,7 @@ stage: build
 component: zookeeper
 version: 3.8.4
 bigtop_ref: ${BIGTOP_REF}
-bigtop_commit: $(git rev-parse HEAD)
+bigtop_commit: ${bigtop_commit}
 environment: openEuler-22.03-LTS-SP4-container
 runner: github-hosted-ubuntu
 package: RPM
