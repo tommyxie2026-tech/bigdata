@@ -16,7 +16,7 @@ cat /etc/os-release
 grep -qi "openEuler" /etc/os-release
 
 echo "== install build toolchain =="
-dnf -y install   git curl wget tar unzip zip   make gcc gcc-c++   maven python3   autoconf automake libtool patch   createrepo_c rpm-build rpmdevtools   java-1.8.0-openjdk-devel   which findutils diffutils procps-ng   ca-certificates
+dnf -y install   git curl wget tar unzip zip sudo   make gcc gcc-c++   maven python3   autoconf automake libtool patch   createrepo_c rpm-build rpmdevtools   java-1.8.0-openjdk-devel   which findutils diffutils procps-ng   ca-certificates
 
 export JAVA_HOME
 JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
@@ -78,7 +78,6 @@ fi
 cat > "${WORK_ROOT}/artifacts/evidence/evidence.md" <<EOF
 # CI Evidence — ZooKeeper RPM Build
 
-```yaml
 schema: bigdata.evidence/v1
 stage: build
 component: zookeeper
@@ -91,7 +90,6 @@ package: RPM
 jdk: 8
 rpm_count: ${rpm_count}
 status: ${status}
-```
 EOF
 
 echo "build_rc=${build_rc}"
