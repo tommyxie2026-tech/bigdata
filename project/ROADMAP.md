@@ -157,3 +157,32 @@ Bigtop -> Repository -> Hadoop -> Hive -> Spark -> HA -> Validation Report
 - `project/ISSUE_TREE.md`
 - `project/MILESTONES.md`
 - `project/FEATURE_MAP.md`
+
+## 10. 2026-09-30 Review Follow-up
+
+项目 Review 已形成正式问题清单与长期 Action Tracker：
+
+- `docs/reviews/2026-09-30-project-review.md`
+- `project/REVIEW_ACTIONS.md`
+
+当前执行原则：
+
+```text
+Review finding
+  -> Action
+  -> Exit Criteria
+  -> Evidence
+  -> Review
+  -> Done
+```
+
+当前 P0 顺序：
+
+```text
+R-001 RC1 baseline alignment
+  -> R-002 Bigtop adaptation branch
+  -> R-003 Evidence lifecycle
+  -> R-010 M2-Wave1 ZooKeeper end-to-end
+```
+
+在上述 P0 问题关闭前，不扩大 BIGDATA-2.0 / BIGDATA-3.0 的实施范围。
