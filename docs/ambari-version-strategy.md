@@ -4,7 +4,17 @@
 
 本文档定义 Bigdata Platform 第一阶段 Ambari 版本选择、兼容性验证、维护策略和后续演进路线。
 
-第一阶段已确认：优先使用最新可维护的社区/发行版最新兼容版本。
+截至 2026-09-30，Apache 官方稳定基线已确认：
+
+```yaml
+ambari: 3.0.0
+bigtop: 3.6.0
+os: openEuler 22.x
+package: RPM
+manager: DNF
+```
+
+Ambari 3.0.0 保持当前稳定主线；Bigtop 构建基线从 3.5.0 更新到 3.6.0。
 
 ## 2. Ambari 定位
 
@@ -26,13 +36,13 @@ Ambari 负责：
 
 ### 3.1 可维护性优先
 
-优先选择仍可维护、可修复、可适配 Ubuntu 22.04 的 Ambari 版本或发行版兼容版本。
+优先选择仍可维护、可修复、可适配 openEuler 22.x 的 Ambari 版本或发行版兼容版本。
 
 ### 3.2 兼容性优先
 
 Ambari 版本必须兼容：
 
-- Ubuntu 22.04
+- openEuler 22.x
 - JDK 8
 - Bigtop 构建出的组件包
 - Hadoop / HDFS / YARN
@@ -68,9 +78,9 @@ Ambari 版本必须兼容：
   -> 自维护构建，作为备选
 ```
 
-## 5. Ubuntu 22.04 验证项
+## 5. openEuler 22.x 验证项
 
-Ambari 候选版本必须在 Ubuntu 22.04 上验证：
+Ambari 候选版本必须在 openEuler 22.x 上验证：
 
 - Ambari Server 安装
 - Ambari Agent 安装
@@ -107,7 +117,7 @@ Ambari 消费 Bigtop 产出的包仓库。
 
 - 包名与 Ambari 服务定义一致
 - Repository base url 可配置
-- 组件安装命令与 Ubuntu 22.04 apt 包体系匹配
+- 组件安装命令与 openEuler 22.x RPM/DNF 包体系匹配
 - Service Check 与组件实际安装路径匹配
 
 ## 8. 与自定义 Stack 的关系
@@ -128,7 +138,7 @@ Ambari 消费 Bigtop 产出的包仓库。
 
 ```text
 收集 Ambari 候选版本
-  -> Ubuntu 22.04 安装验证
+  -> openEuler 22.x 安装验证
   -> JDK 8 运行验证
   -> Bigtop Repo 对接验证
   -> 3M3W1G Blueprint 验证
@@ -141,19 +151,40 @@ Ambari 消费 Bigtop 产出的包仓库。
 
 Ambari 版本进入 Phase 1 基线必须满足：
 
-- 可在 Ubuntu 22.04 安装
+- 可在 openEuler 22.x 安装
 - 可使用 JDK 8 运行
 - Server / Agent 正常通信
-- 可配置 Bigtop apt 仓库
+- 可配置 Bigtop DNF/YUM 仓库
 - 可安装 HDFS / YARN / Hive / Spark / HBase
 - 可执行 Service Check
 - 可支撑 3 Master + 3 Worker + 1 Gateway 验证拓扑
 
-## 11. 后续待办
+## 11. 当前稳定版本决策
 
-- [ ] 收集 Ambari 候选版本
-- [ ] 验证 Ubuntu 22.04 安装路径
+```yaml
+apache_ambari:
+  version: 3.0.0
+  status: current-stable
+  action: keep
+
+apache_bigtop:
+  version: 3.6.0
+  previous_baseline: 3.5.0
+  status: current-stable
+  action: upgrade-before-M2
+```
+
+注意：Ambari 3.0.0 官方内置/对齐的 Bigtop Stack 版本与本项目使用 Apache Bigtop 3.6.0 作为构建基线是两个层次。项目必须验证 Ambari service definitions / repository / package naming 对 Bigtop 3.6.0 产物的兼容性。
+
+关联 ADR：
+
+- `docs/adr/ADR-018-ambari-bigtop-stable-baseline.md`
+
+## 12. 后续待办
+
+- [x] 收集 Ambari 候选版本：3.0.0
+- [ ] 验证 openEuler 22.x 安装路径
 - [ ] 验证 JDK 8 运行兼容性
 - [ ] 验证 JDK 17 兼容性
-- [ ] 验证 Bigtop apt 仓库对接
+- [ ] 验证 Bigtop DNF/YUM 仓库对接
 - [ ] 冻结 Ambari 版本策略
