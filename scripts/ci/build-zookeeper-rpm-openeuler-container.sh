@@ -38,6 +38,7 @@ echo "== checkout Apache Bigtop =="
 git clone --filter=blob:none --branch "${BIGTOP_REF}" --single-branch   https://github.com/apache/bigtop.git "${BIGTOP_DIR}"
 
 cd "${BIGTOP_DIR}"
+patch -p1 < /workspace/packaging/bigtop/patches/zookeeper/0001-openeuler-systemd-only-service.patch
 git rev-parse HEAD | tee "${WORK_ROOT}/artifacts/evidence/bigtop-commit.txt"
 git status --short
 
