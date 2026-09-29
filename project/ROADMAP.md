@@ -40,8 +40,8 @@ type: Reference Distribution
 证明以下技术路线成立：
 
 ```text
-Ubuntu 22.04 + JDK 8
-Bigtop Package Repository
+openEuler 22.x + JDK 8
+Apache Bigtop 3.6.0 + RPM/DNF Repository
 Hadoop + Hive + Spark
 HDFS HA + YARN HA
 Validation Report
@@ -53,7 +53,7 @@ Validation Report
 - Hive / Metastore / HiveServer2
 - Spark / Spark SQL
 - Bigtop 构建与包仓库
-- apt Repository
+- RPM/DNF Repository
 - Release Snapshot
 - Validation Report
 - Runbook
@@ -157,3 +157,49 @@ Bigtop -> Repository -> Hadoop -> Hive -> Spark -> HA -> Validation Report
 - `project/ISSUE_TREE.md`
 - `project/MILESTONES.md`
 - `project/FEATURE_MAP.md`
+
+## 10. 2026-09-30 Review Follow-up
+
+项目 Review 已形成正式问题清单与长期 Action Tracker：
+
+- `docs/reviews/2026-09-30-project-review.md`
+- `project/REVIEW_ACTIONS.md`
+
+当前执行原则：
+
+```text
+Review finding
+  -> Action
+  -> Exit Criteria
+  -> Evidence
+  -> Review
+  -> Done
+```
+
+当前 P0 顺序：
+
+```text
+R-001 RC1 baseline alignment
+  -> R-011 Bigtop 3.6.0 BOM delta review
+  -> R-002 Bigtop 3.6.0 adaptation branch
+  -> R-003 Evidence lifecycle
+  -> R-010 M2-Wave1 ZooKeeper end-to-end
+```
+
+在上述 P0 问题关闭前，不扩大 BIGDATA-2.0 / BIGDATA-3.0 的实施范围。
+
+
+## 11. Current Upstream Stable Baseline
+
+截至 2026-09-30：
+
+```yaml
+Apache Ambari: 3.0.0
+Apache Bigtop: 3.6.0
+```
+
+Bigtop 3.6.0 为 M2 新实施工作的默认构建基线。组件版本仍需经过 upstream BOM 与项目 target BOM 的差异评审后冻结。
+
+关联 ADR：
+
+- `docs/adr/ADR-018-ambari-bigtop-stable-baseline.md`

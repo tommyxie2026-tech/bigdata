@@ -4,7 +4,7 @@
 
 本文档定义 Bigdata Platform 第一阶段的基础版本矩阵、兼容性评估维度和后续版本确认流程。
 
-第一阶段目标是在 Ubuntu 22.04 上，以 JDK 8 为默认运行时，通过 Bigtop 构建和发布大数据组件包，并预留 JDK 17 兼容性评估。
+第一阶段目标是在 openEuler 22.x 上，以 JDK 8 为默认运行时，通过 Bigtop 构建和发布大数据组件包，并预留 JDK 17 兼容性评估。
 
 版本选择原则：
 
@@ -18,11 +18,11 @@
 
 | 项目 | 结果 |
 |---|---|
-| OS | Ubuntu 22.04 |
+| OS | openEuler 22.x |
 | 默认 JDK | JDK 8 |
 | 兼容性评估 | JDK 17 |
-| 构建体系 | Bigtop 真实构建体系 |
-| 管理面 | Ambari 最新可维护社区/发行版兼容版本 |
+| 构建体系 | Apache Bigtop 3.6.0（当前稳定版） |
+| 管理面 | Apache Ambari 3.0.0（当前稳定版） |
 | 验证规模 | 3 Master + 3 Worker + 1 Gateway |
 
 ## 3. 第一阶段组件范围
@@ -48,20 +48,20 @@
 |---|---:|---:|---|---|
 | Ambari | 3.0.0 | 2.7.9 | 以 3.x 为长期管理面基线，2.7.9 仅作为兼容回退 | 已确认，待验证 |
 | Ambari Metrics | 3.0.0 | TBD | 与 Ambari 3.0.0 同步验证 | 已确认，待验证 |
-| Bigtop | 3.5.0 | 3.4.0 | 以 3.5.0 为构建体系基线，后续跟随 Bigtop stable release 升级 | 已确认，待验证 |
+| Bigtop | 3.6.0 | 3.5.0 | 以 3.6.0 为当前上游稳定构建基线；3.5.0 作为历史/回退参考 | 已更新，待验证 |
 
 ### 4.2 存储与协调底座
 
 | 组件 | Phase 1 优先候选 | 兼容/回退候选 | 升级策略 | 状态 |
 |---|---:|---:|---|---|
-| Hadoop | 3.5.0 | 3.4.3 / 3.3.6 | 以 3.5.x 作为未来主线；如 Bigtop/Ambari 适配不通过，回退到 3.4.3 或 3.3.6 | 已确认候选，不冻结，待 Bigtop 3.5.0 构建与 Ambari 3.0.0 管理验证 |
-| ZooKeeper | 3.9.5 | 3.8.6 | 以 3.9.x 作为未来主线；如兼容性不足，回退到 3.8.6 | 已确认候选，不冻结，待 Bigtop 3.5.0 构建与 Ambari 3.0.0 管理验证 |
+| Hadoop | 3.5.0 | 3.4.3 / 3.3.6 | 以 3.5.x 作为未来主线；如 Bigtop/Ambari 适配不通过，回退到 3.4.3 或 3.3.6 | 已确认候选，不冻结，待 Bigtop 3.6.0 构建与 Ambari 3.0.0 管理验证 |
+| ZooKeeper | 3.9.5 | 3.8.6 | 以 3.9.x 作为未来主线；如兼容性不足，回退到 3.8.6 | 已确认候选，不冻结，待 Bigtop 3.6.0 构建与 Ambari 3.0.0 管理验证 |
 
 ### 4.3 数仓 SQL 与执行引擎
 
 | 组件 | Phase 1 优先候选 | 兼容/回退候选 | 升级策略 | 状态 |
 |---|---:|---:|---|---|
-| Hive | 4.2.0 | Hive 4.1.x / 3.x 兼容线待评估 | 以 Hive 4.x 作为未来主线；如 Ambari/Bigtop/JDK/Hadoop 适配不通过，回退到 4.1.x 或 3.x 兼容线 | 已确认候选，不冻结，待 Bigtop 3.5.0 构建、Ambari 3.0.0 管理、Hadoop 3.5.0 和 JDK 8 兼容性验证 |
+| Hive | 4.2.0 | Hive 4.1.x / 3.x 兼容线待评估 | 以 Hive 4.x 作为未来主线；如 Ambari/Bigtop/JDK/Hadoop 适配不通过，回退到 4.1.x 或 3.x 兼容线 | 已确认候选，不冻结，待 Bigtop 3.6.0 构建、Ambari 3.0.0 管理、Hadoop 3.5.0 和 JDK 8 兼容性验证 |
 | Hive Standalone Metastore | 4.2.0 | 3.0.0 | 随 Hive 4.2.0 优先验证；3.0.0 作为兼容回退评估 | 已确认候选，不冻结，待 Spark SQL 访问 Metastore 兼容性验证 |
 | Tez | 0.10.5 | 0.10.4 / 0.10.3 | 以 0.10.5 作为优先候选，随 Hive 4.2.0 验证；必要时回退到 0.10.4 / 0.10.3 | 已确认候选，不冻结，待 Hive 执行引擎适配验证 |
 
@@ -69,16 +69,41 @@
 
 | 组件 | Phase 1 优先候选 | 兼容/回退候选 | 升级策略 | 状态 |
 |---|---:|---:|---|---|
-| Spark | 3.5.8 | 3.4.x | Spark 3.5.x 作为 Phase 1 稳定主线；Spark 4.1.x 作为未来升级评估，面向后续 Spark on Kubernetes 和新生态兼容 | 已确认候选，不冻结，待 Bigtop 3.5.0 构建、Ambari 3.0.0 管理、Hadoop 3.5.0、JDK 8、Hive Metastore 4.2.0 兼容性验证 |
+| Spark | 3.5.8 | 3.4.x | Spark 3.5.x 作为 Phase 1 稳定主线；Spark 4.1.x 作为未来升级评估，面向后续 Spark on Kubernetes 和新生态兼容 | 已确认候选，不冻结，待 Bigtop 3.6.0 构建、Ambari 3.0.0 管理、Hadoop 3.5.0、JDK 8、Hive Metastore 4.2.0 兼容性验证 |
 | Spark Upgrade Evaluation | 4.1.x | N/A | 作为未来升级评估，不进入 Phase 1 主线 | 已确认升级评估项 |
 
 ### 4.5 宽表存储
 
 | 组件 | Phase 1 优先候选 | 兼容/回退候选 | 升级策略 | 状态 |
 |---|---:|---:|---|---|
-| HBase | 2.5.14 | 2.5.13 | HBase 2.5.x 作为 Phase 1 稳定主线；2.6.5 作为未来升级评估；3.0.0-beta-1 仅作为远期技术观察 | 已确认候选，不冻结，待 Bigtop 3.5.0 构建、Ambari 3.0.0 管理、Hadoop 3.5.0、ZooKeeper 3.9.5、JDK 8 兼容性验证 |
+| HBase | 2.5.14 | 2.5.13 | HBase 2.5.x 作为 Phase 1 稳定主线；2.6.5 作为未来升级评估；3.0.0-beta-1 仅作为远期技术观察 | 已确认候选，不冻结，待 Bigtop 3.6.0 构建、Ambari 3.0.0 管理、Hadoop 3.5.0、ZooKeeper 3.9.5、JDK 8 兼容性验证 |
 | HBase Upgrade Evaluation | 2.6.5 | N/A | 作为未来升级评估，不进入 Phase 1 主线 | 已确认升级评估项 |
 | HBase Technical Watch | 3.0.0-beta-1 | N/A | Beta 版本，仅远期技术观察 | 不进入 Phase 1 |
+
+
+## 4.6 Bigtop 3.6.0 Upstream BOM 对照
+
+Bigtop 3.6.0 升级后，必须区分“Bigtop 上游稳定 BOM”和“BIGDATA 项目目标 BOM”。
+
+| Component | Bigtop 3.6.0 upstream | BIGDATA existing target | Delta |
+|---|---:|---:|---|
+| ZooKeeper | 3.8.4 | 3.9.5 | PROJECT_NEWER |
+| Hadoop | 3.4.3 | 3.5.0 | PROJECT_NEWER |
+| HBase | 2.6.5 | 2.5.14 | UPSTREAM_NEWER |
+| Hive | 4.0.1 | 4.2.0 | PROJECT_NEWER |
+| Tez | 0.10.5 | 0.10.5 | UPSTREAM_MATCH |
+| Spark | 3.5.8 | 3.5.8 | UPSTREAM_MATCH |
+
+版本策略因此调整为：
+
+```text
+先验证 Bigtop 3.6.0 upstream BOM
+  -> 再评估项目自定义 BOM 差异
+  -> 只有存在明确需求时才保留自定义版本
+  -> 不因“版本更新”本身增加适配面
+```
+
+在完成 BOM Delta Review 前，ZooKeeper/Hadoop/Hive/HBase 的项目目标版本仍为候选，不视为冻结版本。
 
 ## 5. 待确认版本组
 
@@ -86,14 +111,14 @@
 
 ## 6. 版本矩阵
 
-| 组件 | 目标版本 | 兼容/回退版本 | Ubuntu 22.04 | JDK 8 | JDK 17 评估 | Bigtop 构建 | Ambari 管理 | 备注 |
+| 组件 | 目标版本 | 兼容/回退版本 | openEuler 22.x | JDK 8 | JDK 17 评估 | Bigtop 构建 | Ambari 管理 | 备注 |
 |---|---|---|---|---|---|---|---|---|
 | Ambari | 3.0.0 | 2.7.9 | 必须验证 | 必须验证 | 评估 | 可选 | 是 | 传统大数据长期管理面；已确认，待验证 |
 | Ambari Metrics | 3.0.0 | TBD | 必须验证 | 必须验证 | 评估 | 可选 | 是 | 与 Ambari 3.0.0 同步验证 |
-| Bigtop | 3.5.0 | 3.4.0 | 必须验证 | 必须验证 | 评估 | 是 | 否 | 真实构建体系；已确认，待验证 |
-| Hadoop | 3.5.0 | 3.4.3 / 3.3.6 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 社区最新稳定优先候选，不冻结；需验证 Bigtop 3.5.0 构建与 Ambari 3.0.0 管理适配 |
-| ZooKeeper | 3.9.5 | 3.8.6 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 社区最新稳定优先候选，不冻结；需验证 Bigtop 3.5.0 构建与 Ambari 3.0.0 管理适配 |
-| Hive | 4.2.0 | 4.1.x / 3.x 兼容线待评估 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 社区最新稳定优先候选，不冻结；需验证 Bigtop 3.5.0、Ambari 3.0.0、Hadoop 3.5.0、JDK 8 兼容性 |
+| Bigtop | 3.6.0 | 3.5.0 | 必须验证 | 必须验证 | 评估 | 是 | 否 | 真实构建体系；已确认，待验证 |
+| Hadoop | 3.5.0 | 3.4.3 / 3.3.6 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 社区最新稳定优先候选，不冻结；需验证 Bigtop 3.6.0 构建与 Ambari 3.0.0 管理适配 |
+| ZooKeeper | 3.9.5 | 3.8.6 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 社区最新稳定优先候选，不冻结；需验证 Bigtop 3.6.0 构建与 Ambari 3.0.0 管理适配 |
+| Hive | 4.2.0 | 4.1.x / 3.x 兼容线待评估 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 社区最新稳定优先候选，不冻结；需验证 Bigtop 3.6.0、Ambari 3.0.0、Hadoop 3.5.0、JDK 8 兼容性 |
 | Hive Standalone Metastore | 4.2.0 | 3.0.0 | 必须验证 | 必须验证 | 评估 | 是 | 是 | 随 Hive 4.2.0 优先验证；需验证 Spark SQL 访问 Metastore 兼容性 |
 | Tez | 0.10.5 | 0.10.4 / 0.10.3 | 必须验证 | 必须验证 | 评估 | 是/可选 | 是/可选 | Hive 执行引擎候选，随 Hive 4.2.0 验证 |
 | Spark | 3.5.8 | 3.4.x | 必须验证 | 必须验证 | 评估 | 是 | 是 | Phase 1 优先候选，不冻结；需验证 Hadoop 3.5.0、Hive Metastore 4.2.0、JDK 8、Ambari/Bigtop 适配 |
@@ -106,12 +131,12 @@
 
 ### 7.1 OS 兼容性
 
-Ubuntu 22.04 下需要验证：
+openEuler 22.x 下需要验证：
 
 - 包依赖是否完整
 - systemd 服务是否正常
 - 用户、目录、权限是否符合预期
-- apt 仓库元数据是否正确
+- DNF/YUM 仓库元数据是否正确
 - Ambari Agent 是否可正常执行安装命令
 
 ### 7.2 JDK 兼容性
@@ -142,9 +167,9 @@ JDK 8 是第一阶段默认基线。JDK 17 只做兼容性评估，不作为第�
 
 需要验证：
 
-- Bigtop 构建目标是否支持 Ubuntu 22.04
-- DEB 包是否成功输出
-- apt 仓库是否可发布
+- Bigtop 3.6.0 构建目标是否支持 openEuler 22.x
+- RPM 包是否成功输出
+- DNF/YUM 仓库是否可发布
 - 包名是否与 Ambari 期望一致
 - 包依赖是否满足 Ambari 安装流程
 
@@ -152,7 +177,7 @@ JDK 8 是第一阶段默认基线。JDK 17 只做兼容性评估，不作为第�
 
 Hadoop 3.5.0 与 ZooKeeper 3.9.5 作为社区最新稳定优先候选，但不立即冻结，必须额外验证：
 
-- Bigtop 3.5.0 是否支持对应版本构建
+- Bigtop 3.6.0 是否支持对应版本构建
 - Ambari 3.0.0 是否能安装、配置、启停和检查对应版本
 - HDFS HA 与 YARN HA 是否正常
 - ZooKeeper 与 HDFS/YARN/HBase 的协调关系是否稳定
@@ -162,7 +187,7 @@ Hadoop 3.5.0 与 ZooKeeper 3.9.5 作为社区最新稳定优先候选，但不�
 
 Hive 4.2.0、Hive Standalone Metastore 4.2.0 与 Tez 0.10.5 作为社区最新稳定优先候选，但不立即冻结，必须额外验证：
 
-- Bigtop 3.5.0 是否支持 Hive 4.2.0、Metastore 4.2.0、Tez 0.10.5 构建
+- Bigtop 3.6.0 是否支持 Hive 4.2.0、Metastore 4.2.0、Tez 0.10.5 构建
 - Ambari 3.0.0 是否能安装、配置、启停和检查 Hive 4.2.0
 - Hive 4.2.0 与 Hadoop 3.5.0 的兼容性
 - Hive 4.2.0 在 JDK 8 下的运行兼容性
@@ -174,7 +199,7 @@ Hive 4.2.0、Hive Standalone Metastore 4.2.0 与 Tez 0.10.5 作为社区最新�
 
 Spark 3.5.8 作为 Phase 1 优先候选，但不立即冻结，必须额外验证：
 
-- Bigtop 3.5.0 是否支持 Spark 3.5.8 构建
+- Bigtop 3.6.0 是否支持 Spark 3.5.8 构建
 - Ambari 3.0.0 是否能安装、配置、启停和检查 Spark 3.5.8
 - Spark on YARN 是否兼容 Hadoop 3.5.0
 - Spark SQL 是否兼容 Hive Standalone Metastore 4.2.0
@@ -185,7 +210,7 @@ Spark 3.5.8 作为 Phase 1 优先候选，但不立即冻结，必须额外验�
 
 HBase 2.5.14 作为 Phase 1 优先候选，但不立即冻结，必须额外验证：
 
-- Bigtop 3.5.0 是否支持 HBase 2.5.14 构建
+- Bigtop 3.6.0 是否支持 HBase 2.5.14 构建
 - Ambari 3.0.0 是否能安装、配置、启停和检查 HBase 2.5.14
 - HBase 2.5.14 是否兼容 Hadoop 3.5.0
 - HBase 2.5.14 是否兼容 ZooKeeper 3.9.5
@@ -199,7 +224,7 @@ HBase 2.5.14 作为 Phase 1 优先候选，但不立即冻结，必须额外验�
 候选版本收集
   -> 用户逐组确认
   -> Bigtop 可构建性检查
-  -> Ubuntu 22.04 安装验证
+  -> openEuler 22.x 安装验证
   -> JDK 8 运行验证
   -> Ambari 管理验证
   -> 3M3W1G 集群验证
@@ -229,13 +254,27 @@ HBase 2.5.14 作为 Phase 1 优先候选，但不立即冻结，必须额外验�
 | QA Agent | Smoke Test 与集成验证 |
 | Review Agent | 冻结版本矩阵 |
 
-## 11. 后续待办
+## 11. Upstream Stable Baseline
+
+截至 2026-09-30：
+
+```yaml
+ambari: 3.0.0
+bigtop: 3.6.0
+```
+
+关联决策：
+
+- `docs/adr/ADR-018-ambari-bigtop-stable-baseline.md`
+
+## 12. 后续待办
 
 - [x] 确认 Ambari 候选版本
-- [x] 确认 Bigtop 候选版本或分支
+- [x] 确认 Bigtop 当前稳定版：3.6.0
 - [x] 确认 Hadoop / ZooKeeper 候选版本，状态为待验证不冻结
 - [x] 确认 Hive / Tez 候选版本，状态为待验证不冻结
 - [x] 确认 Spark 候选版本，状态为待验证不冻结
 - [x] 确认 HBase 候选版本，状态为待验证不冻结
+- [ ] 完成 Bigtop 3.6.0 upstream BOM 与 BIGDATA target BOM Delta Review
 - [ ] 补充 JDK 17 兼容性评估结果
 - [ ] 冻结 Phase 1 版本矩阵

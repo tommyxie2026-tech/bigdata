@@ -1,0 +1,98 @@
+name: CI PR
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-pr-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shell:
+    name: Shell checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Bash syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find scripts infra packaging ambari -type f -name '*.sh' 2>/dev/null | sort)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No shell scripts found."
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            echo "bash -n $f"
+            bash -n "$f"
+          done
+
+      - name: ShellCheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find scripts infra packaging ambari -type f -name '*.sh' 2>/dev/null | sort)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No shell scripts found."
+            exit 0
+          fi
+          shellcheck -S warning "${files[@]}"
+
+  yaml:
+    name: YAML checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PyYAML
+        run: python -m pip install --disable-pip-version-check pyyaml
+
+      - name: Parse YAML
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          files = sorted(
+              p for p in Path(".").rglob("*")
+              if p.is_file()
+              and p.suffix in {".yml", ".yaml"}
+              and ".git" not in p.parts
+          )
+          for path in files:
+              print(f"parse {path}")
+              with path.open("r", encoding="utf-8") as f:
+                  list(yaml.safe_load_all(f))
+          print(f"validated {len(files)} YAML files")
+          PY
+
+  docs:
+    name: Documentation integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reject legacy RC1 baseline in active tracker
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f project/REVIEW_ACTIONS.md
+          test -f docs/adr/ADR-018-ambari-bigtop-stable-baseline.md
+          grep -q "Bigtop 3.6.0" project/REVIEW_ACTIONS.md
+          grep -q "Ambari.*3.0.0\|ambari: 3.0.0" docs/adr/ADR-018-ambari-bigtop-stable-baseline.md

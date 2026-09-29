@@ -1,0 +1,135 @@
+name: Release CI
+
+on:
+  workflow_run:
+    workflows:
+      - Test CI
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      test_run_id:
+        description: Successful Test CI run ID containing tested RPMs
+        required: true
+        type: string
+      release_name:
+        description: Release bundle name
+        required: false
+        default: bigdata-1.0-zookeeper-rc
+        type: string
+      publish_github_release:
+        description: Publish a GitHub prerelease
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release-ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Assemble tested ZooKeeper release
+    if: >
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      RELEASE_ROOT: /tmp/bigdata-release
+      TEST_RUN_ID: ${{ github.event.workflow_run.id || inputs.test_run_id }}
+      RELEASE_NAME: ${{ inputs.release_name || 'bigdata-1.0-zookeeper-rc' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Download tested RPMs
+        uses: actions/download-artifact@v4
+        with:
+          name: zookeeper-3.8.4-tested-rpms
+          path: /tmp/tested-rpms
+          run-id: ${{ env.TEST_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download test evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: zookeeper-3.8.4-test-evidence
+          path: /tmp/test-evidence
+          run-id: ${{ env.TEST_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Assemble release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${RELEASE_ROOT}"
+          mkdir -p "${RELEASE_ROOT}"/{rpms,evidence}
+
+          find /tmp/tested-rpms -type f -name '*.rpm' -exec cp -v {} "${RELEASE_ROOT}/rpms/" \;
+          cp -a /tmp/test-evidence/. "${RELEASE_ROOT}/evidence/"
+
+          rpm_count=$(find "${RELEASE_ROOT}/rpms" -type f -name '*.rpm' | wc -l)
+          test "${rpm_count}" -gt 0
+
+          (
+            cd "${RELEASE_ROOT}"
+            find rpms -type f -name '*.rpm' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          )
+
+          {
+            echo "schema: bigdata.release/v1"
+            echo "name: ${RELEASE_NAME}"
+            echo "component: zookeeper"
+            echo "component_version: 3.8.4"
+            echo "bigtop_version: 3.6.0"
+            echo "os: openEuler 22.03 LTS SP4"
+            echo "package_format: RPM"
+            echo "source_commit: ${GITHUB_SHA}"
+            echo "test_run_id: ${TEST_RUN_ID}"
+            echo "rpm_count: ${rpm_count}"
+            echo "status: RELEASE_CANDIDATE"
+          } > "${RELEASE_ROOT}/release-manifest.yaml"
+
+          tar -C "${RELEASE_ROOT}" -czf "/tmp/${RELEASE_NAME}.tar.gz" .
+          sha256sum "/tmp/${RELEASE_NAME}.tar.gz" > "/tmp/${RELEASE_NAME}.tar.gz.sha256"
+
+          cat "${RELEASE_ROOT}/release-manifest.yaml" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload release candidate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.RELEASE_NAME }}
+          path: |
+            /tmp/bigdata-release
+            /tmp/${{ env.RELEASE_NAME }}.tar.gz
+            /tmp/${{ env.RELEASE_NAME }}.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish GitHub prerelease
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_github_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="ci-${RELEASE_NAME}-${GITHUB_RUN_NUMBER}"
+          gh release create "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "${RELEASE_NAME}" \
+            --notes-file "${RELEASE_ROOT}/release-manifest.yaml" \
+            --prerelease \
+            "/tmp/${RELEASE_NAME}.tar.gz" \
+            "/tmp/${RELEASE_NAME}.tar.gz.sha256" \
+            "${RELEASE_ROOT}/SHA256SUMS" \
+            "${RELEASE_ROOT}/release-manifest.yaml"

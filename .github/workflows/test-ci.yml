@@ -1,0 +1,100 @@
+name: Test CI
+
+on:
+  workflow_run:
+    workflows:
+      - Build Component
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  zookeeper-test:
+    name: ZooKeeper install and runtime smoke
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
+      ARTIFACT_ROOT: /tmp/bigdata-zookeeper-artifact
+      EVIDENCE_ROOT: /tmp/bigdata-zookeeper-test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Download RPM build artifact
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: zookeeper-3.8.4-bigtop-3.6-openeuler22-rpm
+          path: /tmp/bigdata-zookeeper-artifact
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Manual mode requires local build
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/bigdata-local-build
+          docker pull "${OPENEULER_IMAGE}"
+          docker run --rm \
+            -e BIGTOP_REF=branch-3.6 \
+            -e COMPONENT=zookeeper \
+            -e WORK_ROOT=/work \
+            -v "${GITHUB_WORKSPACE}:/workspace:ro" \
+            -v /tmp/bigdata-local-build:/work \
+            "${OPENEULER_IMAGE}" \
+            bash /workspace/scripts/ci/build-zookeeper-rpm-openeuler-container.sh
+          mkdir -p "${ARTIFACT_ROOT}"
+          cp -a /tmp/bigdata-local-build/artifacts/. "${ARTIFACT_ROOT}/"
+
+      - name: Run install and runtime smoke in clean openEuler
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${EVIDENCE_ROOT}"
+          mkdir -p "${EVIDENCE_ROOT}"
+          docker pull "${OPENEULER_IMAGE}"
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace:ro" \
+            -v "${ARTIFACT_ROOT}:/artifact:ro" \
+            -v "${EVIDENCE_ROOT}:/evidence" \
+            "${OPENEULER_IMAGE}" \
+            bash /workspace/scripts/ci/test-zookeeper-rpm-openeuler-container.sh
+
+      - name: Publish summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "${EVIDENCE_ROOT}/evidence.md" ]]; then
+            cat "${EVIDENCE_ROOT}/evidence.md" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zookeeper-3.8.4-test-evidence
+          path: /tmp/bigdata-zookeeper-test
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload tested RPM bundle
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zookeeper-3.8.4-tested-rpms
+          path: /tmp/bigdata-zookeeper-artifact
+          if-no-files-found: error
+          retention-days: 30

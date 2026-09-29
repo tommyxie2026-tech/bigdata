@@ -1,0 +1,104 @@
+name: Build Component
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+      - bigdata-1.0-rc1-openeuler22-rpm
+    paths:
+      - ".github/workflows/build-component.yml"
+      - "scripts/ci/build-zookeeper-rpm-openeuler-container.sh"
+      - "packaging/bigtop/**"
+      - "docs/version-matrix.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-component-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-zookeeper:
+    name: ZooKeeper RPM on openEuler container
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    env:
+      BIGTOP_REF: branch-3.6
+      COMPONENT: zookeeper
+      WORK_ROOT: /tmp/bigdata-bigtop-build
+      OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
+
+    steps:
+      - name: Checkout BIGDATA
+        uses: actions/checkout@v4
+
+      - name: Runner capacity
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -a
+          docker version
+          df -h
+          free -h
+
+      - name: Prepare workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${WORK_ROOT}"
+          mkdir -p "${WORK_ROOT}"
+
+      - name: Pull openEuler build image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "${OPENEULER_IMAGE}"
+          docker image inspect "${OPENEULER_IMAGE}" \
+            --format 'image={{.RepoTags}} digest={{.RepoDigests}}'
+
+      - name: Build ZooKeeper RPM in openEuler
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --name bigdata-bigtop-zookeeper-build \
+            -e BIGTOP_REF="${BIGTOP_REF}" \
+            -e COMPONENT="${COMPONENT}" \
+            -e WORK_ROOT=/work \
+            -v "${GITHUB_WORKSPACE}:/workspace:ro" \
+            -v "${WORK_ROOT}:/work" \
+            "${OPENEULER_IMAGE}" \
+            bash /workspace/scripts/ci/build-zookeeper-rpm-openeuler-container.sh
+
+      - name: Validate host-side artifacts
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          find "${WORK_ROOT}" -maxdepth 4 -type f -print 2>/dev/null | sort || true
+
+          if [[ -d "${WORK_ROOT}/artifacts/rpms" ]]; then
+            rpm_count=$(find "${WORK_ROOT}/artifacts/rpms" -type f -name '*.rpm' | wc -l)
+          else
+            rpm_count=0
+          fi
+
+          echo "rpm_count=${rpm_count}" >> "${GITHUB_STEP_SUMMARY}"
+
+          if [[ -f "${WORK_ROOT}/artifacts/evidence/evidence.md" ]]; then
+            cat "${WORK_ROOT}/artifacts/evidence/evidence.md" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zookeeper-3.8.4-bigtop-3.6-openeuler22-rpm
+          path: /tmp/bigdata-bigtop-build/artifacts
+          if-no-files-found: error
+          retention-days: 14
+
