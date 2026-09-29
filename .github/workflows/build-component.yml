@@ -3,9 +3,10 @@ name: Build Component
 on:
   workflow_dispatch:
 
-  pull_request:
+  push:
     branches:
       - main
+      - bigdata-1.0-rc1-openeuler22-rpm
     paths:
       - ".github/workflows/build-component.yml"
       - "scripts/ci/build-zookeeper-rpm-openeuler-container.sh"
@@ -22,7 +23,6 @@ concurrency:
 jobs:
   build-zookeeper:
     name: ZooKeeper RPM on openEuler container
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
