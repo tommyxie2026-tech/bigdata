@@ -29,7 +29,7 @@ jobs:
     env:
       BIGTOP_REF: branch-3.6
       COMPONENT: zookeeper
-      WORK_ROOT: ${{ runner.temp }}/bigdata-bigtop-build
+      WORK_ROOT: /tmp/bigdata-bigtop-build
       OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
 
     steps:
@@ -98,6 +98,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zookeeper-3.8.4-bigtop-3.6-openeuler22-rpm
-          path: ${{ runner.temp }}/bigdata-bigtop-build/artifacts
+          path: /tmp/bigdata-bigtop-build/artifacts
           if-no-files-found: error
           retention-days: 14
