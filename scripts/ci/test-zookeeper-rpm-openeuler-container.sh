@@ -35,8 +35,10 @@ printf '%s\n' "${package_names[@]}" | tee "${EVIDENCE_ROOT}/package-names.txt"
 server_pkg=""
 base_pkg=""
 for p in "${package_names[@]}"; do
-  [[ "${p}" == *zookeeper*server* ]] && server_pkg="${p}"
-  [[ "${p}" == zookeeper* && "${p}" != *server* && "${p}" != *native* && "${p}" != *rest* ]] && base_pkg="${p}"
+  case "${p}" in
+    zookeeper-server|zookeeper_*-server) server_pkg="${p}" ;;
+    zookeeper|zookeeper_[0-9]*) base_pkg="${p}" ;;
+  esac
 done
 
 if [[ -z "${base_pkg}" ]]; then
