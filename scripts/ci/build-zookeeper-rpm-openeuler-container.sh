@@ -58,7 +58,7 @@ EOF
 
 echo "== build ZooKeeper RPM =="
 set +e
-./gradlew zookeeper-rpm --stacktrace 2>&1 | tee "${WORK_ROOT}/artifacts/logs/zookeeper-build.log"
+./gradlew zookeeper-rpm -Dbuildwithdeps=true --stacktrace 2>&1 | tee "${WORK_ROOT}/artifacts/logs/zookeeper-build.log"
 build_rc=${PIPESTATUS[0]}
 set -e
 
