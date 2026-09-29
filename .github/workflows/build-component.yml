@@ -1,0 +1,210 @@
+name: Build Component
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Component to build
+        required: true
+        default: zookeeper
+        type: choice
+        options:
+          - zookeeper
+      bigtop_ref:
+        description: Apache Bigtop ref
+        required: true
+        default: branch-3.6
+        type: string
+
+  push:
+    branches:
+      - bigdata-1.0-rc1-openeuler22-rpm
+    paths:
+      - ".github/workflows/build-component.yml"
+      - "packaging/bigtop/**"
+      - "scripts/build-lab/**"
+      - "infra/build-lab/**"
+      - "docs/version-matrix.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-component-${{ inputs.component || 'zookeeper' }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Trusted runner preflight
+    runs-on:
+      - self-hosted
+      - linux
+      - openeuler22
+      - x64
+      - bigtop-build
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout BIGDATA
+        uses: actions/checkout@v4
+
+      - name: Runner identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "repository=${GITHUB_REPOSITORY}"
+          echo "ref=${GITHUB_REF}"
+          echo "sha=${GITHUB_SHA}"
+          echo "runner=${RUNNER_NAME}"
+          echo "os=${RUNNER_OS}"
+          cat /etc/os-release
+          uname -a
+
+      - name: Verify trusted openEuler environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -qi "openEuler" /etc/os-release
+          command -v dnf
+          command -v rpm
+          command -v rpmbuild
+          command -v git
+          command -v java
+          command -v javac
+          command -v python3
+
+      - name: BIGDATA build-lab preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/build-lab/openeuler22-preflight.sh
+
+  build:
+    name: Build ZooKeeper RPM
+    needs: preflight
+    runs-on:
+      - self-hosted
+      - linux
+      - openeuler22
+      - x64
+      - bigtop-build
+    timeout-minutes: 180
+
+    env:
+      BIGTOP_REF: ${{ inputs.bigtop_ref || 'branch-3.6' }}
+      BIGTOP_JDK: "8"
+      COMPONENT: ${{ inputs.component || 'zookeeper' }}
+      WORK_ROOT: ${{ runner.temp }}/bigdata-bigtop-build
+
+    steps:
+      - name: Checkout BIGDATA
+        uses: actions/checkout@v4
+
+      - name: Prepare clean workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${WORK_ROOT}"
+          mkdir -p "${WORK_ROOT}"
+
+      - name: Checkout Apache Bigtop
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/apache/bigtop.git "${WORK_ROOT}/bigtop"
+          cd "${WORK_ROOT}/bigtop"
+          git fetch --all --tags --prune
+          git checkout "${BIGTOP_REF}"
+          git rev-parse HEAD | tee "${WORK_ROOT}/bigtop-commit.txt"
+          git status --short
+
+      - name: Verify upstream BOM
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${WORK_ROOT}/bigtop"
+
+          grep -q 'version = "3.6.0"' bigtop.bom
+          grep -A12 "'zookeeper'" bigtop.bom | grep -q "3.8.4"
+
+          {
+            echo "component=zookeeper"
+            echo "expected_version=3.8.4"
+            echo "bigtop_ref=${BIGTOP_REF}"
+            echo "bigtop_commit=$(cat "${WORK_ROOT}/bigtop-commit.txt")"
+          } | tee "${WORK_ROOT}/build-metadata.env"
+
+      - name: Build ZooKeeper RPM
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${WORK_ROOT}/bigtop"
+          export BIGTOP_JDK=8
+
+          ./gradlew zookeeper-rpm --stacktrace 2>&1 | tee "${WORK_ROOT}/zookeeper-build.log"
+
+      - name: Collect RPM artifacts
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p "${WORK_ROOT}/artifacts/rpms"
+          mkdir -p "${WORK_ROOT}/artifacts/logs"
+          mkdir -p "${WORK_ROOT}/artifacts/evidence"
+
+          find "${WORK_ROOT}/bigtop" -type f -name '*.rpm' -print -exec cp -v {} "${WORK_ROOT}/artifacts/rpms/" \; || true
+
+          cp -f "${WORK_ROOT}/zookeeper-build.log" "${WORK_ROOT}/artifacts/logs/" 2>/dev/null || true
+          cp -f "${WORK_ROOT}/bigtop-commit.txt" "${WORK_ROOT}/artifacts/evidence/" 2>/dev/null || true
+          cp -f "${WORK_ROOT}/build-metadata.env" "${WORK_ROOT}/artifacts/evidence/" 2>/dev/null || true
+
+          find "${WORK_ROOT}/artifacts/rpms" -type f -name '*.rpm' -print0             | sort -z             | xargs -0 -r sha256sum             > "${WORK_ROOT}/artifacts/evidence/SHA256SUMS"
+
+          find "${WORK_ROOT}/artifacts/rpms" -type f -name '*.rpm' -printf '%f\n'             | sort             > "${WORK_ROOT}/artifacts/evidence/package-list.txt"
+
+      - name: Validate RPM output exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=$(find "${WORK_ROOT}/artifacts/rpms" -type f -name '*.rpm' | wc -l)
+          echo "rpm_count=${count}"
+          test "${count}" -gt 0
+
+      - name: Generate evidence summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          result="PASS"
+          if ! find "${WORK_ROOT}/artifacts/rpms" -type f -name '*.rpm' | grep -q .; then
+            result="FAIL"
+          fi
+
+          cat > "${WORK_ROOT}/artifacts/evidence/evidence.md" <<EOF
+          # CI Evidence — ZooKeeper RPM Build
+
+          ```yaml
+          schema: bigdata.evidence/v1
+          stage: build
+          component: zookeeper
+          version: 3.8.4
+          bigtop_ref: ${BIGTOP_REF}
+          bigtop_commit: $(cat "${WORK_ROOT}/bigtop-commit.txt" 2>/dev/null || echo unknown)
+          repository_commit: ${GITHUB_SHA}
+          runner: ${RUNNER_NAME}
+          environment: openEuler22-x86_64
+          package: RPM
+          jdk: 8
+          status: ${result}
+          ```
+          EOF
+
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zookeeper-3.8.4-bigtop-3.6-rpm
+          path: ${{ runner.temp }}/bigdata-bigtop-build/artifacts
+          if-no-files-found: error
+          retention-days: 14
