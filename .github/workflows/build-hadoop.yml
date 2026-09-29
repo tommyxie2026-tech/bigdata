@@ -9,6 +9,7 @@ on:
     paths:
       - ".github/workflows/build-hadoop.yml"
       - "scripts/ci/build-hadoop-rpm-openeuler-container.sh"
+      - "scripts/ci/test-hadoop-rpm-openeuler-container.sh"
       - "docs/version-matrix.md"
 
 permissions:
