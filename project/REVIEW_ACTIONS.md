@@ -41,7 +41,7 @@ Exit Criteria satisfied
 | R-001 | P0 | 统一 RC1 为 openEuler22 + RPM/DNF 唯一事实基线 | IN_PROGRESS | Before M2 execution | TBD |
 | R-002 | P0 | 基于 Bigtop 3.6.0 创建真实 RC1 adaptation branch | OPEN | M2-Prep | `validation/bigtop/rc1-adaptation-branch.md` |
 | R-003 | P0 | 统一 Evidence lifecycle/schema，区分 placeholder 与真实 evidence | OPEN | M2-Wave1 | TBD |
-| R-004 | P1 | 建立 Repository / Build / Release CI 分层 | OPEN | M2 | TBD |
+| R-004 | P1 | 建立 Repository / Build / Release CI 分层 | IN_PROGRESS | M2 | `docs/ci/github-actions-ci-architecture.md`, `.github/workflows/ci-pr.yml`, `.github/workflows/ci-baseline.yml` |
 | R-005 | P2 | 重写 README 对齐 Reference Distribution 定位 | OPEN | Before RC1 public review | TBD |
 | R-006 | P2 | 2.0/3.0 收敛到 backlog，不阻塞 RC1 | OPEN | Immediate | Roadmap update |
 | R-007 | P1 | 按 Wave 0~5 执行组件构建适配 | OPEN | M2/M3 | Component evidence |
@@ -49,6 +49,7 @@ Exit Criteria satisfied
 | R-009 | P2 | 用 Evidence Coverage 替代主观项目百分比 | OPEN | M2+ | Program Board |
 | R-010 | P0 | 在 BOM Delta Review 后跑通选定 ZooKeeper 版本 Build→RPM→Repo→DNF→Runtime→Smoke | OPEN | M2-Wave1 | ZooKeeper build/install/runtime evidence |
 | R-011 | P0 | 完成 Bigtop 3.6.0 upstream BOM 与 BIGDATA target BOM 差异评审 | OPEN | Before R-010 | `docs/adr/ADR-018-ambari-bigtop-stable-baseline.md` |
+| R-012 | P1 | 建立 GitHub Actions 分层 CI：L0 GitHub-hosted，L1-L4 trusted environments | IN_PROGRESS | M2 | `docs/ci/github-actions-ci-architecture.md` |
 
 ## 4. Execution Order
 
@@ -122,4 +123,30 @@ openEuler22
 -> DNF Repository
 -> Runtime Smoke
 -> Evidence PASS
+```
+
+
+## 8. CI Implementation Status
+
+```yaml
+CI-0:
+  ci-pr: IMPLEMENTED
+  ci-baseline: IMPLEMENTED
+  runner: github-hosted
+  public_fork_safe: true
+
+CI-1:
+  self_hosted_openeuler_runner: NOT_STARTED
+  build_component_workflow: NOT_STARTED
+
+CI-2:
+  rpm_repo_validation: NOT_STARTED
+  runtime_smoke: NOT_STARTED
+
+CI-3:
+  multi_component_waves: NOT_STARTED
+
+CI-4:
+  cluster_ha_validation: NOT_STARTED
+  release_gate: NOT_STARTED
 ```
