@@ -89,3 +89,12 @@ jobs:
           path: /tmp/bigdata-zookeeper-test
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload tested RPM bundle
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zookeeper-3.8.4-tested-rpms
+          path: /tmp/bigdata-zookeeper-artifact
+          if-no-files-found: error
+          retention-days: 30
