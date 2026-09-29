@@ -101,3 +101,119 @@ jobs:
           path: /tmp/bigdata-bigtop-build/artifacts
           if-no-files-found: error
           retention-days: 14
+
+
+  package-install:
+    name: ZooKeeper RPM repo and DNF install
+    needs: build-zookeeper
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
+      ARTIFACT_ROOT: /tmp/bigdata-zookeeper-artifact
+      INSTALL_ROOT: /tmp/bigdata-zookeeper-install
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zookeeper-3.8.4-bigtop-3.6-openeuler22-rpm
+          path: /tmp/bigdata-zookeeper-artifact
+
+      - name: Inspect artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          find "${ARTIFACT_ROOT}" -maxdepth 4 -type f -print | sort
+          test -d "${ARTIFACT_ROOT}/rpms"
+          test "$(find "${ARTIFACT_ROOT}/rpms" -type f -name '*.rpm' | wc -l)" -gt 0
+
+      - name: Create repository and install RPMs in clean openEuler
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${INSTALL_ROOT}"
+          mkdir -p "${INSTALL_ROOT}"
+
+          docker pull "${OPENEULER_IMAGE}"
+
+          docker run --rm \
+            --name bigdata-zookeeper-install-test \
+            -v "${ARTIFACT_ROOT}:/artifact:ro" \
+            -v "${INSTALL_ROOT}:/evidence" \
+            "${OPENEULER_IMAGE}" \
+            bash -lc '
+              set -euo pipefail
+
+              dnf -y install createrepo_c dnf-utils rpm findutils
+
+              mkdir -p /tmp/bigdata-repo
+              cp /artifact/rpms/*.rpm /tmp/bigdata-repo/
+              createrepo_c /tmp/bigdata-repo
+
+              cat > /etc/yum.repos.d/bigdata-ci.repo <<EOF
+          [bigdata-ci]
+          name=BIGDATA CI Local Repository
+          baseurl=file:///tmp/bigdata-repo
+          enabled=1
+          gpgcheck=0
+          metadata_expire=0
+          EOF
+
+              {
+                echo "== RPM files =="
+                ls -lh /tmp/bigdata-repo/*.rpm
+                echo
+                echo "== Repository =="
+                dnf repolist
+                echo
+                echo "== RPM metadata =="
+                for rpm_file in /tmp/bigdata-repo/*.rpm; do
+                  rpm -qpi "${rpm_file}"
+                done
+                echo
+                echo "== Install =="
+                dnf -y install /tmp/bigdata-repo/*.rpm
+                echo
+                echo "== Installed packages =="
+                rpm -qa | grep -i zookeeper || true
+              } 2>&1 | tee /evidence/dnf-install.log
+
+              rpm -qa | grep -i zookeeper > /evidence/installed-packages.txt
+
+              cat > /evidence/evidence.md <<EOF
+          # CI Evidence — ZooKeeper RPM Repository and Install
+
+          schema: bigdata.evidence/v1
+          stage: package-install
+          component: zookeeper
+          version: 3.8.4
+          environment: openEuler-22.03-LTS-SP4-clean-container
+          repository: local-createrepo-c
+          package_manager: dnf
+          status: PASS
+          EOF
+            '
+
+      - name: Publish install evidence to summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f "${INSTALL_ROOT}/evidence.md" ]]; then
+            cat "${INSTALL_ROOT}/evidence.md" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+          if [[ -f "${INSTALL_ROOT}/installed-packages.txt" ]]; then
+            echo "## Installed packages" >> "${GITHUB_STEP_SUMMARY}"
+            cat "${INSTALL_ROOT}/installed-packages.txt" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Upload install evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zookeeper-3.8.4-bigtop-3.6-openeuler22-install-evidence
+          path: /tmp/bigdata-zookeeper-install
+          if-no-files-found: error
+          retention-days: 14
