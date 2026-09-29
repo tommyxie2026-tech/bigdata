@@ -17,7 +17,7 @@ cat /etc/os-release
 grep -qi openEuler /etc/os-release
 
 dnf -y install \
-  sudo git curl wget tar unzip zip gzip bzip2 xz \
+  sudo hostname git curl wget tar unzip zip gzip bzip2 xz \
   which findutils diffutils procps-ng coreutils \
   make gcc gcc-c++ cmake \
   maven ant python3 \
