@@ -2,31 +2,10 @@ name: Build Component
 
 on:
   workflow_dispatch:
-    inputs:
-      component:
-        description: Component to build
-        required: true
-        default: zookeeper
-        type: choice
-        options:
-          - zookeeper
-      bigtop_ref:
-        description: Apache Bigtop ref
-        required: true
-        default: branch-3.6
-        type: string
 
   pull_request:
-    paths:
-      - ".github/workflows/build-component.yml"
-      - "scripts/ci/build-zookeeper-rpm-openeuler-container.sh"
-      - "packaging/bigtop/**"
-      - "docs/version-matrix.md"
-
-  push:
     branches:
       - main
-      - bigdata-1.0-rc1-openeuler22-rpm
     paths:
       - ".github/workflows/build-component.yml"
       - "scripts/ci/build-zookeeper-rpm-openeuler-container.sh"
@@ -37,22 +16,19 @@ permissions:
   contents: read
 
 concurrency:
-  group: build-component-${{ inputs.component || 'zookeeper' }}-${{ github.ref }}
+  group: build-component-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build-zookeeper:
     name: ZooKeeper RPM on openEuler container
-    if: >
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository
-
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
     env:
-      BIGTOP_REF: ${{ inputs.bigtop_ref || 'branch-3.6' }}
-      COMPONENT: ${{ inputs.component || 'zookeeper' }}
+      BIGTOP_REF: branch-3.6
+      COMPONENT: zookeeper
       WORK_ROOT: ${{ runner.temp }}/bigdata-bigtop-build
       OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
 
@@ -81,20 +57,28 @@ jobs:
         run: |
           set -euo pipefail
           docker pull "${OPENEULER_IMAGE}"
-          docker image inspect "${OPENEULER_IMAGE}"             --format 'image={{.RepoTags}} digest={{.RepoDigests}}'
+          docker image inspect "${OPENEULER_IMAGE}" \
+            --format 'image={{.RepoTags}} digest={{.RepoDigests}}'
 
       - name: Build ZooKeeper RPM in openEuler
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm             --name bigdata-bigtop-zookeeper-build             -e BIGTOP_REF="${BIGTOP_REF}"             -e COMPONENT="${COMPONENT}"             -e WORK_ROOT=/work             -v "${GITHUB_WORKSPACE}:/workspace:ro"             -v "${WORK_ROOT}:/work"             "${OPENEULER_IMAGE}"             bash /workspace/scripts/ci/build-zookeeper-rpm-openeuler-container.sh
+          docker run --rm \
+            --name bigdata-bigtop-zookeeper-build \
+            -e BIGTOP_REF="${BIGTOP_REF}" \
+            -e COMPONENT="${COMPONENT}" \
+            -e WORK_ROOT=/work \
+            -v "${GITHUB_WORKSPACE}:/workspace:ro" \
+            -v "${WORK_ROOT}:/work" \
+            "${OPENEULER_IMAGE}" \
+            bash /workspace/scripts/ci/build-zookeeper-rpm-openeuler-container.sh
 
       - name: Validate host-side artifacts
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          echo "Workspace:"
           find "${WORK_ROOT}" -maxdepth 4 -type f -print 2>/dev/null | sort || true
 
           if [[ -d "${WORK_ROOT}/artifacts/rpms" ]]; then
