@@ -1,0 +1,57 @@
+diff --git a/bigtop-packages/src/rpm/zookeeper/SPECS/zookeeper.spec b/bigtop-packages/src/rpm/zookeeper/SPECS/zookeeper.spec
+--- a/bigtop-packages/src/rpm/zookeeper/SPECS/zookeeper.spec
++++ b/bigtop-packages/src/rpm/zookeeper/SPECS/zookeeper.spec
+@@ -46,9 +46,15 @@
+ %define doc_zookeeper %{doc_dir}/%{zookeeper_name}-%{zookeeper_version}
+ %define alternatives_cmd alternatives
+ %define alternatives_dep chkconfig 
++%if 0%{?openEuler}
++%define chkconfig_dep    systemd
++%define service_dep      systemd
++%else
+ %define chkconfig_dep    chkconfig
+ %define service_dep      initscripts
++%endif
+ %global initd_dir %{_sysconfdir}/rc.d/init.d
+ 
+ %endif
+@@ -95,11 +101,13 @@
+ %if %{!?suse_version:1}0 && %{!?mgaversion:1}0
+ # Required for init scripts
++%if 0%{?openEuler} == 0
+ %if 0%{?fedora} >= 40
+ Requires: redhat-lsb-core
+ %else
+ Requires: /lib/lsb/init-functions
+ %endif
++%endif
+ %endif
+@@ -168,17 +176,27 @@
+ %post server
++%if 0%{?openEuler}
++%systemd_post zookeeper-server.service
++%else
+ chkconfig --add %{svc_zookeeper}
+ %systemd_post zookeeper-server.service
++%endif
+ 
+ %preun server
++%if 0%{?openEuler}
++%systemd_preun zookeeper-server.service
++%else
+ if [ $1 = 0 ]; then
+ 	service %{svc_zookeeper} stop > /dev/null 2>&1
+ 	chkconfig --del %{svc_zookeeper}
+ fi
+ %systemd_preun zookeeper-server.service
++%endif
+ 
+ %postun server
++%if 0%{?openEuler}
++%systemd_postun zookeeper-server.service
++%else
+ if [ $1 -ge 1 ]; then
+         service %{svc_zookeeper} condrestart > /dev/null 2>&1
+ fi
+ %systemd_postun zookeeper-server.service
++%endif
