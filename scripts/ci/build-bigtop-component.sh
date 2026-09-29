@@ -21,7 +21,7 @@ dnf -y install \
   which findutils diffutils procps-ng coreutils \
   make gcc gcc-c++ cmake \
   maven ant python3 \
-  autoconf automake libtool patch \
+  autoconf automake libtool patch cppunit-devel \
   rpm-build rpmdevtools createrepo_c \
   java-1.8.0-openjdk-devel \
   openssl-devel zlib-devel \
