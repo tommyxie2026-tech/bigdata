@@ -8,6 +8,7 @@ on:
     paths:
       - ".github/workflows/build-components.yml"
       - "scripts/ci/build-bigtop-component.sh"
+      - "scripts/ci/test-bigtop-component.sh"
       - "ci/components.yaml"
 
 permissions:
