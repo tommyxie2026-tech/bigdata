@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - ci/wave2-hadoop-3.4.3
     paths:
       - ".github/workflows/build-hadoop.yml"
