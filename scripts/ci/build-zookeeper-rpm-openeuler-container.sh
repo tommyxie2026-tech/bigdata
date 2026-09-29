@@ -38,7 +38,106 @@ echo "== checkout Apache Bigtop =="
 git clone --filter=blob:none --branch "${BIGTOP_REF}" --single-branch   https://github.com/apache/bigtop.git "${BIGTOP_DIR}"
 
 cd "${BIGTOP_DIR}"
-patch -p1 < /workspace/packaging/bigtop/patches/zookeeper/0001-openeuler-systemd-only-service.patch
+
+echo "== apply openEuler ZooKeeper RPM service adaptation =="
+python3 - <<'PY'
+from pathlib import Path
+
+spec = Path("bigtop-packages/src/rpm/zookeeper/SPECS/zookeeper.spec")
+text = spec.read_text()
+
+replacements = [
+(
+"""%define alternatives_dep chkconfig 
+%define chkconfig_dep    chkconfig
+%define service_dep      initscripts
+%global initd_dir %{_sysconfdir}/rc.d/init.d""",
+"""%define alternatives_dep chkconfig 
+%if 0%{?openEuler}
+%define chkconfig_dep    systemd
+%define service_dep      systemd
+%else
+%define chkconfig_dep    chkconfig
+%define service_dep      initscripts
+%endif
+%global initd_dir %{_sysconfdir}/rc.d/init.d"""
+),
+(
+"""# Required for init scripts
+%if 0%{?fedora} >= 40
+Requires: redhat-lsb-core
+%else
+Requires: /lib/lsb/init-functions
+%endif""",
+"""# Required for init scripts
+%if 0%{?openEuler} == 0
+%if 0%{?fedora} >= 40
+Requires: redhat-lsb-core
+%else
+Requires: /lib/lsb/init-functions
+%endif
+%endif"""
+),
+(
+"""%post server
+chkconfig --add %{svc_zookeeper}
+%systemd_post zookeeper-server.service""",
+"""%post server
+%if 0%{?openEuler}
+%systemd_post zookeeper-server.service
+%else
+chkconfig --add %{svc_zookeeper}
+%systemd_post zookeeper-server.service
+%endif"""
+),
+(
+"""%preun server
+if [ $1 = 0 ]; then
+\tservice %{svc_zookeeper} stop > /dev/null 2>&1
+\tchkconfig --del %{svc_zookeeper}
+fi
+%systemd_preun zookeeper-server.service""",
+"""%preun server
+%if 0%{?openEuler}
+%systemd_preun zookeeper-server.service
+%else
+if [ $1 = 0 ]; then
+\tservice %{svc_zookeeper} stop > /dev/null 2>&1
+\tchkconfig --del %{svc_zookeeper}
+fi
+%systemd_preun zookeeper-server.service
+%endif"""
+),
+(
+"""%postun server
+if [ $1 -ge 1 ]; then
+        service %{svc_zookeeper} condrestart > /dev/null 2>&1
+fi
+%systemd_postun zookeeper-server.service""",
+"""%postun server
+%if 0%{?openEuler}
+%systemd_postun zookeeper-server.service
+%else
+if [ $1 -ge 1 ]; then
+        service %{svc_zookeeper} condrestart > /dev/null 2>&1
+fi
+%systemd_postun zookeeper-server.service
+%endif"""
+),
+]
+
+for old, new in replacements:
+    if old not in text:
+        raise SystemExit(f"Expected ZooKeeper spec context not found:\n{old}")
+    text = text.replace(old, new, 1)
+
+spec.write_text(text)
+PY
+
+grep -q '%if 0%{?openEuler}' bigtop-packages/src/rpm/zookeeper/SPECS/zookeeper.spec
+git diff --check
+git diff -- bigtop-packages/src/rpm/zookeeper/SPECS/zookeeper.spec
+
 git rev-parse HEAD | tee "${WORK_ROOT}/artifacts/evidence/bigtop-commit.txt"
 git status --short
 
