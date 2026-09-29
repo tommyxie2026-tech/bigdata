@@ -49,7 +49,7 @@ if [[ -z "${base_pkg}" ]]; then
   exit 1
 fi
 
-dnf -y --repo=bigdata-ci install "${base_pkg}" 2>&1 | tee "${EVIDENCE_ROOT}/dnf-install.log"
+dnf -y --enablerepo=bigdata-ci install "${base_pkg}" 2>&1 | tee "${EVIDENCE_ROOT}/dnf-install.log"
 
 rpm -qi "${base_pkg}" > "${EVIDENCE_ROOT}/rpm-info.txt"
 rpm -ql "${base_pkg}" > "${EVIDENCE_ROOT}/rpm-files.txt"
