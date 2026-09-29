@@ -49,7 +49,7 @@ install_pkgs=("${client_pkg}")
 {
   echo "Installing Hadoop packages from local repo:"
   printf '  %s\n' "${install_pkgs[@]}"
-  dnf -y --repo=bigdata-ci install "${install_pkgs[@]}"
+  dnf -y --enablerepo=bigdata-ci install "${install_pkgs[@]}"
 } 2>&1 | tee "${EVIDENCE_ROOT}/dnf-install.log"
 
 rpm -qa | grep -E '^(hadoop|bigtop|zookeeper)' | sort \
