@@ -136,8 +136,9 @@ CI-0:
   public_fork_safe: true
 
 CI-1:
-  self_hosted_openeuler_runner: NOT_STARTED
-  build_component_workflow: NOT_STARTED
+  self_hosted_openeuler_runner: REQUIRED
+  build_component_workflow: IMPLEMENTED
+  first_target: zookeeper-3.8.4-on-bigtop-3.6.0
 
 CI-2:
   rpm_repo_validation: NOT_STARTED
@@ -150,3 +151,31 @@ CI-4:
   cluster_ha_validation: NOT_STARTED
   release_gate: NOT_STARTED
 ```
+
+
+## 9. CI-1 First Build Contract
+
+```yaml
+workflow: .github/workflows/build-component.yml
+trigger:
+  - workflow_dispatch
+  - trusted_rc1_branch_push
+runner_labels:
+  - self-hosted
+  - linux
+  - openeuler22
+  - x64
+  - bigtop-build
+target:
+  bigtop: 3.6.0
+  zookeeper: 3.8.4
+  jdk: 8
+outputs:
+  - rpm
+  - build-log
+  - package-list
+  - checksums
+  - evidence-summary
+```
+
+该 workflow 不允许由 public fork PR 直接触发 self-hosted runner。
