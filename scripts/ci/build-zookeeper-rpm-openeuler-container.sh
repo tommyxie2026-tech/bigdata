@@ -16,7 +16,7 @@ cat /etc/os-release
 grep -qi "openEuler" /etc/os-release
 
 echo "== install build toolchain =="
-dnf -y install   git curl wget tar unzip zip sudo   make gcc gcc-c++   maven python3   autoconf automake libtool patch   createrepo_c rpm-build rpmdevtools   java-1.8.0-openjdk-devel   which findutils diffutils procps-ng   ca-certificates
+dnf -y install   git curl wget tar unzip zip sudo   make gcc gcc-c++   maven python3   autoconf automake libtool patch cppunit-devel   createrepo_c rpm-build rpmdevtools   java-1.8.0-openjdk-devel   which findutils diffutils procps-ng   ca-certificates
 
 export JAVA_HOME
 JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
@@ -63,7 +63,7 @@ build_rc=${PIPESTATUS[0]}
 set -e
 
 echo "== collect artifacts =="
-find "${BIGTOP_DIR}" -type f -name '*.rpm' -print -exec cp -v {} "${WORK_ROOT}/artifacts/rpms/" \; || true
+find "${BIGTOP_DIR}/output" -type f -name '*.rpm' ! -name '*.src.rpm' -print -exec cp -v {} "${WORK_ROOT}/artifacts/rpms/" \; || true
 
 find "${WORK_ROOT}/artifacts/rpms" -type f -name '*.rpm' -printf '%f\n'   | sort > "${WORK_ROOT}/artifacts/evidence/package-list.txt"
 
