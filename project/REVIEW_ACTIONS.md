@@ -136,8 +136,10 @@ CI-0:
   public_fork_safe: true
 
 CI-1:
-  self_hosted_openeuler_runner: REQUIRED
-  build_component_workflow: IMPLEMENTED
+  github_hosted_runner: IMPLEMENTED
+  openeuler_container: openeuler/openeuler:22.03-lts-sp4
+  self_hosted_openeuler_runner: FALLBACK_ONLY
+  build_component_workflow: RUNNING_FIRST_VALIDATION
   first_target: zookeeper-3.8.4-on-bigtop-3.6.0
 
 CI-2:
@@ -160,12 +162,10 @@ workflow: .github/workflows/build-component.yml
 trigger:
   - workflow_dispatch
   - trusted_rc1_branch_push
-runner_labels:
-  - self-hosted
-  - linux
-  - openeuler22
-  - x64
-  - bigtop-build
+runner:
+  type: github-hosted
+  label: ubuntu-latest
+  build_container: openeuler/openeuler:22.03-lts-sp4
 target:
   bigtop: 3.6.0
   zookeeper: 3.8.4
@@ -178,4 +178,4 @@ outputs:
   - evidence-summary
 ```
 
-该 workflow 不允许由 public fork PR 直接触发 self-hosted runner。
+该 workflow 默认使用 GitHub-hosted runner。内部 PR 可执行组件构建；fork PR 不执行重型组件构建。self-hosted 仅作为资源不足或 systemd/HA 验证的 fallback。
