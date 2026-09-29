@@ -1,0 +1,137 @@
+name: Release Components
+
+on:
+  workflow_run:
+    workflows:
+      - Test Components
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      test_run_id:
+        description: Successful Test Components run ID
+        required: true
+        type: string
+      publish_github_release:
+        description: Publish GitHub prereleases
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    name: Release ${{ matrix.component }} ${{ matrix.version }}
+    if: >
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: tez
+            version: 0.10.5
+          - component: hive
+            version: 4.0.1
+          - component: spark
+            version: 3.5.8
+          - component: hbase
+            version: 2.6.5
+
+    env:
+      TEST_RUN_ID: ${{ github.event.workflow_run.id || inputs.test_run_id }}
+      RELEASE_ROOT: /tmp/bigdata-release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Download tested RPMs
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.component }}-${{ matrix.version }}-tested-rpms
+          path: /tmp/tested-rpms
+          run-id: ${{ env.TEST_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download test evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.component }}-${{ matrix.version }}-test-evidence
+          path: /tmp/test-evidence
+          run-id: ${{ env.TEST_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Assemble release candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${RELEASE_ROOT}"
+          mkdir -p "${RELEASE_ROOT}"/{rpms,evidence}
+
+          find /tmp/tested-rpms -type f -name '*.rpm' -exec cp -v {} "${RELEASE_ROOT}/rpms/" \;
+          cp -a /tmp/test-evidence/. "${RELEASE_ROOT}/evidence/"
+
+          rpm_count=$(find "${RELEASE_ROOT}/rpms" -type f -name '*.rpm' | wc -l)
+          test "${rpm_count}" -gt 0
+
+          (
+            cd "${RELEASE_ROOT}"
+            find rpms -type f -name '*.rpm' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          )
+
+          cat > "${RELEASE_ROOT}/release-manifest.yaml" <<EOF
+          schema: bigdata.release/v1
+          component: ${{ matrix.component }}
+          component_version: ${{ matrix.version }}
+          bigtop_version: 3.6.0
+          ambari_version: 3.0.0
+          os: openEuler 22.03 LTS SP4
+          package_format: RPM
+          test_run_id: ${TEST_RUN_ID}
+          rpm_count: ${rpm_count}
+          status: RELEASE_CANDIDATE
+          EOF
+
+          archive="bigdata-1.0-${{ matrix.component }}-${{ matrix.version }}-rc.tar.gz"
+          tar -C "${RELEASE_ROOT}" -czf "/tmp/${archive}" .
+          sha256sum "/tmp/${archive}" > "/tmp/${archive}.sha256"
+
+          cat "${RELEASE_ROOT}/release-manifest.yaml" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bigdata-1.0-${{ matrix.component }}-${{ matrix.version }}-rc
+          path: |
+            /tmp/bigdata-release
+            /tmp/bigdata-1.0-${{ matrix.component }}-${{ matrix.version }}-rc.tar.gz
+            /tmp/bigdata-1.0-${{ matrix.component }}-${{ matrix.version }}-rc.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish GitHub prerelease
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_github_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="ci-${{ matrix.component }}-${{ matrix.version }}-${GITHUB_RUN_NUMBER}"
+          archive="bigdata-1.0-${{ matrix.component }}-${{ matrix.version }}-rc.tar.gz"
+          gh release create "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "BIGDATA ${{ matrix.component }} ${{ matrix.version }} RC" \
+            --notes-file "${RELEASE_ROOT}/release-manifest.yaml" \
+            --prerelease \
+            "/tmp/${archive}" \
+            "/tmp/${archive}.sha256" \
+            "${RELEASE_ROOT}/SHA256SUMS" \
+            "${RELEASE_ROOT}/release-manifest.yaml"
