@@ -14,7 +14,7 @@ dnf -y install \
   git curl wget tar unzip zip sudo hostname which findutils diffutils procps-ng \
   make gcc gcc-c++ cmake \
   maven python3 \
-  autoconf automake libtool patch \
+  autoconf automake libtool patch cppunit-devel \
   rpm-build rpmdevtools createrepo_c \
   java-1.8.0-openjdk-devel \
   openssl-devel zlib-devel \
@@ -67,7 +67,7 @@ build_rc=${PIPESTATUS[0]}
 set -e
 
 echo "== collect RPM artifacts =="
-find "${BIGTOP_DIR}" -type f -name '*.rpm' -print -exec cp -v {} "${WORK_ROOT}/artifacts/rpms/" \; || true
+find "${BIGTOP_DIR}/output" -type f -name '*.rpm' ! -name '*.src.rpm' -print -exec cp -v {} "${WORK_ROOT}/artifacts/rpms/" \; || true
 
 find "${WORK_ROOT}/artifacts/rpms" -type f -name '*.rpm' -printf '%f\n' \
   | sort > "${WORK_ROOT}/artifacts/evidence/package-list.txt"
