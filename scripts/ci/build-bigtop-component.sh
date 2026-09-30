@@ -47,6 +47,47 @@ bigtop_commit="$(git rev-parse HEAD)"
 grep -q 'version = "3.6.0"' bigtop.bom
 grep -A20 "'${COMPONENT}'" bigtop.bom | grep -q "${VERSION}"
 
+if [[ "${COMPONENT}" == "tez" ]]; then
+  echo "== apply Tez UI root-build adaptation =="
+  python3 - <<'PY'
+from pathlib import Path
+
+candidates = [
+    Path("bigtop-packages/src/common/tez/patch0-tez-build.diff"),
+    Path("bigtop-packages/src/common/tez"),
+]
+
+root = Path(".")
+matches = []
+for p in root.rglob("*"):
+    if not p.is_file():
+        continue
+    try:
+        text = p.read_text(errors="ignore")
+    except Exception:
+        continue
+    if "bower install" in text and "--allow-root=false" in text:
+        matches.append(p)
+
+if not matches:
+    raise SystemExit("Expected Tez bower --allow-root=false context not found")
+
+changed = 0
+for p in matches:
+    text = p.read_text()
+    new = text.replace("--allow-root=false", "--allow-root")
+    if new != text:
+        p.write_text(new)
+        changed += 1
+        print(f"adapted {p}")
+
+if changed == 0:
+    raise SystemExit("Tez root-build adaptation made no changes")
+PY
+  git diff --check
+  git diff -- bigtop-packages || true
+fi
+
 set +e
 ./gradlew "${BUILD_TASK}" -Dbuildwithdeps=true --stacktrace 2>&1 \
   | tee "${WORK_ROOT}/artifacts/logs/${COMPONENT}-build.log"
