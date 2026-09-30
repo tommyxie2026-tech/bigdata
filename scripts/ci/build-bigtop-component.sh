@@ -24,7 +24,7 @@ dnf -y install \
   autoconf automake libtool patch cppunit-devel \
   rpm-build rpmdevtools createrepo_c \
   java-1.8.0-openjdk-devel \
-  openssl-devel zlib-devel boost-devel protobuf-devel cyrus-sasl-devel libcap-devel \
+  openssl-devel zlib-devel boost-devel protobuf-devel cyrus-sasl-devel libcap-devel libtirpc-devel \
   pkgconfig openEuler-rpm-config lzo-devel \
   fuse fuse-devel fuse-libs \
   ca-certificates
