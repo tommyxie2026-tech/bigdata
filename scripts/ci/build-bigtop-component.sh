@@ -33,6 +33,25 @@ export JAVA_HOME
 JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
 export PATH="${JAVA_HOME}/bin:${PATH}"
 export BIGTOP_JDK=8
+
+# Spark 3.5.8 enforces Maven >= 3.9.6; openEuler 22.03 ships Maven 3.6.3.
+# Override Maven for Spark only, leaving other component toolchains unchanged.
+if [[ "${COMPONENT}" == "spark" ]]; then
+  MAVEN_VERSION=3.9.9
+  MAVEN_URL="https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz"
+  MAVEN_HOME="/opt/apache-maven-${MAVEN_VERSION}"
+  curl --fail --location --retry 5 --retry-delay 5 --connect-timeout 30 \
+    --output /tmp/apache-maven.tar.gz "${MAVEN_URL}"
+  curl --fail --location --retry 5 --retry-delay 5 --connect-timeout 30 \
+    --output /tmp/apache-maven.tar.gz.sha512 "${MAVEN_URL}.sha512"
+  (cd /tmp && sha512sum --check apache-maven.tar.gz.sha512)
+  tar -xzf /tmp/apache-maven.tar.gz -C /opt
+  export MAVEN_HOME
+  export PATH="${MAVEN_HOME}/bin:${PATH}"
+  mvn --version
+  mvn --version | grep -q "Apache Maven ${MAVEN_VERSION}"
+fi
+
 export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Dmaven.wagon.httpconnectionManager.ttlSeconds=60"
 
 rm -rf "${BIGTOP_DIR}"
