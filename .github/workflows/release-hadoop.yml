@@ -1,0 +1,94 @@
+name: Release Hadoop
+
+on:
+  workflow_run:
+    workflows:
+      - Test Hadoop
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  release:
+    name: Assemble Hadoop release candidate
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      RELEASE_ROOT: /tmp/bigdata-hadoop-release
+      RELEASE_NAME: bigdata-1.0-hadoop-3.4.3-rc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Download tested Hadoop RPMs
+        uses: actions/download-artifact@v4
+        with:
+          name: hadoop-3.4.3-tested-rpms
+          path: /tmp/tested-rpms
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download Hadoop test evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: hadoop-3.4.3-test-evidence
+          path: /tmp/test-evidence
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Assemble release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${RELEASE_ROOT}"
+          mkdir -p "${RELEASE_ROOT}"/{rpms,evidence}
+
+          find /tmp/tested-rpms -type f -name '*.rpm' -exec cp -v {} "${RELEASE_ROOT}/rpms/" \;
+          cp -a /tmp/test-evidence/. "${RELEASE_ROOT}/evidence/"
+
+          rpm_count=$(find "${RELEASE_ROOT}/rpms" -type f -name '*.rpm' | wc -l)
+          test "${rpm_count}" -gt 0
+
+          (
+            cd "${RELEASE_ROOT}"
+            find rpms -type f -name '*.rpm' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          )
+
+          {
+            echo "schema: bigdata.release/v1"
+            echo "name: ${RELEASE_NAME}"
+            echo "component: hadoop"
+            echo "component_version: 3.4.3"
+            echo "bigtop_version: 3.6.0"
+            echo "ambari_version: 3.0.0"
+            echo "ambari_compatibility: ADAPTATION_REQUIRED"
+            echo "os: openEuler 22.03 LTS SP4"
+            echo "package_format: RPM"
+            echo "source_commit: ${GITHUB_SHA}"
+            echo "test_run_id: ${{ github.event.workflow_run.id }}"
+            echo "rpm_count: ${rpm_count}"
+            echo "status: RELEASE_CANDIDATE"
+          } > "${RELEASE_ROOT}/release-manifest.yaml"
+
+          tar -C "${RELEASE_ROOT}" -czf "/tmp/${RELEASE_NAME}.tar.gz" .
+          sha256sum "/tmp/${RELEASE_NAME}.tar.gz" > "/tmp/${RELEASE_NAME}.tar.gz.sha256"
+          cat "${RELEASE_ROOT}/release-manifest.yaml" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload Hadoop release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.RELEASE_NAME }}
+          path: |
+            /tmp/bigdata-hadoop-release
+            /tmp/${{ env.RELEASE_NAME }}.tar.gz
+            /tmp/${{ env.RELEASE_NAME }}.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 90

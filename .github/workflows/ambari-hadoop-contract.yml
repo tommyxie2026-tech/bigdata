@@ -1,0 +1,43 @@
+name: Ambari Hadoop Contract
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ci/wave2-hadoop-3.4.3
+    paths:
+      - ".github/workflows/ambari-hadoop-contract.yml"
+      - "scripts/ci/check-ambari-hadoop-contract.sh"
+      - "docs/version-matrix.md"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Ambari 3.0.0 vs Bigtop 3.6.0 Hadoop contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run contract check
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORK_ROOT=/tmp/ambari-hadoop-contract bash scripts/ci/check-ambari-hadoop-contract.sh
+
+      - name: Publish contract report
+        shell: bash
+        run: |
+          cat /tmp/ambari-hadoop-contract/contract-report.md >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload contract evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ambari-3.0.0-bigtop-3.6.0-hadoop-contract
+          path: /tmp/ambari-hadoop-contract
+          if-no-files-found: error
+          retention-days: 30
