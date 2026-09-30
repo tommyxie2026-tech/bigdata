@@ -40,12 +40,13 @@ if [[ "${COMPONENT}" == "spark" ]]; then
   MAVEN_VERSION=3.9.9
   MAVEN_URL="https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz"
   MAVEN_HOME="/opt/apache-maven-${MAVEN_VERSION}"
+  MAVEN_ARCHIVE="apache-maven-${MAVEN_VERSION}-bin.tar.gz"
   curl --fail --location --retry 5 --retry-delay 5 --connect-timeout 30 \
-    --output /tmp/apache-maven.tar.gz "${MAVEN_URL}"
+    --output "/tmp/${MAVEN_ARCHIVE}" "${MAVEN_URL}"
   curl --fail --location --retry 5 --retry-delay 5 --connect-timeout 30 \
-    --output /tmp/apache-maven.tar.gz.sha512 "${MAVEN_URL}.sha512"
-  (cd /tmp && sha512sum --check apache-maven.tar.gz.sha512)
-  tar -xzf /tmp/apache-maven.tar.gz -C /opt
+    --output "/tmp/${MAVEN_ARCHIVE}.sha512" "${MAVEN_URL}.sha512"
+  (cd /tmp && sha512sum --check "${MAVEN_ARCHIVE}.sha512")
+  tar -xzf "/tmp/${MAVEN_ARCHIVE}" -C /opt
   export MAVEN_HOME
   export PATH="${MAVEN_HOME}/bin:${PATH}"
   mvn --version
