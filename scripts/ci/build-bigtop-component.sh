@@ -33,6 +33,7 @@ export JAVA_HOME
 JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
 export PATH="${JAVA_HOME}/bin:${PATH}"
 export BIGTOP_JDK=8
+export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Dmaven.wagon.httpconnectionManager.ttlSeconds=60"
 
 rm -rf "${BIGTOP_DIR}"
 mkdir -p "${WORK_ROOT}/artifacts"/{rpms,logs,evidence}
