@@ -45,7 +45,11 @@ if [[ "${COMPONENT}" == "spark" ]]; then
     --output "/tmp/${MAVEN_ARCHIVE}" "${MAVEN_URL}"
   curl --fail --location --retry 5 --retry-delay 5 --connect-timeout 30 \
     --output "/tmp/${MAVEN_ARCHIVE}.sha512" "${MAVEN_URL}.sha512"
-  (cd /tmp && sha512sum --check "${MAVEN_ARCHIVE}.sha512")
+  # Apache checksum sidecars may contain only the digest rather than
+  # "digest  filename", so normalize both formats before verification.
+  expected_sha512="$(awk '{print $1}' "/tmp/${MAVEN_ARCHIVE}.sha512")"
+  actual_sha512="$(sha512sum "/tmp/${MAVEN_ARCHIVE}" | awk '{print $1}')"
+  [[ "${actual_sha512}" == "${expected_sha512}" ]]
   tar -xzf "/tmp/${MAVEN_ARCHIVE}" -C /opt
   export MAVEN_HOME
   export PATH="${MAVEN_HOME}/bin:${PATH}"
