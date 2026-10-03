@@ -642,3 +642,41 @@ Full RC repository
   -> HA Validation
   -> BIGDATA-1.0 RC
 ```
+
+
+## 12. Wave 3-5 parallel CI implementation
+
+Implemented on branch `ci/wave3-5-components`.
+
+Shared component matrix:
+
+```text
+ci/components.yaml
+```
+
+Core reusable scripts:
+
+```text
+scripts/ci/build-bigtop-component.sh
+scripts/ci/test-bigtop-component.sh
+```
+
+Workflows:
+
+```text
+.github/workflows/build-components.yml
+.github/workflows/test-components.yml
+.github/workflows/ambari-component-contracts.yml
+.github/workflows/release-components.yml
+```
+
+Components enabled:
+
+| Component | Version | Build | Test | Ambari Contract | Release |
+|---|---:|---|---|---|---|
+| Tez | 0.10.5 | enabled | enabled | enabled | enabled |
+| Hive | 4.0.1 | enabled | enabled | enabled | enabled |
+| Spark | 3.5.8 | enabled | enabled | enabled | enabled |
+| HBase | 2.6.5 | enabled | enabled | enabled | enabled |
+
+The release workflow consumes tested RPM artifacts only and does not rebuild source.
