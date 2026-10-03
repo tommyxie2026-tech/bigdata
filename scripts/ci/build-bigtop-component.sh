@@ -53,6 +53,7 @@ if [[ "${COMPONENT}" == "spark" ]]; then
   tar -xzf "/tmp/${MAVEN_ARCHIVE}" -C /opt
   export MAVEN_HOME
   export PATH="${MAVEN_HOME}/bin:${PATH}"
+  dnf -y install R
   mvn --version
   mvn --version | grep -q "Apache Maven ${MAVEN_VERSION}"
 fi
