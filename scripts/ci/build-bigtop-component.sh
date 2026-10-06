@@ -55,6 +55,7 @@ if [[ "${COMPONENT}" == "spark" ]]; then
   export PATH="${MAVEN_HOME}/bin:${PATH}"
   mvn --version
   mvn --version | grep -q "Apache Maven ${MAVEN_VERSION}"
+  bash /workspace/scripts/ci/install-spark-r.sh
 fi
 
 export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Dmaven.wagon.httpconnectionManager.ttlSeconds=60"
