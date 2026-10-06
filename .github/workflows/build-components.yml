@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - ".github/workflows/*components.yml"
+      - ".github/workflows/build-one-component.yml"
       - "scripts/ci/*.sh"
       - "ci/components.yaml"
 
@@ -15,6 +16,7 @@ on:
       - main
     paths:
       - ".github/workflows/*components.yml"
+      - ".github/workflows/build-one-component.yml"
       - "scripts/ci/*.sh"
       - "ci/components.yaml"
 
@@ -23,86 +25,121 @@ permissions:
   actions: read
 
 jobs:
-  build:
-    name: Build ${{ matrix.component }} ${{ matrix.version }}
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 240
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - component: tez
-            version: 0.10.5
-            task: tez-rpm
-          - component: hive
-            version: 4.0.1
-            task: hive-rpm
-          - component: spark
-            version: 3.5.8
-            task: spark-rpm
-          - component: hbase
-            version: 2.6.5
-            task: hbase-rpm
+  tez_build:
+    name: Build tez 0.10.5
+    uses: ./.github/workflows/build-one-component.yml
+    with:
+      component: tez
+      version: 0.10.5
+      task: tez-rpm
 
-    env:
-      OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
-      WORK_ROOT: /tmp/bigdata-component-build
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Runner capacity
-        run: |
-          df -h
-          free -h
-          docker version
-
-      - name: Build RPMs
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf "${WORK_ROOT}"
-          mkdir -p "${WORK_ROOT}"
-          docker pull "${OPENEULER_IMAGE}"
-          docker run --rm \
-            -e COMPONENT="${{ matrix.component }}" \
-            -e VERSION="${{ matrix.version }}" \
-            -e BUILD_TASK="${{ matrix.task }}" \
-            -e BIGTOP_REF=branch-3.6 \
-            -e WORK_ROOT=/work \
-            -v "${GITHUB_WORKSPACE}:/workspace:ro" \
-            -v "${WORK_ROOT}:/work" \
-            "${OPENEULER_IMAGE}" \
-            bash /workspace/scripts/ci/build-bigtop-component.sh
-
-      - name: Publish summary
-        if: always()
-        run: |
-          test ! -f "${WORK_ROOT}/artifacts/evidence/evidence.md" ||             cat "${WORK_ROOT}/artifacts/evidence/evidence.md" >> "${GITHUB_STEP_SUMMARY}"
-
-      - name: Upload RPM artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.component }}-${{ matrix.version }}-bigtop-3.6-openeuler22-rpm
-          path: /tmp/bigdata-component-build/artifacts
-          if-no-files-found: error
-          retention-days: 14
-
-  test:
-    name: Test Components
-    needs: build
+  tez_test:
+    name: Test tez 0.10.5
+    needs: tez_build
     uses: ./.github/workflows/test-components.yml
     with:
+      component: tez
+      version: 0.10.5
       build_run_id: ${{ format('{0}', github.run_id) }}
 
-  release:
-    name: Release Components
-    needs: test
+  tez_release:
+    name: Release tez 0.10.5
+    needs: tez_test
     permissions:
       contents: write
       actions: read
     uses: ./.github/workflows/release-components.yml
     with:
+      component: tez
+      version: 0.10.5
+      test_run_id: ${{ format('{0}', github.run_id) }}
+
+  hive_build:
+    name: Build hive 4.0.1
+    needs: tez_release
+    uses: ./.github/workflows/build-one-component.yml
+    with:
+      component: hive
+      version: 4.0.1
+      task: hive-rpm
+
+  hive_test:
+    name: Test hive 4.0.1
+    needs: hive_build
+    uses: ./.github/workflows/test-components.yml
+    with:
+      component: hive
+      version: 4.0.1
+      build_run_id: ${{ format('{0}', github.run_id) }}
+
+  hive_release:
+    name: Release hive 4.0.1
+    needs: hive_test
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/release-components.yml
+    with:
+      component: hive
+      version: 4.0.1
+      test_run_id: ${{ format('{0}', github.run_id) }}
+
+  spark_build:
+    name: Build spark 3.5.8
+    needs: hive_release
+    uses: ./.github/workflows/build-one-component.yml
+    with:
+      component: spark
+      version: 3.5.8
+      task: spark-rpm
+
+  spark_test:
+    name: Test spark 3.5.8
+    needs: spark_build
+    uses: ./.github/workflows/test-components.yml
+    with:
+      component: spark
+      version: 3.5.8
+      build_run_id: ${{ format('{0}', github.run_id) }}
+
+  spark_release:
+    name: Release spark 3.5.8
+    needs: spark_test
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/release-components.yml
+    with:
+      component: spark
+      version: 3.5.8
+      test_run_id: ${{ format('{0}', github.run_id) }}
+
+  hbase_build:
+    name: Build hbase 2.6.5
+    needs: spark_release
+    uses: ./.github/workflows/build-one-component.yml
+    with:
+      component: hbase
+      version: 2.6.5
+      task: hbase-rpm
+
+  hbase_test:
+    name: Test hbase 2.6.5
+    needs: hbase_build
+    uses: ./.github/workflows/test-components.yml
+    with:
+      component: hbase
+      version: 2.6.5
+      build_run_id: ${{ format('{0}', github.run_id) }}
+
+  hbase_release:
+    name: Release hbase 2.6.5
+    needs: hbase_test
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/release-components.yml
+    with:
+      component: hbase
+      version: 2.6.5
       test_run_id: ${{ format('{0}', github.run_id) }}

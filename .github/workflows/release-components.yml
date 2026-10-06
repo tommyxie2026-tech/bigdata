@@ -3,11 +3,30 @@ name: Release Components
 on:
   workflow_call:
     inputs:
+      component:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
       test_run_id:
         required: true
         type: string
   workflow_dispatch:
     inputs:
+      component:
+        description: Component to release
+        required: true
+        type: choice
+        options:
+          - tez
+          - hive
+          - spark
+          - hbase
+      version:
+        description: Component version
+        required: true
+        type: string
       test_run_id:
         description: Successful Test Components run ID
         required: true
@@ -24,23 +43,11 @@ permissions:
 
 jobs:
   release:
-    name: Release ${{ matrix.component }} ${{ matrix.version }}
+    name: Release ${{ inputs.component }} ${{ inputs.version }}
     if: >
       github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - component: tez
-            version: 0.10.5
-          - component: hive
-            version: 4.0.1
-          - component: spark
-            version: 3.5.8
-          - component: hbase
-            version: 2.6.5
 
     env:
       TEST_RUN_ID: ${{ inputs.test_run_id }}
@@ -55,7 +62,7 @@ jobs:
       - name: Download tested RPMs
         uses: actions/download-artifact@v4
         with:
-          name: ${{ matrix.component }}-${{ matrix.version }}-tested-rpms
+          name: ${{ inputs.component }}-${{ inputs.version }}-tested-rpms
           path: /tmp/tested-rpms
           run-id: ${{ env.TEST_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -63,7 +70,7 @@ jobs:
       - name: Download test evidence
         uses: actions/download-artifact@v4
         with:
-          name: ${{ matrix.component }}-${{ matrix.version }}-test-evidence
+          name: ${{ inputs.component }}-${{ inputs.version }}-test-evidence
           path: /tmp/test-evidence
           run-id: ${{ env.TEST_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -88,8 +95,8 @@ jobs:
 
           cat > "${RELEASE_ROOT}/release-manifest.yaml" <<EOF
           schema: bigdata.release/v1
-          component: ${{ matrix.component }}
-          component_version: ${{ matrix.version }}
+          component: ${{ inputs.component }}
+          component_version: ${{ inputs.version }}
           bigtop_version: 3.6.0
           ambari_version: 3.0.0
           os: openEuler 22.03 LTS SP4
@@ -99,7 +106,7 @@ jobs:
           status: RELEASE_CANDIDATE
           EOF
 
-          archive="bigdata-1.0-${{ matrix.component }}-${{ matrix.version }}-rc.tar.gz"
+          archive="bigdata-1.0-${{ inputs.component }}-${{ inputs.version }}-rc.tar.gz"
           tar -C "${RELEASE_ROOT}" -czf "/tmp/${archive}" .
           sha256sum "/tmp/${archive}" > "/tmp/${archive}.sha256"
 
@@ -108,11 +115,11 @@ jobs:
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bigdata-1.0-${{ matrix.component }}-${{ matrix.version }}-rc
+          name: bigdata-1.0-${{ inputs.component }}-${{ inputs.version }}-rc
           path: |
             /tmp/bigdata-release
-            /tmp/bigdata-1.0-${{ matrix.component }}-${{ matrix.version }}-rc.tar.gz
-            /tmp/bigdata-1.0-${{ matrix.component }}-${{ matrix.version }}-rc.tar.gz.sha256
+            /tmp/bigdata-1.0-${{ inputs.component }}-${{ inputs.version }}-rc.tar.gz
+            /tmp/bigdata-1.0-${{ inputs.component }}-${{ inputs.version }}-rc.tar.gz.sha256
           if-no-files-found: error
           retention-days: 90
 
@@ -123,12 +130,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="ci-${{ matrix.component }}-${{ matrix.version }}-${GITHUB_RUN_NUMBER}"
-          archive="bigdata-1.0-${{ matrix.component }}-${{ matrix.version }}-rc.tar.gz"
+          tag="ci-${{ inputs.component }}-${{ inputs.version }}-${GITHUB_RUN_NUMBER}"
+          archive="bigdata-1.0-${{ inputs.component }}-${{ inputs.version }}-rc.tar.gz"
           gh release create "${tag}" \
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
-            --title "BIGDATA ${{ matrix.component }} ${{ matrix.version }} RC" \
+            --title "BIGDATA ${{ inputs.component }} ${{ inputs.version }} RC" \
             --notes-file "${RELEASE_ROOT}/release-manifest.yaml" \
             --prerelease \
             "/tmp/${archive}" \

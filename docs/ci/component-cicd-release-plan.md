@@ -680,3 +680,23 @@ Components enabled:
 | HBase | 2.6.5 | enabled | enabled | enabled | enabled |
 
 The release workflow consumes tested RPM artifacts only and does not rebuild source.
+
+## 13. Serial component validation on PR #43
+
+The active Wave 3–5 workflow runs one component at a time, in this order:
+
+```text
+Tez Build -> Test -> Release Candidate
+  -> Hive Build -> Test -> Release Candidate
+  -> Spark Build -> Test -> Release Candidate
+  -> HBase Build -> Test -> Release Candidate
+```
+
+Each step depends on the previous step succeeding. A failed build or install smoke
+prevents later release candidates from being assembled. Automatic release steps
+upload candidate artifacts only; publishing a GitHub prerelease still requires an
+explicit manual dispatch. Maven and Gradle downloads are cached between successful
+component jobs, while each job still builds and checks its RPMs independently.
+Serial execution limits concurrent external downloads but does not increase an
+individual GitHub-hosted runner's CPU or memory. The first cache miss can still be
+slow, and the full pipeline's elapsed time is the sum of its component stages.
