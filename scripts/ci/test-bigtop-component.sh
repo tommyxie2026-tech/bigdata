@@ -35,12 +35,14 @@ printf '%s\n' "${package_names[@]}" > "${EVIDENCE_ROOT}/package-names.txt"
 
 base_pkg=""
 for p in "${package_names[@]}"; do
-  case "${COMPONENT}" in
-    tez)   [[ "${p}" == tez* ]] && base_pkg="${p}" ;;
-    hive)  [[ "${p}" == hive* && "${p}" != *server* && "${p}" != *metastore* && "${p}" != *webhcat* ]] && base_pkg="${p}" ;;
-    spark) [[ "${p}" == spark* && "${p}" != *historyserver* && "${p}" != *thriftserver* ]] && base_pkg="${p}" ;;
-    hbase) [[ "${p}" == hbase* && "${p}" != *master* && "${p}" != *regionserver* && "${p}" != *thrift* ]] && base_pkg="${p}" ;;
-  esac
+  # Match the base RPM, never a client, documentation, Python or SparkR subpackage.
+  if [[ "${p}" =~ ^${COMPONENT}(_[0-9]+)*$ ]]; then
+    if [[ -n "${base_pkg}" ]]; then
+      echo "Multiple base packages for ${COMPONENT}: ${base_pkg}, ${p}" >&2
+      exit 1
+    fi
+    base_pkg="${p}"
+  fi
 done
 
 if [[ -z "${base_pkg}" ]]; then

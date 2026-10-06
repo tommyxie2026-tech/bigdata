@@ -1,11 +1,11 @@
 name: Release Components
 
 on:
-  workflow_run:
-    workflows:
-      - Test Components
-    types:
-      - completed
+  workflow_call:
+    inputs:
+      test_run_id:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       test_run_id:
@@ -26,8 +26,8 @@ jobs:
   release:
     name: Release ${{ matrix.component }} ${{ matrix.version }}
     if: >
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-      github.event_name == 'workflow_dispatch'
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -43,14 +43,14 @@ jobs:
             version: 2.6.5
 
     env:
-      TEST_RUN_ID: ${{ github.event.workflow_run.id || inputs.test_run_id }}
+      TEST_RUN_ID: ${{ inputs.test_run_id }}
       RELEASE_ROOT: /tmp/bigdata-release
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
 
       - name: Download tested RPMs
         uses: actions/download-artifact@v4

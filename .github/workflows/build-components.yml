@@ -4,23 +4,23 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - ci/wave3-5-components
+      - main
     paths:
-      - ".github/workflows/build-components.yml"
-      - "scripts/ci/build-bigtop-component.sh"
-      - "scripts/ci/test-bigtop-component.sh"
+      - ".github/workflows/*components.yml"
+      - "scripts/ci/*.sh"
       - "ci/components.yaml"
 
   pull_request:
     branches:
       - main
     paths:
-      - ".github/workflows/build-components.yml"
-      - "scripts/ci/build-bigtop-component.sh"
+      - ".github/workflows/*components.yml"
+      - "scripts/ci/*.sh"
       - "ci/components.yaml"
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   build:
@@ -89,3 +89,20 @@ jobs:
           path: /tmp/bigdata-component-build/artifacts
           if-no-files-found: error
           retention-days: 14
+
+  test:
+    name: Test Components
+    needs: build
+    uses: ./.github/workflows/test-components.yml
+    with:
+      build_run_id: ${{ format('{0}', github.run_id) }}
+
+  release:
+    name: Release Components
+    needs: test
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/release-components.yml
+    with:
+      test_run_id: ${{ format('{0}', github.run_id) }}

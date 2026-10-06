@@ -1,11 +1,11 @@
 name: Test Components
 
 on:
-  workflow_run:
-    workflows:
-      - Build Components
-    types:
-      - completed
+  workflow_call:
+    inputs:
+      build_run_id:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       build_run_id:
@@ -21,8 +21,8 @@ jobs:
   test:
     name: Test ${{ matrix.component }} ${{ matrix.version }}
     if: >
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-      github.event_name == 'workflow_dispatch'
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
@@ -42,13 +42,13 @@ jobs:
       OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
       ARTIFACT_ROOT: /tmp/bigdata-component-artifact
       EVIDENCE_ROOT: /tmp/bigdata-component-test
-      BUILD_RUN_ID: ${{ github.event.workflow_run.id || inputs.build_run_id }}
+      BUILD_RUN_ID: ${{ inputs.build_run_id }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
 
       - name: Download component RPMs
         uses: actions/download-artifact@v4
