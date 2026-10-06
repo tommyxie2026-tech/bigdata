@@ -94,9 +94,10 @@ PY
 fi
 
 set +e
-./gradlew "${BUILD_TASK}" -Dbuildwithdeps=true --stacktrace 2>&1 \
-  | tee "${WORK_ROOT}/artifacts/logs/${COMPONENT}-build.log"
-build_rc=${PIPESTATUS[0]}
+bash /workspace/scripts/ci/retry-maven-downloads.sh \
+  "${WORK_ROOT}/artifacts/logs/${COMPONENT}-build.log" \
+  ./gradlew "${BUILD_TASK}" -Dbuildwithdeps=true --stacktrace
+build_rc=$?
 set -e
 
 find "${BIGTOP_DIR}" -type f -name '*.rpm' -print -exec cp -v {} "${WORK_ROOT}/artifacts/rpms/" \; || true
