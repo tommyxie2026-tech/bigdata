@@ -6,9 +6,13 @@ set -euo pipefail
 # SparkR's HTML vignette opens an SVG graphics device while R CMD build runs.
 # Cairo headers must be present when compiling R itself, not installed later.
 dnf -y install gcc-gfortran readline-devel bzip2-devel xz-devel pcre2-devel libcurl-devel \
-  cairo-devel pango-devel libpng-devel
+  cairo-devel pango-devel libpng-devel \
+  texlive-latex texlive-pdftex texlive-collection-fontsrecommended
 pkg-config --modversion cairo
 pkg-config --modversion pangocairo
+# SparkR's R CMD check also renders its reference manual as PDF.
+command -v pdflatex
+pdflatex --version | head -n 1
 R_VERSION=4.4.3
 source_root="$(mktemp -d /tmp/spark-r.XXXXXX)"
 trap 'rm -rf "${source_root}"' EXIT
