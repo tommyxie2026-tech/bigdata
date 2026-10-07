@@ -22,7 +22,14 @@ grep -qx "component: ${COMPONENT}" "${TEST_EVIDENCE_DIR}/evidence.md"
 grep -qx "version: ${VERSION}" "${TEST_EVIDENCE_DIR}/evidence.md"
 (
   cd "${TESTED_RPMS_DIR}"
-  sha256sum -c evidence/SHA256SUMS
+  # Older build artifacts listed Bigtop's hidden `.rpm` placeholder. GitHub's
+  # artifact upload excludes hidden files, so compare the exact visible RPM set
+  # and verify every uploaded RPM while ignoring only that placeholder entry.
+  diff -u \
+    <(awk '$2 != "rpms/.rpm" {print $2}' evidence/SHA256SUMS | LC_ALL=C sort) \
+    <(find rpms -maxdepth 1 -type f -name '*.rpm' ! -name '.rpm' \
+      -print | LC_ALL=C sort)
+  sha256sum -c <(awk '$2 != "rpms/.rpm"' evidence/SHA256SUMS)
 )
 
 target="${REPO_CHECKOUT}/repo/openeuler-22.03-lts-sp4/bigtop-3.6/${COMPONENT}/${VERSION}"
@@ -34,7 +41,7 @@ if [[ -e "${target}" ]]; then
   exit 0
 fi
 mkdir -p "${target}"
-find "${TESTED_RPMS_DIR}/rpms" -maxdepth 1 -type f -name '*.rpm' \
+find "${TESTED_RPMS_DIR}/rpms" -maxdepth 1 -type f -name '*.rpm' ! -name '.rpm' \
   -exec cp {} "${target}/" \;
 rpm_count="$(find "${target}" -maxdepth 1 -type f -name '*.rpm' | wc -l | tr -d ' ')"
 [[ "${rpm_count}" -gt 0 ]]

@@ -101,17 +101,19 @@ bash /workspace/scripts/ci/retry-maven-downloads.sh \
 build_rc=$?
 set -e
 
-find "${BIGTOP_DIR}" -type f -name '*.rpm' -print -exec cp -v {} "${WORK_ROOT}/artifacts/rpms/" \; || true
+find "${BIGTOP_DIR}" -type f -name '*.rpm' ! -name '.rpm' -print \
+  -exec cp -v {} "${WORK_ROOT}/artifacts/rpms/" \; || true
 
-find "${WORK_ROOT}/artifacts/rpms" -type f -name '*.rpm' -printf '%f\n' \
+find "${WORK_ROOT}/artifacts/rpms" -type f -name '*.rpm' ! -name '.rpm' -printf '%f\n' \
   | sort > "${WORK_ROOT}/artifacts/evidence/package-list.txt"
 
 (
   cd "${WORK_ROOT}/artifacts"
-  find rpms -type f -name '*.rpm' -print0 | sort -z | xargs -0 -r sha256sum > evidence/SHA256SUMS
+  find rpms -type f -name '*.rpm' ! -name '.rpm' -print0 \
+    | sort -z | xargs -0 -r sha256sum > evidence/SHA256SUMS
 )
 
-rpm_count="$(find "${WORK_ROOT}/artifacts/rpms" -type f -name '*.rpm' | wc -l)"
+rpm_count="$(find "${WORK_ROOT}/artifacts/rpms" -type f -name '*.rpm' ! -name '.rpm' | wc -l)"
 status=PASS
 if [[ "${build_rc}" -ne 0 || "${rpm_count}" -eq 0 ]]; then status=FAIL; fi
 
