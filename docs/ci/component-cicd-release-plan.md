@@ -706,3 +706,11 @@ For a targeted rerun, manually dispatch `Build Components` with
 starts at Build and continues through Test and Release Candidate, followed by
 each remaining component in order. Earlier components are intentionally skipped
 in that run; a targeted rerun does not replace a complete PR validation run.
+
+After a component passes the install smoke, its release job verifies the tested
+RPM checksums, assembles the release candidate, and opens a pull request against
+`main` containing those RPMs under `repo/`. The job merges that PR after the
+repository metadata is generated. RPMs are tracked with Git LFS to avoid GitHub's
+ordinary file-size limit. Each component version has a separate repository
+directory; an already promoted version is left untouched on rerun. The checkout
+must use Git LFS to retrieve actual RPM bytes.

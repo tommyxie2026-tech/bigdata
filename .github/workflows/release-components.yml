@@ -40,6 +40,7 @@ on:
 permissions:
   contents: write
   actions: read
+  pull-requests: write
 
 jobs:
   release:
@@ -122,6 +123,69 @@ jobs:
             /tmp/bigdata-1.0-${{ inputs.component }}-${{ inputs.version }}-rc.tar.gz.sha256
           if-no-files-found: error
           retention-days: 90
+
+      - name: Prepare RPM repository tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y createrepo-c git-lfs
+
+      - name: Checkout RPM repository base
+        uses: actions/checkout@v4
+        env:
+          GIT_LFS_SKIP_SMUDGE: '1'
+        with:
+          ref: main
+          path: rpm-repository-pr
+          lfs: false
+
+      - name: Open and merge tested RPM pull request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMPONENT: ${{ inputs.component }}
+          VERSION: ${{ inputs.version }}
+          TEST_RUN_ID: ${{ inputs.test_run_id }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
+        run: |
+          set -euo pipefail
+          cd "${REPO_CHECKOUT}"
+          git lfs install --local
+          branch="ci/rpm-repo-${COMPONENT}-${VERSION}-${GITHUB_RUN_ID}"
+          git switch -c "${branch}"
+          mkdir -p repo
+          cp "${GITHUB_WORKSPACE}/repo/.gitattributes" repo/.gitattributes
+          cp "${GITHUB_WORKSPACE}/repo/README.md" repo/README.md
+          bash "${GITHUB_WORKSPACE}/scripts/ci/stage-tested-rpms.sh"
+          git add repo
+          git diff --cached --check
+          while IFS= read -r -d '' rpm; do
+            relative="${rpm#./}"
+            [[ "$(git check-attr filter -- "${relative}")" == *'filter: lfs' ]]
+            [[ "$(git cat-file -s ":${relative}")" -lt 300 ]]
+          done < <(find "repo/openeuler-22.03-lts-sp4/bigtop-3.6/${COMPONENT}/${VERSION}" \
+            -maxdepth 1 -type f -name '*.rpm' -print0)
+          if git diff --cached --quiet; then
+            echo "RPM repository already contains ${COMPONENT} ${VERSION}." >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "repo: add tested ${COMPONENT} ${VERSION} RPMs"
+          git push origin "${branch}"
+          body_file="$(mktemp)"
+          cat > "${body_file}" <<EOF
+          Adds the ${COMPONENT} ${VERSION} RPMs from tested artifact run ${TEST_RUN_ID}.
+          Source commit: ${SOURCE_SHA}
+          Release candidate: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+          pr_url="$(gh pr create --repo "${GITHUB_REPOSITORY}" \
+            --base main --head "${branch}" \
+            --title "repo: add tested ${COMPONENT} ${VERSION} RPMs" \
+            --body-file "${body_file}")"
+          echo "RPM repository PR: ${pr_url}" >> "${GITHUB_STEP_SUMMARY}"
+          gh pr merge "${pr_url}" --repo "${GITHUB_REPOSITORY}" --squash --delete-branch
+          echo "Merged tested RPMs into main/repo." >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Publish GitHub prerelease
         if: github.event_name == 'workflow_dispatch' && inputs.publish_github_release
