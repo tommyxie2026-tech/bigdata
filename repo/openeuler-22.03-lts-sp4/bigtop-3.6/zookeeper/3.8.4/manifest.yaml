@@ -1,0 +1,9 @@
+schema: bigdata.rpm-repo/v1
+component: zookeeper
+version: 3.8.4
+bigtop_version: 3.6.0
+os: openEuler 22.03 LTS SP4
+promotion_workflow_commit: c6b892e80f6d6fe656c22902b13c34ca40c6e774
+tested_artifact_run_id: 36659305585
+rpm_count: 7
+test_status: PASS
