@@ -19,3 +19,8 @@ make install
 ldconfig
 R --version
 Rscript -e 'stopifnot(getRversion() == "4.4.3"); library(methods); library(utils)'
+
+# Spark's RPM invokes `R CMD build` for SparkR, whose DESCRIPTION declares
+# knitr as its vignette builder. Check it now so a missing package does not
+# surface only after the Maven and RPM builds have finished.
+Rscript -e 'options(timeout=300); install.packages("knitr", repos="https://cloud.r-project.org", Ncpus=2); stopifnot(requireNamespace("knitr", quietly=TRUE))'
