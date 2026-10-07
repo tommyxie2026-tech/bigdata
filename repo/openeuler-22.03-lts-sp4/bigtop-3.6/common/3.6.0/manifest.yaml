@@ -1,0 +1,8 @@
+schema: bigdata.rpm-repo/v2
+component: common
+version: 3.6.0
+rpm_count: 3
+test_status: PASS
+repository_layout: split-runtime/v2
+source_test_run_ids:
+  - 36661238781

@@ -5,5 +5,6 @@ bigtop_version: 3.6.0
 os: openEuler 22.03 LTS SP4
 promotion_workflow_commit: c6b892e80f6d6fe656c22902b13c34ca40c6e774
 tested_artifact_run_id: 36661238781
-rpm_count: 39
+rpm_count: 23
 test_status: PASS
+repository_layout: split-runtime/v2
