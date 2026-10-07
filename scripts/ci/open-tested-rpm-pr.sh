@@ -28,11 +28,10 @@ bash "${GITHUB_WORKSPACE}/scripts/ci/stage-tested-rpms.sh"
 git add repo
 git diff --cached --check
 while IFS= read -r -d '' rpm; do
-  relative="${rpm#./}"
-  [[ "$(git check-attr filter -- "${relative}")" == *'filter: lfs' ]]
-  [[ "$(git cat-file -s ":${relative}")" -lt 300 ]]
-done < <(find "repo/openeuler-22.03-lts-sp4/bigtop-3.6/${COMPONENT}/${VERSION}" \
-  -maxdepth 1 -type f -name '*.rpm' -print0)
+  [[ "${rpm}" == *.rpm ]] || continue
+  [[ "$(git check-attr filter -- "${rpm}")" == *'filter: lfs' ]]
+  [[ "$(git cat-file -s ":${rpm}")" -lt 300 ]]
+done < <(git diff --cached --name-only -z -- repo)
 
 if git diff --cached --quiet; then
   echo "RPM repository already contains ${COMPONENT} ${VERSION}." >> "${GITHUB_STEP_SUMMARY}"

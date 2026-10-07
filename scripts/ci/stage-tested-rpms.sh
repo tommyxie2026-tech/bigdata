@@ -40,7 +40,9 @@ grep -qx "version: ${VERSION}" "${TEST_EVIDENCE_DIR}/evidence.md"
   sha256sum -c "${normalized_checksums}"
 )
 
-target="${REPO_CHECKOUT}/repo/openeuler-22.03-lts-sp4/bigtop-3.6/${COMPONENT}/${VERSION}"
+repo_root="${REPO_CHECKOUT}/repo/openeuler-22.03-lts-sp4/bigtop-3.6"
+target="${repo_root}/${COMPONENT}/${VERSION}"
+common="${repo_root}/common/3.6.0"
 if [[ -e "${target}" ]]; then
   grep -qx "component: ${COMPONENT}" "${target}/manifest.yaml"
   grep -qx "version: ${VERSION}" "${target}/manifest.yaml"
@@ -48,9 +50,22 @@ if [[ -e "${target}" ]]; then
   echo "Already promoted: ${target}"
   exit 0
 fi
-mkdir -p "${target}"
-find "${TESTED_RPMS_DIR}/rpms" -maxdepth 1 -type f -name '*.rpm' ! -name '.rpm' \
-  -exec cp {} "${target}/" \;
+mkdir -p "${target}" "${common}"
+common_changed=false
+for rpm in "${TESTED_RPMS_DIR}"/rpms/*.rpm; do
+  name="${rpm##*/}"
+  case "${name}" in
+    *.src.rpm|*-debuginfo-*|*-debugsource-*|*-doc-*|*-devel-*|*-test-*|*-tests-*|*-javadoc-*) continue ;;
+    "${COMPONENT}"-*) cp "${rpm}" "${target}/" ;;
+    bigtop-*)
+      if [[ ! -e "${common}/${name}" ]]; then
+        cp "${rpm}" "${common}/"
+        common_changed=true
+      fi
+      ;;
+    *) echo "Using separately published dependency: ${name}" ;;
+  esac
+done
 rpm_count="$(find "${target}" -maxdepth 1 -type f -name '*.rpm' | wc -l | tr -d ' ')"
 [[ "${rpm_count}" -gt 0 ]]
 
@@ -58,8 +73,26 @@ rpm_count="$(find "${target}" -maxdepth 1 -type f -name '*.rpm' | wc -l | tr -d 
   cd "${target}"
   find . -maxdepth 1 -type f -name '*.rpm' -print0 | sort -z \
     | xargs -0 -r sha256sum > SHA256SUMS
-  createrepo_c .
+  createrepo_c --no-database .
 )
+
+if [[ "${common_changed}" == true ]]; then
+  (
+    cd "${common}"
+    find . -maxdepth 1 -type f -name '*.rpm' -print0 | sort -z \
+      | xargs -0 -r sha256sum > SHA256SUMS
+    createrepo_c --no-database .
+  )
+  common_count="$(find "${common}" -maxdepth 1 -type f -name '*.rpm' | wc -l | tr -d ' ')"
+  cat > "${common}/manifest.yaml" <<EOF
+schema: bigdata.rpm-repo/v2
+component: common
+version: 3.6.0
+rpm_count: ${common_count}
+test_status: PASS
+repository_layout: split-runtime/v2
+EOF
+fi
 
 cat > "${target}/manifest.yaml" <<EOF
 schema: bigdata.rpm-repo/v1
@@ -71,6 +104,7 @@ promotion_workflow_commit: ${SOURCE_SHA}
 tested_artifact_run_id: ${TEST_RUN_ID}
 rpm_count: ${rpm_count}
 test_status: PASS
+repository_layout: split-runtime/v2
 EOF
 
 echo "Staged ${rpm_count} verified RPMs in ${target}"

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       start_component:
-        description: First component to build, test, and package as a release candidate
+        description: First component to build, or RPM repository maintenance
         required: true
         default: tez
         type: choice
@@ -13,6 +13,7 @@ on:
           - hive
           - spark
           - hbase
+          - repo_maintenance
       promote_test_run_id:
         description: Existing successful Test run ID; when set, promote tested RPMs without rebuilding
         required: false
@@ -51,9 +52,88 @@ permissions:
   actions: read
 
 jobs:
+  slim_repository:
+    name: Deduplicate tested RPM repository
+    if: github.event_name == 'workflow_dispatch' && inputs.start_component == 'repo_maintenance'
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout maintenance code
+        uses: actions/checkout@v4
+
+      - name: Prepare RPM repository tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y createrepo-c git-lfs
+
+      - name: Checkout current RPM repository
+        uses: actions/checkout@v4
+        env:
+          GIT_LFS_SKIP_SMUDGE: '1'
+        with:
+          ref: main
+          path: rpm-repository-pr
+          lfs: false
+
+      - name: Select runtime RPMs and rebuild metadata
+        env:
+          REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
+        run: |
+          set -euo pipefail
+          cd "${REPO_CHECKOUT}"
+          git lfs install --local
+          git switch -c "ci/slim-rpm-repo-${GITHUB_RUN_ID}"
+          python3 "${GITHUB_WORKSPACE}/scripts/ci/slim-rpm-repo.py" \
+            --repo-checkout "${REPO_CHECKOUT}"
+
+      - name: Test split DNF repositories in clean openEuler
+        env:
+          REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
+        run: bash scripts/ci/test-slim-rpm-repo.sh
+
+      - name: Document the split repository layout
+        env:
+          REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
+        run: cp repo/README.md "${REPO_CHECKOUT}/repo/README.md"
+
+      - name: Open and merge RPM cleanup pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
+        run: |
+          set -euo pipefail
+          cd "${REPO_CHECKOUT}"
+          git add repo
+          git diff --cached --check
+          while IFS= read -r -d '' rpm; do
+            [[ "${rpm}" == *.rpm ]] || continue
+            [[ "$(git check-attr filter -- "${rpm}")" == *'filter: lfs' ]]
+            [[ "$(git cat-file -s ":${rpm}")" -lt 300 ]]
+          done < <(git diff --cached --name-only -z -- repo)
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'repo: keep one copy of tested runtime RPMs'
+          git push origin "ci/slim-rpm-repo-${GITHUB_RUN_ID}"
+          body_file="$(mktemp)"
+          cat > "${body_file}" <<EOF
+          Move shared Bigtop packages to common/, keep component RPMs only in their
+          owning repositories, and remove source/debug/test/docs/devel packages.
+          Validated with checksum checks and a clean openEuler DNF install.
+          Maintenance run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+          pr_url="$(gh pr create --repo "${GITHUB_REPOSITORY}" \
+            --base main --head "ci/slim-rpm-repo-${GITHUB_RUN_ID}" \
+            --title 'repo: deduplicate tested runtime RPMs' \
+            --body-file "${body_file}")"
+          echo "RPM cleanup PR: ${pr_url}" >> "${GITHUB_STEP_SUMMARY}"
+          gh pr merge "${pr_url}" --repo "${GITHUB_REPOSITORY}" --squash
+
   promote_existing:
     name: Promote tested ${{ inputs.promote_component || inputs.start_component }} RPMs
-    if: github.event_name == 'workflow_dispatch' && inputs.promote_test_run_id != ''
+    if: github.event_name == 'workflow_dispatch' && inputs.start_component != 'repo_maintenance' && inputs.promote_test_run_id != ''
     permissions:
       contents: write
       actions: read
