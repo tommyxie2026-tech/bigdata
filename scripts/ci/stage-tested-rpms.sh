@@ -10,7 +10,7 @@ TESTED_RPMS_DIR="${TESTED_RPMS_DIR:-/tmp/tested-rpms}"
 TEST_EVIDENCE_DIR="${TEST_EVIDENCE_DIR:-/tmp/test-evidence}"
 
 case "${COMPONENT}" in
-  tez|hive|spark|hbase) ;;
+  zookeeper|hadoop|tez|hive|spark|hbase) ;;
   *) echo "Unsupported component: ${COMPONENT}" >&2; exit 2 ;;
 esac
 [[ "${VERSION}" =~ ^[0-9]+(\.[0-9]+)+$ ]]
@@ -22,14 +22,22 @@ grep -qx "component: ${COMPONENT}" "${TEST_EVIDENCE_DIR}/evidence.md"
 grep -qx "version: ${VERSION}" "${TEST_EVIDENCE_DIR}/evidence.md"
 (
   cd "${TESTED_RPMS_DIR}"
-  # Older build artifacts listed Bigtop's hidden `.rpm` placeholder. GitHub's
-  # artifact upload excludes hidden files, so compare the exact visible RPM set
-  # and verify every uploaded RPM while ignoring only that placeholder entry.
+  # Older ZooKeeper/Hadoop build artifacts recorded container-absolute RPM
+  # paths. Artifact download places all RPMs in rpms/, so normalize each
+  # checksum entry before checking the exact uploaded file set and its hashes.
+  normalized_checksums="$(mktemp)"
+  trap 'rm -f "${normalized_checksums}"' EXIT
+  awk 'NF >= 2 {
+    name = $2
+    sub(/^.*\//, "", name)
+    if (name != ".rpm") print $1 "  rpms/" name
+  }' evidence/SHA256SUMS > "${normalized_checksums}"
+  [[ -s "${normalized_checksums}" ]]
   diff -u \
-    <(awk '$2 != "rpms/.rpm" {print $2}' evidence/SHA256SUMS | LC_ALL=C sort) \
+    <(awk '{print $2}' "${normalized_checksums}" | LC_ALL=C sort) \
     <(find rpms -maxdepth 1 -type f -name '*.rpm' ! -name '.rpm' \
       -print | LC_ALL=C sort)
-  sha256sum -c <(awk '$2 != "rpms/.rpm"' evidence/SHA256SUMS)
+  sha256sum -c "${normalized_checksums}"
 )
 
 target="${REPO_CHECKOUT}/repo/openeuler-22.03-lts-sp4/bigtop-3.6/${COMPONENT}/${VERSION}"

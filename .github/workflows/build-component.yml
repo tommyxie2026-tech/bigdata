@@ -10,6 +10,7 @@ on:
     paths:
       - ".github/workflows/build-component.yml"
       - "scripts/ci/build-zookeeper-rpm-openeuler-container.sh"
+      - "scripts/ci/test-zookeeper-rpm-openeuler-container.sh"
       - "packaging/bigtop/**"
       - "docs/version-matrix.md"
 

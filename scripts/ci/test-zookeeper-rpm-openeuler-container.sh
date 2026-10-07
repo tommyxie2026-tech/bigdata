@@ -52,7 +52,7 @@ install_pkgs=("${base_pkg}")
 {
   echo "Installing packages from repo:"
   printf '  %s\n' "${install_pkgs[@]}"
-  dnf -y --repo=bigdata-ci install "${install_pkgs[@]}"
+  dnf -y --enablerepo=bigdata-ci install "${install_pkgs[@]}"
 } 2>&1 | tee "${EVIDENCE_ROOT}/dnf-install.log"
 
 rpm -qa | grep -i zookeeper | sort | tee "${EVIDENCE_ROOT}/installed-packages.txt"
@@ -60,8 +60,13 @@ rpm -ql "${base_pkg}" | sort > "${EVIDENCE_ROOT}/rpm-files.txt"
 rpm -qR "${base_pkg}" | sort > "${EVIDENCE_ROOT}/rpm-requires.txt"
 
 test -x /usr/bin/zookeeper-server
+test -x /usr/bin/zookeeper-server-initialize
 test -x /usr/bin/zookeeper-client
 test -f /etc/zookeeper/conf/zoo.cfg
+
+echo "== initialize ZooKeeper data directory =="
+zookeeper-server-initialize 2>&1 | tee "${EVIDENCE_ROOT}/runtime-initialize.log"
+test -d /var/lib/zookeeper
 
 zookeeper-server start 2>&1 | tee "${EVIDENCE_ROOT}/runtime-start.log"
 

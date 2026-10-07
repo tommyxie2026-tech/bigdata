@@ -1,0 +1,99 @@
+name: Test Hadoop
+
+on:
+  workflow_run:
+    workflows:
+      - Build Hadoop
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  test:
+    name: Hadoop DNF install smoke
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
+      ARTIFACT_ROOT: /tmp/bigdata-hadoop-artifact
+      EVIDENCE_ROOT: /tmp/bigdata-hadoop-test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Download Hadoop build artifact
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: hadoop-3.4.3-bigtop-3.6-openeuler22-rpm
+          path: /tmp/bigdata-hadoop-artifact
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Manual mode builds locally first
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/bigdata-hadoop-local-build
+          docker pull "${OPENEULER_IMAGE}"
+          docker run --rm \
+            -e BIGTOP_REF=branch-3.6 \
+            -e WORK_ROOT=/work \
+            -v "${GITHUB_WORKSPACE}:/workspace:ro" \
+            -v /tmp/bigdata-hadoop-local-build:/work \
+            "${OPENEULER_IMAGE}" \
+            bash /workspace/scripts/ci/build-hadoop-rpm-openeuler-container.sh
+          mkdir -p "${ARTIFACT_ROOT}"
+          cp -a /tmp/bigdata-hadoop-local-build/artifacts/. "${ARTIFACT_ROOT}/"
+
+      - name: Run Hadoop install smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${EVIDENCE_ROOT}"
+          mkdir -p "${EVIDENCE_ROOT}"
+          docker pull "${OPENEULER_IMAGE}"
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace:ro" \
+            -v "${ARTIFACT_ROOT}:/artifact:ro" \
+            -v "${EVIDENCE_ROOT}:/evidence" \
+            "${OPENEULER_IMAGE}" \
+            bash /workspace/scripts/ci/test-hadoop-rpm-openeuler-container.sh
+
+      - name: Publish summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "${EVIDENCE_ROOT}/evidence.md" ]]; then
+            cat "${EVIDENCE_ROOT}/evidence.md" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Upload Hadoop test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hadoop-3.4.3-test-evidence
+          path: /tmp/bigdata-hadoop-test
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload tested Hadoop RPMs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hadoop-3.4.3-tested-rpms
+          path: /tmp/bigdata-hadoop-artifact
+          if-no-files-found: error
+          retention-days: 30

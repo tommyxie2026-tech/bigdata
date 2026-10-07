@@ -1,40 +1,26 @@
-name: Release CI
+name: Release Hadoop
 
 on:
   workflow_run:
     workflows:
-      - Test CI
+      - Test Hadoop
     types:
       - completed
   workflow_dispatch:
     inputs:
       test_run_id:
-        description: Successful Test CI run ID containing tested RPMs
+        description: Successful Test Hadoop run ID containing tested RPMs
         required: true
         type: string
-      release_name:
-        description: Release bundle name
-        required: false
-        default: bigdata-1.0-zookeeper-rc
-        type: string
-      publish_github_release:
-        description: Publish a GitHub prerelease
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: write
   actions: read
   pull-requests: write
 
-concurrency:
-  group: release-ci-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   release:
-    name: Assemble tested ZooKeeper release
+    name: Assemble Hadoop release candidate
     if: >
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
@@ -45,9 +31,9 @@ jobs:
     timeout-minutes: 30
 
     env:
-      RELEASE_ROOT: /tmp/bigdata-release
+      RELEASE_ROOT: /tmp/bigdata-hadoop-release
+      RELEASE_NAME: bigdata-1.0-hadoop-3.4.3-rc
       TEST_RUN_ID: ${{ github.event.workflow_run.id || inputs.test_run_id }}
-      RELEASE_NAME: ${{ inputs.release_name || 'bigdata-1.0-zookeeper-rc' }}
 
     steps:
       - name: Checkout
@@ -55,18 +41,18 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
-      - name: Download tested RPMs
+      - name: Download tested Hadoop RPMs
         uses: actions/download-artifact@v4
         with:
-          name: zookeeper-3.8.4-tested-rpms
+          name: hadoop-3.4.3-tested-rpms
           path: /tmp/tested-rpms
           run-id: ${{ env.TEST_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download test evidence
+      - name: Download Hadoop test evidence
         uses: actions/download-artifact@v4
         with:
-          name: zookeeper-3.8.4-test-evidence
+          name: hadoop-3.4.3-test-evidence
           path: /tmp/test-evidence
           run-id: ${{ env.TEST_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -92,9 +78,11 @@ jobs:
           {
             echo "schema: bigdata.release/v1"
             echo "name: ${RELEASE_NAME}"
-            echo "component: zookeeper"
-            echo "component_version: 3.8.4"
+            echo "component: hadoop"
+            echo "component_version: 3.4.3"
             echo "bigtop_version: 3.6.0"
+            echo "ambari_version: 3.0.0"
+            echo "ambari_compatibility: ADAPTATION_REQUIRED"
             echo "os: openEuler 22.03 LTS SP4"
             echo "package_format: RPM"
             echo "source_commit: ${GITHUB_SHA}"
@@ -105,15 +93,14 @@ jobs:
 
           tar -C "${RELEASE_ROOT}" -czf "/tmp/${RELEASE_NAME}.tar.gz" .
           sha256sum "/tmp/${RELEASE_NAME}.tar.gz" > "/tmp/${RELEASE_NAME}.tar.gz.sha256"
-
           cat "${RELEASE_ROOT}/release-manifest.yaml" >> "${GITHUB_STEP_SUMMARY}"
 
-      - name: Upload release candidate artifact
+      - name: Upload Hadoop release candidate
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.RELEASE_NAME }}
           path: |
-            /tmp/bigdata-release
+            /tmp/bigdata-hadoop-release
             /tmp/${{ env.RELEASE_NAME }}.tar.gz
             /tmp/${{ env.RELEASE_NAME }}.tar.gz.sha256
           if-no-files-found: error
@@ -137,28 +124,9 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COMPONENT: zookeeper
-          VERSION: 3.8.4
-          TEST_WORKFLOW_PATH: .github/workflows/test-ci.yml
+          COMPONENT: hadoop
+          VERSION: 3.4.3
+          TEST_WORKFLOW_PATH: .github/workflows/test-hadoop.yml
           SOURCE_SHA: ${{ github.sha }}
           REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
         run: bash "${GITHUB_WORKSPACE}/scripts/ci/open-tested-rpm-pr.sh"
-
-      - name: Publish GitHub prerelease
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_github_release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag="ci-${RELEASE_NAME}-${GITHUB_RUN_NUMBER}"
-          gh release create "${tag}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --target "${GITHUB_SHA}" \
-            --title "${RELEASE_NAME}" \
-            --notes-file "${RELEASE_ROOT}/release-manifest.yaml" \
-            --prerelease \
-            "/tmp/${RELEASE_NAME}.tar.gz" \
-            "/tmp/${RELEASE_NAME}.tar.gz.sha256" \
-            "${RELEASE_ROOT}/SHA256SUMS" \
-            "${RELEASE_ROOT}/release-manifest.yaml"

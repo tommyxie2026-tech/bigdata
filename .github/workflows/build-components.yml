@@ -23,6 +23,11 @@ on:
         required: false
         default: ''
         type: string
+      promote_component:
+        description: Component in an existing tested run (including ZooKeeper or Hadoop)
+        required: false
+        default: ''
+        type: string
   push:
     branches:
       - main
@@ -47,7 +52,7 @@ permissions:
 
 jobs:
   promote_existing:
-    name: Promote tested ${{ inputs.start_component }} RPMs
+    name: Promote tested ${{ inputs.promote_component || inputs.start_component }} RPMs
     if: github.event_name == 'workflow_dispatch' && inputs.promote_test_run_id != ''
     permissions:
       contents: write
@@ -55,7 +60,7 @@ jobs:
       pull-requests: write
     uses: ./.github/workflows/release-components.yml
     with:
-      component: ${{ inputs.start_component }}
+      component: ${{ inputs.promote_component || inputs.start_component }}
       version: ${{ inputs.promote_version }}
       test_run_id: ${{ inputs.promote_test_run_id }}
 

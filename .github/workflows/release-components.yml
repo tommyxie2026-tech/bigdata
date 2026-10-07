@@ -19,6 +19,8 @@ on:
         required: true
         type: choice
         options:
+          - zookeeper
+          - hadoop
           - tez
           - hive
           - spark
