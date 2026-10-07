@@ -2,6 +2,17 @@ name: Build Components
 
 on:
   workflow_dispatch:
+    inputs:
+      start_component:
+        description: First component to build, test, and package as a release candidate
+        required: true
+        default: tez
+        type: choice
+        options:
+          - tez
+          - hive
+          - spark
+          - hbase
   push:
     branches:
       - main
@@ -27,6 +38,7 @@ permissions:
 jobs:
   tez_build:
     name: Build tez 0.10.5
+    if: github.event_name != 'workflow_dispatch' || inputs.start_component == 'tez'
     uses: ./.github/workflows/build-one-component.yml
     with:
       component: tez
@@ -57,6 +69,10 @@ jobs:
   hive_build:
     name: Build hive 4.0.1
     needs: tez_release
+    if: >-
+      always() &&
+      ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'hive') ||
+       needs.tez_release.result == 'success')
     uses: ./.github/workflows/build-one-component.yml
     with:
       component: hive
@@ -87,6 +103,10 @@ jobs:
   spark_build:
     name: Build spark 3.5.8
     needs: hive_release
+    if: >-
+      always() &&
+      ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'spark') ||
+       needs.hive_release.result == 'success')
     uses: ./.github/workflows/build-one-component.yml
     with:
       component: spark
@@ -117,6 +137,10 @@ jobs:
   hbase_build:
     name: Build hbase 2.6.5
     needs: spark_release
+    if: >-
+      always() &&
+      ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'hbase') ||
+       needs.spark_release.result == 'success')
     uses: ./.github/workflows/build-one-component.yml
     with:
       component: hbase

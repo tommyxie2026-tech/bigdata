@@ -700,3 +700,9 @@ component jobs, while each job still builds and checks its RPMs independently.
 Serial execution limits concurrent external downloads but does not increase an
 individual GitHub-hosted runner's CPU or memory. The first cache miss can still be
 slow, and the full pipeline's elapsed time is the sum of its component stages.
+
+For a targeted rerun, manually dispatch `Build Components` with
+`start_component` set to `tez`, `hive`, `spark`, or `hbase`. The selected component
+starts at Build and continues through Test and Release Candidate, followed by
+each remaining component in order. Earlier components are intentionally skipped
+in that run; a targeted rerun does not replace a complete PR validation run.
