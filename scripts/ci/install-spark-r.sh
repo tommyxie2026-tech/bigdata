@@ -20,7 +20,18 @@ ldconfig
 R --version
 Rscript -e 'stopifnot(getRversion() == "4.4.3"); library(methods); library(utils)'
 
-# Spark's RPM invokes `R CMD build` for SparkR, whose DESCRIPTION declares
-# knitr as its vignette builder. Check it now so a missing package does not
-# surface only after the Maven and RPM builds have finished.
-Rscript -e 'options(timeout=300); install.packages("knitr", repos="https://cloud.r-project.org", Ncpus=2); stopifnot(requireNamespace("knitr", quietly=TRUE))'
+# SparkR's R CMD build renders an HTML vignette with knitr and rmarkdown.
+# openEuler does not provide Pandoc in the base image, so install a pinned
+# upstream binary and verify it before the lengthy Maven and RPM builds.
+PANDOC_VERSION=3.12
+PANDOC_SHA256=67d7d011fed8c8543306022b985b9b2499ab9b74818df91d8727c7e9ebc5ba06
+PANDOC_ARCHIVE="pandoc-${PANDOC_VERSION}-linux-amd64.tar.gz"
+curl --fail --location --retry 5 --retry-delay 5 --connect-timeout 30 \
+  --output "${source_root}/${PANDOC_ARCHIVE}" \
+  "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/${PANDOC_ARCHIVE}"
+printf '%s  %s\n' "${PANDOC_SHA256}" "${source_root}/${PANDOC_ARCHIVE}" | sha256sum -c -
+tar -xzf "${source_root}/${PANDOC_ARCHIVE}" -C /opt
+ln -s "/opt/pandoc-${PANDOC_VERSION}/bin/pandoc" /usr/local/bin/pandoc
+pandoc --version | head -n 1
+
+Rscript -e 'options(timeout=300); install.packages(c("knitr", "rmarkdown"), repos="https://cloud.r-project.org", Ncpus=2); stopifnot(requireNamespace("knitr", quietly=TRUE), requireNamespace("rmarkdown", quietly=TRUE), rmarkdown::pandoc_available())'
