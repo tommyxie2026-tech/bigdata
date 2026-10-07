@@ -34,4 +34,6 @@ tar -xzf "${source_root}/${PANDOC_ARCHIVE}" -C /opt
 ln -s "/opt/pandoc-${PANDOC_VERSION}/bin/pandoc" /usr/local/bin/pandoc
 pandoc --version | head -n 1
 
-Rscript -e 'options(timeout=300); install.packages(c("knitr", "rmarkdown"), repos="https://cloud.r-project.org", Ncpus=2); stopifnot(requireNamespace("knitr", quietly=TRUE), requireNamespace("rmarkdown", quietly=TRUE), rmarkdown::pandoc_available())'
+# fs, an rmarkdown dependency, can compile its bundled libuv when the
+# openEuler image has no libuv headers.
+USE_BUNDLED_LIBUV=1 Rscript -e 'options(timeout=300); install.packages(c("knitr", "rmarkdown"), repos="https://cloud.r-project.org", Ncpus=2); stopifnot(requireNamespace("knitr", quietly=TRUE), requireNamespace("rmarkdown", quietly=TRUE), rmarkdown::pandoc_available())'
