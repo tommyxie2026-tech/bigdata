@@ -3,7 +3,12 @@ set -euo pipefail
 
 # openEuler 22.03 does not ship R. Follow Bigtop's renv source-build approach;
 # Spark's RPM includes SparkR, so removing -Psparkr is not a valid workaround.
-dnf -y install gcc-gfortran readline-devel bzip2-devel xz-devel pcre2-devel libcurl-devel
+# SparkR's HTML vignette opens an SVG graphics device while R CMD build runs.
+# Cairo headers must be present when compiling R itself, not installed later.
+dnf -y install gcc-gfortran readline-devel bzip2-devel xz-devel pcre2-devel libcurl-devel \
+  cairo-devel pango-devel libpng-devel
+pkg-config --modversion cairo
+pkg-config --modversion pangocairo
 R_VERSION=4.4.3
 source_root="$(mktemp -d /tmp/spark-r.XXXXXX)"
 trap 'rm -rf "${source_root}"' EXIT
@@ -18,7 +23,7 @@ make -j2
 make install
 ldconfig
 R --version
-Rscript -e 'stopifnot(getRversion() == "4.4.3"); library(methods); library(utils)'
+Rscript -e 'stopifnot(getRversion() == "4.4.3", capabilities("cairo")); svg(tempfile(fileext=".svg")); plot(1, 1); dev.off(); library(methods); library(utils)'
 
 # SparkR's R CMD build renders an HTML vignette with knitr and rmarkdown.
 # openEuler does not provide Pandoc in the base image, so install a pinned
