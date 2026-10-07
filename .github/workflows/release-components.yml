@@ -176,7 +176,7 @@ jobs:
           body_file="$(mktemp)"
           cat > "${body_file}" <<EOF
           Adds the ${COMPONENT} ${VERSION} RPMs from tested artifact run ${TEST_RUN_ID}.
-          Source commit: ${SOURCE_SHA}
+          Promotion workflow commit: ${SOURCE_SHA}
           Release candidate: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
           EOF
           pr_url="$(gh pr create --repo "${GITHUB_REPOSITORY}" \
@@ -184,7 +184,7 @@ jobs:
             --title "repo: add tested ${COMPONENT} ${VERSION} RPMs" \
             --body-file "${body_file}")"
           echo "RPM repository PR: ${pr_url}" >> "${GITHUB_STEP_SUMMARY}"
-          gh pr merge "${pr_url}" --repo "${GITHUB_REPOSITORY}" --squash --delete-branch
+          gh pr merge "${pr_url}" --repo "${GITHUB_REPOSITORY}" --squash
           echo "Merged tested RPMs into main/repo." >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Publish GitHub prerelease

@@ -52,7 +52,7 @@ component: ${COMPONENT}
 version: ${VERSION}
 bigtop_version: 3.6.0
 os: openEuler 22.03 LTS SP4
-source_head_commit: ${SOURCE_SHA}
+promotion_workflow_commit: ${SOURCE_SHA}
 tested_artifact_run_id: ${TEST_RUN_ID}
 rpm_count: ${rpm_count}
 test_status: PASS
