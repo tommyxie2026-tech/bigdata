@@ -128,8 +128,16 @@ jobs:
 
       - name: Prepare RPM repository tools
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y createrepo-c git-lfs
+          for attempt in 1 2 3; do
+            if timeout 5m sudo apt-get update -qq &&
+               timeout 5m sudo apt-get install -y createrepo-c git-lfs; then
+              break
+            fi
+            if [ "${attempt}" -eq 3 ]; then
+              exit 1
+            fi
+            sleep 15
+          done
 
       - name: Checkout RPM repository base
         uses: actions/checkout@v4
