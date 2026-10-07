@@ -714,3 +714,8 @@ repository metadata is generated. RPMs are tracked with Git LFS to avoid GitHub'
 ordinary file-size limit. Each component version has a separate repository
 directory; an already promoted version is left untouched on rerun. The checkout
 must use Git LFS to retrieve actual RPM bytes.
+
+When a tested artifact is already available, dispatch `Build Components` with
+`start_component`, `promote_version`, and `promote_test_run_id`. This runs only the
+release candidate and RPM repository PR path, and verifies the saved test
+evidence and checksums before making a repository change.

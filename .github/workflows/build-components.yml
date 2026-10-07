@@ -13,6 +13,16 @@ on:
           - hive
           - spark
           - hbase
+      promote_test_run_id:
+        description: Existing successful Test run ID; when set, promote tested RPMs without rebuilding
+        required: false
+        default: ''
+        type: string
+      promote_version:
+        description: Component version for an existing tested run
+        required: false
+        default: ''
+        type: string
   push:
     branches:
       - main
@@ -36,9 +46,24 @@ permissions:
   actions: read
 
 jobs:
+  promote_existing:
+    name: Promote tested ${{ inputs.start_component }} RPMs
+    if: github.event_name == 'workflow_dispatch' && inputs.promote_test_run_id != ''
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/release-components.yml
+    with:
+      component: ${{ inputs.start_component }}
+      version: ${{ inputs.promote_version }}
+      test_run_id: ${{ inputs.promote_test_run_id }}
+
   tez_build:
     name: Build tez 0.10.5
-    if: github.event_name != 'workflow_dispatch' || inputs.start_component == 'tez'
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      (inputs.promote_test_run_id == '' && inputs.start_component == 'tez')
     uses: ./.github/workflows/build-one-component.yml
     with:
       component: tez
@@ -72,6 +97,7 @@ jobs:
     needs: tez_release
     if: >-
       always() &&
+      (github.event_name != 'workflow_dispatch' || inputs.promote_test_run_id == '') &&
       ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'hive') ||
        needs.tez_release.result == 'success')
     uses: ./.github/workflows/build-one-component.yml
@@ -107,6 +133,7 @@ jobs:
     needs: hive_release
     if: >-
       always() &&
+      (github.event_name != 'workflow_dispatch' || inputs.promote_test_run_id == '') &&
       ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'spark') ||
        needs.hive_release.result == 'success')
     uses: ./.github/workflows/build-one-component.yml
@@ -142,6 +169,7 @@ jobs:
     needs: spark_release
     if: >-
       always() &&
+      (github.event_name != 'workflow_dispatch' || inputs.promote_test_run_id == '') &&
       ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'hbase') ||
        needs.spark_release.result == 'success')
     uses: ./.github/workflows/build-one-component.yml
