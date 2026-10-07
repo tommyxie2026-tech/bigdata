@@ -1,0 +1,9 @@
+schema: bigdata.rpm-repo/v1
+component: hadoop
+version: 3.4.3
+bigtop_version: 3.6.0
+os: openEuler 22.03 LTS SP4
+promotion_workflow_commit: c6b892e80f6d6fe656c22902b13c34ca40c6e774
+tested_artifact_run_id: 36661238781
+rpm_count: 39
+test_status: PASS
