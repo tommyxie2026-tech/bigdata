@@ -38,7 +38,9 @@ baseurl=file:///repo/hive/4.0.1
 enabled=1
 gpgcheck=0
 EOF
-  dnf -y install zookeeper-server hadoop-client hadoop-conf-pseudo tez hive
+  dnf -y install java-1.8.0-openjdk-devel zookeeper-server hadoop-client hadoop-conf-pseudo tez hive
+  export JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
+  export PATH="${JAVA_HOME}/bin:${PATH}"
   rpm -q zookeeper-server hadoop-client hadoop-conf-pseudo tez hive
   hadoop version
   hive --version
