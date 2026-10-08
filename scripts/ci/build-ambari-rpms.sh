@@ -24,9 +24,26 @@ for command in java mvn rpmbuild; do
   command -v "${command}" >/dev/null
 done
 
-export JAVA_HOME="${JAVA_HOME:-$(dirname "$(dirname "$(readlink -f "$(command -v javac || command -v java)")")")}"
+if [[ "${AMBARI_INSTALL_BUILD_DEPS}" == true ]]; then
+  java17_javac="$(
+    rpm -ql java-17-openjdk-devel |
+      awk '/\/bin\/javac$/ && !found { found=$0 } END { print found }'
+  )"
+  [[ -n "${java17_javac}" && -x "${java17_javac}" ]]
+  export JAVA_HOME="$(dirname "$(dirname "${java17_javac}")")"
+else
+  export JAVA_HOME="${AMBARI_JAVA_HOME:-${JAVA_HOME:-$(dirname "$(dirname "$(readlink -f "$(command -v javac || command -v java)")")")}}"
+fi
 export PATH="${JAVA_HOME}/bin:${PATH}"
 export MAVEN_OPTS="${MAVEN_OPTS:-} -Xmx4g -XX:MaxMetaspaceSize=1g -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true"
+
+if [[ "${AMBARI_INSTALL_BUILD_DEPS}" == true ]]; then
+  javac_version="$("${JAVA_HOME}/bin/javac" -version 2>&1)"
+  maven_version="$(mvn -version)"
+  printf '%s\n' "${javac_version}" "${maven_version}"
+  grep -Eq '^javac 17([.]|$)' <<< "${javac_version}"
+  grep -Eq '^Java version: 17([.]|$)' <<< "${maven_version}"
+fi
 
 if [[ ! -f "${AMBARI_SOURCE_DIR}/pom.xml" ]]; then
   rm -rf "${AMBARI_SOURCE_DIR}"

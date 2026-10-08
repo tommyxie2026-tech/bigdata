@@ -213,6 +213,15 @@ end
 RUBY
 }
 
+test_build_pins_and_verifies_java17() {
+  grep -q 'rpm -ql java-17-openjdk-devel' "${BUILD_SCRIPT}" ||
+    fail "build does not resolve JAVA_HOME from the installed Java 17 development package"
+  grep -q 'JAVA_HOME}/bin/javac.*-version' "${BUILD_SCRIPT}" ||
+    fail "build does not verify the selected Java compiler"
+  grep -q 'mvn -version' "${BUILD_SCRIPT}" ||
+    fail "build does not verify the Java runtime used by Maven"
+}
+
 test_build_collects_only_core_runtime_rpms
 test_build_rejects_incomplete_core_package_set
 test_install_smoke_verifies_both_core_packages
@@ -220,4 +229,5 @@ test_stage_publishes_only_verified_runtime_rpms
 test_workflow_orders_build_test_release
 test_ci_pr_runs_ambari_contract_tests
 test_ambari_changes_do_not_trigger_bigtop_component_builds
+test_build_pins_and_verifies_java17
 echo "Ambari CI tests: PASS"
