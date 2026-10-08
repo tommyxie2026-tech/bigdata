@@ -7,6 +7,7 @@ TEST_SCRIPT="${REPO_ROOT}/scripts/ci/test-ambari-rpms.sh"
 STAGE_SCRIPT="${REPO_ROOT}/scripts/ci/stage-tested-ambari-rpms.sh"
 WORKFLOW="${REPO_ROOT}/.github/workflows/build-ambari.yml"
 CI_WORKFLOW="${REPO_ROOT}/.github/workflows/ci-pr.yml"
+COMPONENTS_WORKFLOW="${REPO_ROOT}/.github/workflows/build-components.yml"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -200,10 +201,23 @@ abort "CI PR does not execute Ambari CI contract tests" unless commands.include?
 RUBY
 }
 
+test_ambari_changes_do_not_trigger_bigtop_component_builds() {
+  ruby - "${COMPONENTS_WORKFLOW}" <<'RUBY'
+require "yaml"
+workflow = YAML.load_file(ARGV.fetch(0))
+triggers = workflow["on"] || workflow[true]
+%w[push pull_request].each do |event|
+  paths = triggers.fetch(event).fetch("paths")
+  abort "#{event} does not exclude Ambari-only CI scripts" unless paths.include?("!scripts/ci/*ambari*.sh")
+end
+RUBY
+}
+
 test_build_collects_only_core_runtime_rpms
 test_build_rejects_incomplete_core_package_set
 test_install_smoke_verifies_both_core_packages
 test_stage_publishes_only_verified_runtime_rpms
 test_workflow_orders_build_test_release
 test_ci_pr_runs_ambari_contract_tests
+test_ambari_changes_do_not_trigger_bigtop_component_builds
 echo "Ambari CI tests: PASS"
