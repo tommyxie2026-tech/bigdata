@@ -30,10 +30,11 @@ if [[ "${AMBARI_INSTALL_BUILD_DEPS}" == true ]]; then
       awk '/\/bin\/javac$/ && !found { found=$0 } END { print found }'
   )"
   [[ -n "${java17_javac}" && -x "${java17_javac}" ]]
-  export JAVA_HOME="$(dirname "$(dirname "${java17_javac}")")"
+  JAVA_HOME="$(dirname "$(dirname "${java17_javac}")")"
 else
-  export JAVA_HOME="${AMBARI_JAVA_HOME:-${JAVA_HOME:-$(dirname "$(dirname "$(readlink -f "$(command -v javac || command -v java)")")")}}"
+  JAVA_HOME="${AMBARI_JAVA_HOME:-${JAVA_HOME:-$(dirname "$(dirname "$(readlink -f "$(command -v javac || command -v java)")")")}}"
 fi
+export JAVA_HOME
 export PATH="${JAVA_HOME}/bin:${PATH}"
 export MAVEN_OPTS="${MAVEN_OPTS:-} -Xmx4g -XX:MaxMetaspaceSize=1g -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true"
 
