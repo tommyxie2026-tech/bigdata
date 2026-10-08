@@ -51,6 +51,10 @@ jobs:
           fi
           shellcheck -S warning "${files[@]}"
 
+      - name: Ambari CI contract tests
+        shell: bash
+        run: bash scripts/ci/test-ambari-ci.sh
+
   yaml:
     name: YAML checks
     runs-on: ubuntu-latest
