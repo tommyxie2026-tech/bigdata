@@ -1,0 +1,35 @@
+schema: bigdata.ci.components/v1
+bigtop_ref: branch-3.6
+bigtop_version: 3.6.0
+ambari_ref: release-3.0.0
+ambari_version: 3.0.0
+os_image: openeuler/openeuler:22.03-lts-sp4
+jdk: 8
+
+components:
+  tez:
+    version: 0.10.5
+    build_task: tez-rpm
+    wave: 3
+    depends_on:
+      - hadoop
+  hive:
+    version: 4.0.1
+    build_task: hive-rpm
+    wave: 3
+    depends_on:
+      - hadoop
+      - tez
+  spark:
+    version: 3.5.8
+    build_task: spark-rpm
+    wave: 4
+    depends_on:
+      - hadoop
+  hbase:
+    version: 2.6.5
+    build_task: hbase-rpm
+    wave: 5
+    depends_on:
+      - hadoop
+      - zookeeper

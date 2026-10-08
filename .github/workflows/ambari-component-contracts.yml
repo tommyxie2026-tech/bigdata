@@ -1,0 +1,75 @@
+name: Ambari Component Contracts
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ci/wave3-5-components
+    paths:
+      - ".github/workflows/ambari-component-contracts.yml"
+      - "ci/components.yaml"
+      - "docs/ci/component-cicd-release-plan.md"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Ambari contract ${{ matrix.component }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: TEZ
+            version: 0.10.5
+          - component: HIVE
+            version: 4.0.1
+          - component: SPARK
+            version: 3.5.8
+          - component: HBASE
+            version: 2.6.5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Ambari BIGTOP service metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          work=/tmp/ambari-contract-${{ matrix.component }}
+          mkdir -p "${work}"
+
+          base=https://raw.githubusercontent.com/apache/ambari/release-3.0.0/ambari-server/src/main/resources/stacks/BIGTOP
+          curl -fsSL "${base}/3.2.0/services/${{ matrix.component }}/metainfo.xml"             -o "${work}/metainfo-3.2.0.xml"
+
+          if curl -fsSL "${base}/3.3.0/services/${{ matrix.component }}/metainfo.xml"             -o "${work}/metainfo-3.3.0.xml"; then
+            :
+          else
+            rm -f "${work}/metainfo-3.3.0.xml"
+          fi
+
+          grep -q "<name>${{ matrix.component }}</name>" "${work}/metainfo-3.2.0.xml"
+          grep -q "openeuler22" "${work}/metainfo-3.2.0.xml" || true
+
+          {
+            echo "# Ambari component contract"
+            echo
+            echo "component: ${{ matrix.component }}"
+            echo "target_version: ${{ matrix.version }}"
+            echo "ambari: 3.0.0"
+            echo "target_bigtop: 3.6.0"
+            echo "status: ADAPTATION_REVIEW_REQUIRED"
+            echo
+            echo "Ambari 3.0.0 ships BIGTOP 3.2/3.3 metadata; target package/runtime contract must be revalidated against Bigtop 3.6 tested RPMs."
+          } > "${work}/contract-report.md"
+
+          cat "${work}/contract-report.md" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload contract evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ambari-${{ matrix.component }}-${{ matrix.version }}-contract
+          path: /tmp/ambari-contract-${{ matrix.component }}
+          if-no-files-found: error
+          retention-days: 30

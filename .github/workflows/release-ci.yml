@@ -26,6 +26,7 @@ on:
 permissions:
   contents: write
   actions: read
+  pull-requests: write
 
 concurrency:
   group: release-ci-${{ github.ref }}
@@ -35,7 +36,10 @@ jobs:
   release:
     name: Assemble tested ZooKeeper release
     if: >
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.head_branch == 'main') ||
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -49,7 +53,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
 
       - name: Download tested RPMs
         uses: actions/download-artifact@v4
@@ -114,6 +118,31 @@ jobs:
             /tmp/${{ env.RELEASE_NAME }}.tar.gz.sha256
           if-no-files-found: error
           retention-days: 90
+
+      - name: Prepare RPM repository tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y createrepo-c git-lfs
+
+      - name: Checkout RPM repository base
+        uses: actions/checkout@v4
+        env:
+          GIT_LFS_SKIP_SMUDGE: '1'
+        with:
+          ref: main
+          path: rpm-repository-pr
+          lfs: false
+
+      - name: Open and merge tested RPM pull request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMPONENT: zookeeper
+          VERSION: 3.8.4
+          TEST_WORKFLOW_PATH: .github/workflows/test-ci.yml
+          SOURCE_SHA: ${{ github.sha }}
+          REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
+        run: bash "${GITHUB_WORKSPACE}/scripts/ci/open-tested-rpm-pr.sh"
 
       - name: Publish GitHub prerelease
         if: github.event_name == 'workflow_dispatch' && inputs.publish_github_release

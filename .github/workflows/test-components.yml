@@ -1,0 +1,107 @@
+name: Test Components
+
+on:
+  workflow_call:
+    inputs:
+      component:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      build_run_id:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Component to test
+        required: true
+        type: choice
+        options:
+          - tez
+          - hive
+          - spark
+          - hbase
+      version:
+        description: Component version
+        required: true
+        type: string
+      build_run_id:
+        description: Successful Build Components run ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  test:
+    name: Test ${{ inputs.component }} ${{ inputs.version }}
+    if: >
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
+      ARTIFACT_ROOT: /tmp/bigdata-component-artifact
+      EVIDENCE_ROOT: /tmp/bigdata-component-test
+      BUILD_RUN_ID: ${{ inputs.build_run_id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Download component RPMs
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.component }}-${{ inputs.version }}-bigtop-3.6-openeuler22-rpm
+          path: /tmp/bigdata-component-artifact
+          run-id: ${{ env.BUILD_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run install smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${EVIDENCE_ROOT}"
+          mkdir -p "${EVIDENCE_ROOT}"
+          docker pull "${OPENEULER_IMAGE}"
+          docker run --rm \
+            -e COMPONENT="${{ inputs.component }}" \
+            -e VERSION="${{ inputs.version }}" \
+            -e ARTIFACT_ROOT=/artifact \
+            -e EVIDENCE_ROOT=/evidence \
+            -v "${GITHUB_WORKSPACE}:/workspace:ro" \
+            -v "${ARTIFACT_ROOT}:/artifact:ro" \
+            -v "${EVIDENCE_ROOT}:/evidence" \
+            "${OPENEULER_IMAGE}" \
+            bash /workspace/scripts/ci/test-bigtop-component.sh
+
+      - name: Publish summary
+        if: always()
+        run: |
+          test ! -f "${EVIDENCE_ROOT}/evidence.md" ||             cat "${EVIDENCE_ROOT}/evidence.md" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.component }}-${{ inputs.version }}-test-evidence
+          path: /tmp/bigdata-component-test
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload tested RPMs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.component }}-${{ inputs.version }}-tested-rpms
+          path: /tmp/bigdata-component-artifact
+          if-no-files-found: error
+          retention-days: 30

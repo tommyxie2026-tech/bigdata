@@ -6,34 +6,47 @@ on:
       - Test Hadoop
     types:
       - completed
+  workflow_dispatch:
+    inputs:
+      test_run_id:
+        description: Successful Test Hadoop run ID containing tested RPMs
+        required: true
+        type: string
 
 permissions:
-  contents: read
+  contents: write
   actions: read
+  pull-requests: write
 
 jobs:
   release:
     name: Assemble Hadoop release candidate
-    if: github.event.workflow_run.conclusion == 'success'
+    if: >
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.head_branch == 'main') ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     env:
       RELEASE_ROOT: /tmp/bigdata-hadoop-release
       RELEASE_NAME: bigdata-1.0-hadoop-3.4.3-rc
+      TEST_RUN_ID: ${{ github.event.workflow_run.id || inputs.test_run_id }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
 
       - name: Download tested Hadoop RPMs
         uses: actions/download-artifact@v4
         with:
           name: hadoop-3.4.3-tested-rpms
           path: /tmp/tested-rpms
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ env.TEST_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download Hadoop test evidence
@@ -41,7 +54,7 @@ jobs:
         with:
           name: hadoop-3.4.3-test-evidence
           path: /tmp/test-evidence
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ env.TEST_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Assemble release bundle
@@ -73,7 +86,7 @@ jobs:
             echo "os: openEuler 22.03 LTS SP4"
             echo "package_format: RPM"
             echo "source_commit: ${GITHUB_SHA}"
-            echo "test_run_id: ${{ github.event.workflow_run.id }}"
+            echo "test_run_id: ${TEST_RUN_ID}"
             echo "rpm_count: ${rpm_count}"
             echo "status: RELEASE_CANDIDATE"
           } > "${RELEASE_ROOT}/release-manifest.yaml"
@@ -92,3 +105,28 @@ jobs:
             /tmp/${{ env.RELEASE_NAME }}.tar.gz.sha256
           if-no-files-found: error
           retention-days: 90
+
+      - name: Prepare RPM repository tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y createrepo-c git-lfs
+
+      - name: Checkout RPM repository base
+        uses: actions/checkout@v4
+        env:
+          GIT_LFS_SKIP_SMUDGE: '1'
+        with:
+          ref: main
+          path: rpm-repository-pr
+          lfs: false
+
+      - name: Open and merge tested RPM pull request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMPONENT: hadoop
+          VERSION: 3.4.3
+          TEST_WORKFLOW_PATH: .github/workflows/test-hadoop.yml
+          SOURCE_SHA: ${{ github.sha }}
+          REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
+        run: bash "${GITHUB_WORKSPACE}/scripts/ci/open-tested-rpm-pr.sh"

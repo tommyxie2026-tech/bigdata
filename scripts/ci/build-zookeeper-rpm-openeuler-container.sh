@@ -48,11 +48,11 @@ text = spec.read_text()
 
 replacements = [
 (
-"""%define alternatives_dep chkconfig 
+"""%define alternatives_dep chkconfig\x20
 %define chkconfig_dep    chkconfig
 %define service_dep      initscripts
 %global initd_dir %{_sysconfdir}/rc.d/init.d""",
-"""%define alternatives_dep chkconfig 
+"""%define alternatives_dep chkconfig\x20
 %if 0%{?openEuler}
 %define chkconfig_dep    systemd
 %define service_dep      systemd

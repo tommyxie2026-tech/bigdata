@@ -642,3 +642,80 @@ Full RC repository
   -> HA Validation
   -> BIGDATA-1.0 RC
 ```
+
+
+## 12. Wave 3-5 parallel CI implementation
+
+Implemented on branch `ci/wave3-5-components`.
+
+Shared component matrix:
+
+```text
+ci/components.yaml
+```
+
+Core reusable scripts:
+
+```text
+scripts/ci/build-bigtop-component.sh
+scripts/ci/test-bigtop-component.sh
+```
+
+Workflows:
+
+```text
+.github/workflows/build-components.yml
+.github/workflows/test-components.yml
+.github/workflows/ambari-component-contracts.yml
+.github/workflows/release-components.yml
+```
+
+Components enabled:
+
+| Component | Version | Build | Test | Ambari Contract | Release |
+|---|---:|---|---|---|---|
+| Tez | 0.10.5 | enabled | enabled | enabled | enabled |
+| Hive | 4.0.1 | enabled | enabled | enabled | enabled |
+| Spark | 3.5.8 | enabled | enabled | enabled | enabled |
+| HBase | 2.6.5 | enabled | enabled | enabled | enabled |
+
+The release workflow consumes tested RPM artifacts only and does not rebuild source.
+
+## 13. Serial component validation on PR #43
+
+The active Wave 3–5 workflow runs one component at a time, in this order:
+
+```text
+Tez Build -> Test -> Release Candidate
+  -> Hive Build -> Test -> Release Candidate
+  -> Spark Build -> Test -> Release Candidate
+  -> HBase Build -> Test -> Release Candidate
+```
+
+Each step depends on the previous step succeeding. A failed build or install smoke
+prevents later release candidates from being assembled. Automatic release steps
+upload candidate artifacts only; publishing a GitHub prerelease still requires an
+explicit manual dispatch. Maven and Gradle downloads are cached between successful
+component jobs, while each job still builds and checks its RPMs independently.
+Serial execution limits concurrent external downloads but does not increase an
+individual GitHub-hosted runner's CPU or memory. The first cache miss can still be
+slow, and the full pipeline's elapsed time is the sum of its component stages.
+
+For a targeted rerun, manually dispatch `Build Components` with
+`start_component` set to `tez`, `hive`, `spark`, or `hbase`. The selected component
+starts at Build and continues through Test and Release Candidate, followed by
+each remaining component in order. Earlier components are intentionally skipped
+in that run; a targeted rerun does not replace a complete PR validation run.
+
+After a component passes the install smoke, its release job verifies the tested
+RPM checksums, assembles the release candidate, and opens a pull request against
+`main` containing those RPMs under `repo/`. The job merges that PR after the
+repository metadata is generated. RPMs are tracked with Git LFS to avoid GitHub's
+ordinary file-size limit. Each component version has a separate repository
+directory; an already promoted version is left untouched on rerun. The checkout
+must use Git LFS to retrieve actual RPM bytes.
+
+When a tested artifact is already available, dispatch `Build Components` with
+`start_component`, `promote_version`, and `promote_test_run_id`. This runs only the
+release candidate and RPM repository PR path, and verifies the saved test
+evidence and checksums before making a repository change.

@@ -1,0 +1,294 @@
+name: Build Components
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_component:
+        description: First component to build, or RPM repository maintenance
+        required: true
+        default: tez
+        type: choice
+        options:
+          - tez
+          - hive
+          - spark
+          - hbase
+          - repo_maintenance
+      promote_test_run_id:
+        description: Existing successful Test run ID; when set, promote tested RPMs without rebuilding
+        required: false
+        default: ''
+        type: string
+      promote_version:
+        description: Component version for an existing tested run
+        required: false
+        default: ''
+        type: string
+      promote_component:
+        description: Component in an existing tested run (including ZooKeeper or Hadoop)
+        required: false
+        default: ''
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/*components.yml"
+      - ".github/workflows/build-one-component.yml"
+      - "scripts/ci/*.sh"
+      - "ci/components.yaml"
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/*components.yml"
+      - ".github/workflows/build-one-component.yml"
+      - "scripts/ci/*.sh"
+      - "ci/components.yaml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  slim_repository:
+    name: Deduplicate tested RPM repository
+    if: github.event_name == 'workflow_dispatch' && inputs.start_component == 'repo_maintenance'
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout maintenance code
+        uses: actions/checkout@v4
+
+      - name: Prepare RPM repository tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y createrepo-c git-lfs
+
+      - name: Checkout current RPM repository
+        uses: actions/checkout@v4
+        env:
+          GIT_LFS_SKIP_SMUDGE: '1'
+        with:
+          ref: main
+          path: rpm-repository-pr
+          lfs: false
+
+      - name: Select runtime RPMs and rebuild metadata
+        env:
+          REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
+        run: |
+          set -euo pipefail
+          cd "${REPO_CHECKOUT}"
+          git lfs install --local
+          git switch -c "ci/slim-rpm-repo-${GITHUB_RUN_ID}"
+          python3 "${GITHUB_WORKSPACE}/scripts/ci/slim-rpm-repo.py" \
+            --repo-checkout "${REPO_CHECKOUT}"
+
+      - name: Test split DNF repositories in clean openEuler
+        env:
+          REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
+        run: bash scripts/ci/test-slim-rpm-repo.sh
+
+      - name: Document the split repository layout
+        env:
+          REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
+        run: cp repo/README.md "${REPO_CHECKOUT}/repo/README.md"
+
+      - name: Open and merge RPM cleanup pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
+        run: |
+          set -euo pipefail
+          cd "${REPO_CHECKOUT}"
+          git add repo
+          git diff --cached --check
+          while IFS= read -r -d '' rpm; do
+            [[ "${rpm}" == *.rpm ]] || continue
+            [[ "$(git check-attr filter -- "${rpm}")" == *'filter: lfs' ]]
+            [[ "$(git cat-file -s ":${rpm}")" -lt 300 ]]
+          done < <(git diff --cached --name-only -z -- repo)
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'repo: keep one copy of tested runtime RPMs'
+          git push origin "ci/slim-rpm-repo-${GITHUB_RUN_ID}"
+          body_file="$(mktemp)"
+          cat > "${body_file}" <<EOF
+          Move shared Bigtop packages to common/, keep component RPMs only in their
+          owning repositories, and remove source/debug/test/docs/devel packages.
+          Validated with checksum checks and a clean openEuler DNF install.
+          Maintenance run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+          pr_url="$(gh pr create --repo "${GITHUB_REPOSITORY}" \
+            --base main --head "ci/slim-rpm-repo-${GITHUB_RUN_ID}" \
+            --title 'repo: deduplicate tested runtime RPMs' \
+            --body-file "${body_file}")"
+          echo "RPM cleanup PR: ${pr_url}" >> "${GITHUB_STEP_SUMMARY}"
+          gh pr merge "${pr_url}" --repo "${GITHUB_REPOSITORY}" --squash
+
+  promote_existing:
+    name: Promote tested ${{ inputs.promote_component || inputs.start_component }} RPMs
+    if: github.event_name == 'workflow_dispatch' && inputs.start_component != 'repo_maintenance' && inputs.promote_test_run_id != ''
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/release-components.yml
+    with:
+      component: ${{ inputs.promote_component || inputs.start_component }}
+      version: ${{ inputs.promote_version }}
+      test_run_id: ${{ inputs.promote_test_run_id }}
+
+  tez_build:
+    name: Build tez 0.10.5
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      (inputs.promote_test_run_id == '' && inputs.start_component == 'tez')
+    uses: ./.github/workflows/build-one-component.yml
+    with:
+      component: tez
+      version: 0.10.5
+      task: tez-rpm
+
+  tez_test:
+    name: Test tez 0.10.5
+    needs: tez_build
+    if: ${{ always() && needs.tez_build.result == 'success' }}
+    uses: ./.github/workflows/test-components.yml
+    with:
+      component: tez
+      version: 0.10.5
+      build_run_id: ${{ format('{0}', github.run_id) }}
+
+  tez_release:
+    name: Release tez 0.10.5
+    needs: tez_test
+    if: ${{ always() && needs.tez_test.result == 'success' }}
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/release-components.yml
+    with:
+      component: tez
+      version: 0.10.5
+      test_run_id: ${{ format('{0}', github.run_id) }}
+
+  hive_build:
+    name: Build hive 4.0.1
+    needs: tez_release
+    if: >-
+      always() &&
+      (github.event_name != 'workflow_dispatch' || inputs.promote_test_run_id == '') &&
+      ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'hive') ||
+       needs.tez_release.result == 'success')
+    uses: ./.github/workflows/build-one-component.yml
+    with:
+      component: hive
+      version: 4.0.1
+      task: hive-rpm
+
+  hive_test:
+    name: Test hive 4.0.1
+    needs: hive_build
+    if: ${{ always() && needs.hive_build.result == 'success' }}
+    uses: ./.github/workflows/test-components.yml
+    with:
+      component: hive
+      version: 4.0.1
+      build_run_id: ${{ format('{0}', github.run_id) }}
+
+  hive_release:
+    name: Release hive 4.0.1
+    needs: hive_test
+    if: ${{ always() && needs.hive_test.result == 'success' }}
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/release-components.yml
+    with:
+      component: hive
+      version: 4.0.1
+      test_run_id: ${{ format('{0}', github.run_id) }}
+
+  spark_build:
+    name: Build spark 3.5.8
+    needs: hive_release
+    if: >-
+      always() &&
+      (github.event_name != 'workflow_dispatch' || inputs.promote_test_run_id == '') &&
+      ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'spark') ||
+       needs.hive_release.result == 'success')
+    uses: ./.github/workflows/build-one-component.yml
+    with:
+      component: spark
+      version: 3.5.8
+      task: spark-rpm
+
+  spark_test:
+    name: Test spark 3.5.8
+    needs: spark_build
+    if: ${{ always() && needs.spark_build.result == 'success' }}
+    uses: ./.github/workflows/test-components.yml
+    with:
+      component: spark
+      version: 3.5.8
+      build_run_id: ${{ format('{0}', github.run_id) }}
+
+  spark_release:
+    name: Release spark 3.5.8
+    needs: spark_test
+    if: ${{ always() && needs.spark_test.result == 'success' }}
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/release-components.yml
+    with:
+      component: spark
+      version: 3.5.8
+      test_run_id: ${{ format('{0}', github.run_id) }}
+
+  hbase_build:
+    name: Build hbase 2.6.5
+    needs: spark_release
+    if: >-
+      always() &&
+      (github.event_name != 'workflow_dispatch' || inputs.promote_test_run_id == '') &&
+      ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'hbase') ||
+       needs.spark_release.result == 'success')
+    uses: ./.github/workflows/build-one-component.yml
+    with:
+      component: hbase
+      version: 2.6.5
+      task: hbase-rpm
+
+  hbase_test:
+    name: Test hbase 2.6.5
+    needs: hbase_build
+    if: ${{ always() && needs.hbase_build.result == 'success' }}
+    uses: ./.github/workflows/test-components.yml
+    with:
+      component: hbase
+      version: 2.6.5
+      build_run_id: ${{ format('{0}', github.run_id) }}
+
+  hbase_release:
+    name: Release hbase 2.6.5
+    needs: hbase_test
+    if: ${{ always() && needs.hbase_test.result == 'success' }}
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/release-components.yml
+    with:
+      component: hbase
+      version: 2.6.5
+      test_run_id: ${{ format('{0}', github.run_id) }}
