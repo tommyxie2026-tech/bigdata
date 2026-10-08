@@ -1,0 +1,11 @@
+c65d9c843522818edd8e508b6fbc7db147b8eba1bc220eb5a33c88daa1221dc8  ./spark-3.5.8-1.noarch.rpm
+9ac832130a2d01ae4378248661dd5c0207f10759bff47f1e13bdf2f687c6ab29  ./spark-core-3.5.8-1.noarch.rpm
+612a9ad1402c0effb6e6188adbe8833c2c5e6c3de9f733aa5d21a00135c42489  ./spark-datanucleus-3.5.8-1.noarch.rpm
+f0d0c6586226dd20c59de51039fd218890131e2138ccd083e82cbd37708e1f95  ./spark-external-3.5.8-1.noarch.rpm
+b9fba5e986afda37f4786db31bf5f057585f16055341b41283984ab82b430f93  ./spark-history-server-3.5.8-1.noarch.rpm
+51235cc1790df81efdb9d0f5fd4a618e1059504837717f4a18df501107c3dd21  ./spark-master-3.5.8-1.noarch.rpm
+e7454b9c6b023abe28907e83d6712761d853063477eb58b0536bd7a8b127b08f  ./spark-python-3.5.8-1.noarch.rpm
+1ebc33606747cd2d545e0cdff15e871e22d9701c346775c2ed7e71efc14155f8  ./spark-sparkr-3.5.8-1.noarch.rpm
+45d37761d1a1e69a51d0b1b9e211bf933de220d474a0acbd95ec70a766c79b8a  ./spark-thriftserver-3.5.8-1.noarch.rpm
+c0ad8e3c83026e0ad4452051641f09337de40d81e9ad45502a6510ff7d1d7fef  ./spark-worker-3.5.8-1.noarch.rpm
+affbfa184c473a0ffe2d193e9184cde9f859cf7a06bca1429061600e8860ba32  ./spark-yarn-shuffle-3.5.8-1.noarch.rpm
