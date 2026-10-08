@@ -38,12 +38,12 @@ for rpm in "${TESTED_RPMS_DIR}"/rpms/*.rpm; do
   name="${rpm##*/}"
   case "${name}" in
     *.src.rpm|*-debuginfo-*|*-debugsource-*|*-devel-*|*-test-*|*-tests-*|*-doc-*|*-javadoc-*) ;;
-    ambari-server-*.rpm|ambari-agent-*.rpm) cp "${rpm}" "${target}/${name}" ;;
+    ambari-server-[0-9]*.rpm|ambari-agent-[0-9]*.rpm) cp "${rpm}" "${target}/${name}" ;;
   esac
 done
 
-server_count="$(find "${target}" -maxdepth 1 -type f -name 'ambari-server-*.rpm' | wc -l | tr -d ' ')"
-agent_count="$(find "${target}" -maxdepth 1 -type f -name 'ambari-agent-*.rpm' | wc -l | tr -d ' ')"
+server_count="$(find "${target}" -maxdepth 1 -type f -name 'ambari-server-[0-9]*.rpm' | wc -l | tr -d ' ')"
+agent_count="$(find "${target}" -maxdepth 1 -type f -name 'ambari-agent-[0-9]*.rpm' | wc -l | tr -d ' ')"
 rpm_count="$(find "${target}" -maxdepth 1 -type f -name '*.rpm' | wc -l | tr -d ' ')"
 [[ "${server_count}" -eq 1 ]]
 [[ "${agent_count}" -eq 1 ]]

@@ -19,8 +19,8 @@ mkdir -p "${EVIDENCE_ROOT}"
   sha256sum -c evidence/SHA256SUMS
 )
 
-server_count="$(find "${rpms}" -maxdepth 1 -type f -name 'ambari-server-*.rpm' | wc -l | tr -d ' ')"
-agent_count="$(find "${rpms}" -maxdepth 1 -type f -name 'ambari-agent-*.rpm' | wc -l | tr -d ' ')"
+server_count="$(find "${rpms}" -maxdepth 1 -type f -name 'ambari-server-[0-9]*.rpm' | wc -l | tr -d ' ')"
+agent_count="$(find "${rpms}" -maxdepth 1 -type f -name 'ambari-agent-[0-9]*.rpm' | wc -l | tr -d ' ')"
 rpm_count="$(find "${rpms}" -maxdepth 1 -type f -name '*.rpm' | wc -l | tr -d ' ')"
 [[ "${server_count}" -eq 1 ]]
 [[ "${agent_count}" -eq 1 ]]
@@ -34,7 +34,7 @@ if find "${rpms}" -maxdepth 1 -type f \( \
   exit 1
 fi
 
-set -- "${rpms}"/ambari-server-*.rpm "${rpms}"/ambari-agent-*.rpm
+set -- "${rpms}"/ambari-server-[0-9]*.rpm "${rpms}"/ambari-agent-[0-9]*.rpm
 {
   dnf -y install python3-distro java-17-openjdk-devel
   dnf -y install "$@"

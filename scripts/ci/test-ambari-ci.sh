@@ -53,10 +53,12 @@ test_build_collects_only_core_runtime_rpms() {
 set -euo pipefail
 mkdir -p \
   ambari-server/target/rpm/ambari-server/RPMS/noarch \
+  ambari-server-spi/target/rpm/ambari-server-spi/RPMS/noarch \
   ambari-agent/target/rpm/ambari-agent/RPMS/x86_64 \
   ambari-agent/target/rpm/ambari-agent/SRPMS \
   ambari-server/target/rpm/ambari-server/RPMS/noarch
 touch ambari-server/target/rpm/ambari-server/RPMS/noarch/ambari-server-3.0.0.0-0.noarch.rpm
+touch ambari-server-spi/target/rpm/ambari-server-spi/RPMS/noarch/ambari-server-spi-3.0.0.0-0.noarch.rpm
 touch ambari-agent/target/rpm/ambari-agent/RPMS/x86_64/ambari-agent-3.0.0.0-0.x86_64.rpm
 touch ambari-agent/target/rpm/ambari-agent/RPMS/x86_64/ambari-agent-debuginfo-3.0.0.0-0.x86_64.rpm
 touch ambari-agent/target/rpm/ambari-agent/SRPMS/ambari-agent-3.0.0.0-0.src.rpm
@@ -146,6 +148,7 @@ test_stage_publishes_only_verified_runtime_rpms() {
   trap 'rm -rf "${root}"' RETURN
   mkdir -p "${root}/tested/rpms" "${root}/tested/evidence" "${root}/test-evidence" "${root}/repo/repo" "${root}/bin"
   touch "${root}/tested/rpms/ambari-server-3.0.0.0-0.noarch.rpm"
+  touch "${root}/tested/rpms/ambari-server-spi-3.0.0.0-0.noarch.rpm"
   touch "${root}/tested/rpms/ambari-agent-3.0.0.0-0.x86_64.rpm"
   touch "${root}/tested/rpms/ambari-agent-debuginfo-3.0.0.0-0.x86_64.rpm"
   (cd "${root}/tested" && sha256sum rpms/*.rpm > evidence/SHA256SUMS)
@@ -175,6 +178,7 @@ EOF
   [[ -f "${target}/ambari-server-3.0.0.0-0.noarch.rpm" ]] || fail "staged server RPM missing"
   [[ -f "${target}/ambari-agent-3.0.0.0-0.x86_64.rpm" ]] || fail "staged agent RPM missing"
   [[ ! -e "${target}/ambari-agent-debuginfo-3.0.0.0-0.x86_64.rpm" ]] || fail "debug RPM was published"
+  [[ ! -e "${target}/ambari-server-spi-3.0.0.0-0.noarch.rpm" ]] || fail "optional server SPI RPM was published"
   grep -qx 'test_status: PASS' "${target}/manifest.yaml"
   [[ -s "${target}/repodata/repomd.xml" ]] || fail "repository metadata missing"
 }
