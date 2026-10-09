@@ -8,6 +8,11 @@ dependencies as separate DNF repositories: ZooKeeper needs `common`; Hadoop
 needs `common` and ZooKeeper; Tez and Hive also need Hadoop. Each directory has
 its own `repodata/`, `SHA256SUMS`, and provenance manifest.
 
+Ambari management-plane packages are published separately under
+`openeuler-22.03-lts-sp4/ambari/3.0.0/`. That repository contains only the
+tested `ambari-server` and `ambari-agent` runtime RPMs and does not share the
+Bigtop `common` repository.
+
 The build and test artifacts retain the full RPM set. This repository omits
 duplicate dependency copies, source RPMs, debug packages, test packages, docs,
 and development headers. A package with the same name built in several jobs
