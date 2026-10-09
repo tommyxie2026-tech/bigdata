@@ -184,7 +184,7 @@ jobs:
             -exec cp -v {} "${RELEASE_ROOT}/rpms/" \;
           cp -a /tmp/test-evidence/. "${RELEASE_ROOT}/evidence/"
           rpm_count="$(find "${RELEASE_ROOT}/rpms" -type f -name '*.rpm' | wc -l | tr -d ' ')"
-          test "${rpm_count}" -ge 2
+          test "${rpm_count}" -eq 3
           (
             cd "${RELEASE_ROOT}"
             find rpms -type f -name '*.rpm' -print0 | sort -z | \

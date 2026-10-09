@@ -43,7 +43,7 @@ EOF
   chmod +x "${root}/bin/"*
 }
 
-test_build_collects_only_core_runtime_rpms() {
+test_build_collects_server_spi_and_agent_runtime_rpms() {
   local root
   root="$(new_fixture)"
   trap 'rm -rf "${root}"' RETURN
@@ -73,10 +73,11 @@ EOF
     bash "${BUILD_SCRIPT}"
 
   rpm_list="$(find "${root}/work/artifacts/rpms" -maxdepth 1 -type f -name '*.rpm' -exec basename {} \; | sort)"
-  expected_list=$'ambari-agent-3.0.0.0-0.x86_64.rpm\nambari-server-3.0.0.0-0.noarch.rpm'
+  expected_list=$'ambari-agent-3.0.0.0-0.x86_64.rpm\nambari-server-3.0.0.0-0.noarch.rpm\nambari-server-spi-3.0.0.0-0.noarch.rpm'
   [[ "${rpm_list}" == "${expected_list}" ]] || fail "unexpected runtime RPM set: ${rpm_list}"
   grep -qx 'status: PASS' "${root}/work/artifacts/evidence/evidence.md"
   grep -qx 'jdk: 17' "${root}/work/artifacts/evidence/evidence.md"
+  grep -qx 'server_spi_rpm_count: 1' "${root}/work/artifacts/evidence/evidence.md"
 }
 
 test_build_rejects_incomplete_core_package_set() {
@@ -121,8 +122,10 @@ if [[ "${count}" -eq 1 ]]; then
 fi
 mkdir -p \
   ambari-server/target/rpm/ambari-server/RPMS/noarch \
+  ambari-server-spi/target/rpm/ambari-server-spi/RPMS/noarch \
   ambari-agent/target/rpm/ambari-agent/RPMS/x86_64
 touch ambari-server/target/rpm/ambari-server/RPMS/noarch/ambari-server-3.0.0.0-0.noarch.rpm
+touch ambari-server-spi/target/rpm/ambari-server-spi/RPMS/noarch/ambari-server-spi-3.0.0.0-0.noarch.rpm
 touch ambari-agent/target/rpm/ambari-agent/RPMS/x86_64/ambari-agent-3.0.0.0-0.x86_64.rpm
 EOF
   chmod +x "${root}/bin/mvn"
@@ -146,6 +149,7 @@ test_install_smoke_verifies_both_core_packages() {
   trap 'rm -rf "${root}"' RETURN
   mkdir -p "${root}/artifact/rpms" "${root}/artifact/evidence" "${root}/evidence" "${root}/bin"
   touch "${root}/artifact/rpms/ambari-server-3.0.0.0-0.noarch.rpm"
+  touch "${root}/artifact/rpms/ambari-server-spi-3.0.0.0-0.noarch.rpm"
   touch "${root}/artifact/rpms/ambari-agent-3.0.0.0-0.x86_64.rpm"
   (cd "${root}/artifact" && sha256sum rpms/*.rpm > evidence/SHA256SUMS)
   cat > "${root}/bin/dnf" <<EOF
@@ -155,6 +159,7 @@ EOF
   cat > "${root}/bin/rpm" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
+  *ambari-server-spi*) echo 'ambari-server-spi-3.0.0.0-0.noarch' ;;
   *ambari-server*) echo 'ambari-server-3.0.0.0-0.noarch' ;;
   *ambari-agent*) echo 'ambari-agent-3.0.0.0-0.x86_64' ;;
   *) exit 1 ;;
@@ -176,7 +181,9 @@ EOF
     bash "${TEST_SCRIPT}"
 
   grep -qx 'status: PASS' "${root}/evidence/evidence.md"
+  grep -qx 'server_spi_package: PASS' "${root}/evidence/evidence.md"
   grep -q 'ambari-server' "${root}/dnf.calls"
+  grep -q 'ambari-server-spi' "${root}/dnf.calls"
   grep -q 'ambari-agent' "${root}/dnf.calls"
 }
 
@@ -214,10 +221,11 @@ EOF
 
   target="${root}/repo/repo/openeuler-22.03-lts-sp4/ambari/3.0.0"
   [[ -f "${target}/ambari-server-3.0.0.0-0.noarch.rpm" ]] || fail "staged server RPM missing"
+  [[ -f "${target}/ambari-server-spi-3.0.0.0-0.noarch.rpm" ]] || fail "staged server SPI RPM missing"
   [[ -f "${target}/ambari-agent-3.0.0.0-0.x86_64.rpm" ]] || fail "staged agent RPM missing"
   [[ ! -e "${target}/ambari-agent-debuginfo-3.0.0.0-0.x86_64.rpm" ]] || fail "debug RPM was published"
-  [[ ! -e "${target}/ambari-server-spi-3.0.0.0-0.noarch.rpm" ]] || fail "optional server SPI RPM was published"
   grep -qx 'test_status: PASS' "${target}/manifest.yaml"
+  grep -qx 'rpm_count: 3' "${target}/manifest.yaml"
   [[ -s "${target}/repodata/repomd.xml" ]] || fail "repository metadata missing"
 }
 
@@ -285,7 +293,7 @@ if text.index(install) > text.index("diff -u"):
 PY
 }
 
-test_build_collects_only_core_runtime_rpms
+test_build_collects_server_spi_and_agent_runtime_rpms
 test_build_rejects_incomplete_core_package_set
 test_build_retries_transient_maven_downloads
 test_install_smoke_verifies_both_core_packages
