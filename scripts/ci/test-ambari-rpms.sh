@@ -24,11 +24,13 @@ dnf -y install coreutils diffutils findutils gawk grep rpm
 )
 
 server_count="$(find "${rpms}" -maxdepth 1 -type f -name 'ambari-server-[0-9]*.rpm' | wc -l | tr -d ' ')"
+server_spi_count="$(find "${rpms}" -maxdepth 1 -type f -name 'ambari-server-spi-[0-9]*.rpm' | wc -l | tr -d ' ')"
 agent_count="$(find "${rpms}" -maxdepth 1 -type f -name 'ambari-agent-[0-9]*.rpm' | wc -l | tr -d ' ')"
 rpm_count="$(find "${rpms}" -maxdepth 1 -type f -name '*.rpm' | wc -l | tr -d ' ')"
 [[ "${server_count}" -eq 1 ]]
+[[ "${server_spi_count}" -eq 1 ]]
 [[ "${agent_count}" -eq 1 ]]
-[[ "${rpm_count}" -eq 2 ]]
+[[ "${rpm_count}" -eq 3 ]]
 
 if find "${rpms}" -maxdepth 1 -type f \( \
   -name '*.src.rpm' -o -name '*-debuginfo-*' -o -name '*-debugsource-*' \
@@ -38,11 +40,14 @@ if find "${rpms}" -maxdepth 1 -type f \( \
   exit 1
 fi
 
-set -- "${rpms}"/ambari-server-[0-9]*.rpm "${rpms}"/ambari-agent-[0-9]*.rpm
+set -- \
+  "${rpms}"/ambari-server-[0-9]*.rpm \
+  "${rpms}"/ambari-server-spi-[0-9]*.rpm \
+  "${rpms}"/ambari-agent-[0-9]*.rpm
 {
   dnf -y install python3-distro java-17-openjdk-devel
   dnf -y install "$@"
-  rpm -q ambari-server ambari-agent
+  rpm -q ambari-server ambari-server-spi ambari-agent
   ambari-server --version
   ambari-agent --version
 } 2>&1 | tee "${EVIDENCE_ROOT}/install-smoke.log"
@@ -57,6 +62,7 @@ version: ${AMBARI_VERSION}
 os: openEuler 22.03 LTS SP4
 checksums: PASS
 server_package: PASS
+server_spi_package: PASS
 agent_package: PASS
 server_version_command: PASS
 agent_version_command: PASS
