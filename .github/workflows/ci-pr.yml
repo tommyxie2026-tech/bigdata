@@ -51,6 +51,9 @@ jobs:
           fi
           shellcheck -S warning "${files[@]}"
 
+      - name: Maven download resilience contracts
+        run: bash scripts/ci/test-maven-download-resilience.sh
+
   yaml:
     name: YAML checks
     runs-on: ubuntu-latest
