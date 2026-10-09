@@ -36,6 +36,7 @@ on:
       - ".github/workflows/*components.yml"
       - ".github/workflows/build-one-component.yml"
       - "scripts/ci/*.sh"
+      - "!scripts/ci/*ambari*.sh"
       - "ci/components.yaml"
 
   pull_request:
@@ -45,6 +46,7 @@ on:
       - ".github/workflows/*components.yml"
       - ".github/workflows/build-one-component.yml"
       - "scripts/ci/*.sh"
+      - "!scripts/ci/*ambari*.sh"
       - "ci/components.yaml"
 
 permissions:
