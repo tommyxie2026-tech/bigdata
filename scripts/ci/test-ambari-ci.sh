@@ -271,6 +271,20 @@ test_build_bounds_maven_transfer_waits() {
     fail "build does not retry transient Maven download failures"
 }
 
+test_install_smoke_bootstraps_validation_tools() {
+  python3 - "${TEST_SCRIPT}" <<'PY'
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text()
+install = "dnf -y install coreutils diffutils findutils gawk grep rpm"
+if install not in text:
+    raise SystemExit("install smoke does not install clean-container validation tools")
+if text.index(install) > text.index("diff -u"):
+    raise SystemExit("validation tools are installed after their first use")
+PY
+}
+
 test_build_collects_only_core_runtime_rpms
 test_build_rejects_incomplete_core_package_set
 test_build_retries_transient_maven_downloads
@@ -281,4 +295,5 @@ test_ci_pr_runs_ambari_contract_tests
 test_ambari_changes_do_not_trigger_bigtop_component_builds
 test_build_pins_and_verifies_java17
 test_build_bounds_maven_transfer_waits
+test_install_smoke_bootstraps_validation_tools
 echo "Ambari CI tests: PASS"

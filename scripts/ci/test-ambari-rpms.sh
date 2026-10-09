@@ -8,6 +8,10 @@ rpms="${ARTIFACT_ROOT}/rpms"
 checksums="${ARTIFACT_ROOT}/evidence/SHA256SUMS"
 mkdir -p "${EVIDENCE_ROOT}"
 
+# The openEuler base image is intentionally minimal; install the tools used by
+# artifact verification before touching the downloaded RPM set.
+dnf -y install coreutils diffutils findutils gawk grep rpm
+
 [[ -d "${rpms}" ]]
 [[ -s "${checksums}" ]]
 
