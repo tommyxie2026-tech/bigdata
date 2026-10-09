@@ -1,0 +1,10 @@
+schema: bigdata.rpm-repo/v1
+component: ambari
+version: 3.0.0
+ambari_version: 3.0.0
+os: openEuler 22.03 LTS SP4
+promotion_workflow_commit: 6ee960f08b829830010aa16edbf92fac08da7d7f
+tested_artifact_run_id: 37949592658
+rpm_count: 3
+test_status: PASS
+repository_layout: ambari-runtime/v1

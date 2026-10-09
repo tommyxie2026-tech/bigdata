@@ -54,6 +54,10 @@ jobs:
       - name: Maven download resilience contracts
         run: bash scripts/ci/test-maven-download-resilience.sh
 
+      - name: Ambari CI contract tests
+        shell: bash
+        run: bash scripts/ci/test-ambari-ci.sh
+
   yaml:
     name: YAML checks
     runs-on: ubuntu-latest
