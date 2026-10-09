@@ -7,6 +7,8 @@ AMBARI_REPO_URL="${AMBARI_REPO_URL:-https://github.com/apache/ambari.git}"
 WORK_ROOT="${WORK_ROOT:-/work}"
 AMBARI_SOURCE_DIR="${AMBARI_SOURCE_DIR:-${WORK_ROOT}/src/ambari}"
 AMBARI_INSTALL_BUILD_DEPS="${AMBARI_INSTALL_BUILD_DEPS:-true}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MAVEN_RETRY_SCRIPT="${SCRIPT_DIR}/retry-maven-downloads.sh"
 
 artifacts="${WORK_ROOT}/artifacts"
 rpms="${artifacts}/rpms"
@@ -36,7 +38,7 @@ else
 fi
 export JAVA_HOME
 export PATH="${JAVA_HOME}/bin:${PATH}"
-export MAVEN_OPTS="${MAVEN_OPTS:-} -Xmx4g -XX:MaxMetaspaceSize=1g -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true"
+export MAVEN_OPTS="${MAVEN_OPTS:-} -Xmx4g -XX:MaxMetaspaceSize=1g -Dmaven.wagon.rto=120000 -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Dmaven.wagon.httpconnectionManager.ttlSeconds=60"
 
 if [[ "${AMBARI_INSTALL_BUILD_DEPS}" == true ]]; then
   javac_version="$("${JAVA_HOME}/bin/javac" -version 2>&1)"
@@ -54,14 +56,16 @@ fi
 set +e
 (
   cd "${AMBARI_SOURCE_DIR}"
-  mvn -B -T 1C clean install package rpm:rpm \
+  MAVEN_RETRY_DELAY_SECONDS="${MAVEN_RETRY_DELAY_SECONDS:-15}" \
+    bash "${MAVEN_RETRY_SCRIPT}" "${logs}/ambari-build.log" \
+    mvn -B -T 1C clean install package rpm:rpm \
     -Drat.skip=true \
     -DskipTests \
     -Dmaven.test.skip=true \
     -Dfindbugs.skip=true \
     -Dcheckstyle.skip=true
-) 2>&1 | tee "${logs}/ambari-build.log"
-build_rc=${PIPESTATUS[0]}
+)
+build_rc=$?
 set -e
 
 find "${AMBARI_SOURCE_DIR}" -type f -name '*.rpm' -print0 | while IFS= read -r -d '' rpm; do

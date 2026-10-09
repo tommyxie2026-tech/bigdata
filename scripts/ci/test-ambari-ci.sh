@@ -102,6 +102,44 @@ EOF
   grep -qx 'status: FAIL' "${root}/work/artifacts/evidence/evidence.md"
 }
 
+test_build_retries_transient_maven_downloads() {
+  local root
+  root="$(new_fixture)"
+  trap 'rm -rf "${root}"' RETURN
+  write_common_build_stubs "${root}"
+  cat > "${root}/bin/mvn" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+count_file="${AMBARI_MVN_CALL_COUNT:?}"
+count=0
+[[ ! -f "${count_file}" ]] || count="$(cat "${count_file}")"
+count=$((count + 1))
+printf '%s\n' "${count}" > "${count_file}"
+if [[ "${count}" -eq 1 ]]; then
+  echo '[ERROR] Could not transfer artifact example:artifact:jar:1.0: Connection timed out'
+  exit 1
+fi
+mkdir -p \
+  ambari-server/target/rpm/ambari-server/RPMS/noarch \
+  ambari-agent/target/rpm/ambari-agent/RPMS/x86_64
+touch ambari-server/target/rpm/ambari-server/RPMS/noarch/ambari-server-3.0.0.0-0.noarch.rpm
+touch ambari-agent/target/rpm/ambari-agent/RPMS/x86_64/ambari-agent-3.0.0.0-0.x86_64.rpm
+EOF
+  chmod +x "${root}/bin/mvn"
+
+  PATH="${root}/bin:${PATH}" \
+    JAVA_HOME="${root}/fake-java" \
+    AMBARI_SOURCE_DIR="${root}/source" \
+    WORK_ROOT="${root}/work" \
+    AMBARI_INSTALL_BUILD_DEPS=false \
+    AMBARI_MVN_CALL_COUNT="${root}/mvn-call-count" \
+    MAVEN_RETRY_DELAY_SECONDS=0 \
+    bash "${BUILD_SCRIPT}"
+
+  [[ "$(cat "${root}/mvn-call-count")" -eq 2 ]] || fail "transient Maven failure was not retried"
+  grep -qx 'status: PASS' "${root}/work/artifacts/evidence/evidence.md"
+}
+
 test_install_smoke_verifies_both_core_packages() {
   local root
   root="$(mktemp -d)"
@@ -226,12 +264,21 @@ test_build_pins_and_verifies_java17() {
     fail "build does not verify the Java runtime used by Maven"
 }
 
+test_build_bounds_maven_transfer_waits() {
+  grep -q -- '-Dmaven.wagon.rto=' "${BUILD_SCRIPT}" ||
+    fail "build does not bound Maven read timeouts"
+  grep -q 'retry-maven-downloads.sh' "${BUILD_SCRIPT}" ||
+    fail "build does not retry transient Maven download failures"
+}
+
 test_build_collects_only_core_runtime_rpms
 test_build_rejects_incomplete_core_package_set
+test_build_retries_transient_maven_downloads
 test_install_smoke_verifies_both_core_packages
 test_stage_publishes_only_verified_runtime_rpms
 test_workflow_orders_build_test_release
 test_ci_pr_runs_ambari_contract_tests
 test_ambari_changes_do_not_trigger_bigtop_component_builds
 test_build_pins_and_verifies_java17
+test_build_bounds_maven_transfer_waits
 echo "Ambari CI tests: PASS"
