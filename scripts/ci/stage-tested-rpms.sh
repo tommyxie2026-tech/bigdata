@@ -8,6 +8,7 @@ SOURCE_SHA="${SOURCE_SHA:?SOURCE_SHA is required}"
 REPO_CHECKOUT="${REPO_CHECKOUT:?REPO_CHECKOUT is required}"
 TESTED_RPMS_DIR="${TESTED_RPMS_DIR:-/tmp/tested-rpms}"
 TEST_EVIDENCE_DIR="${TEST_EVIDENCE_DIR:-/tmp/test-evidence}"
+CI_SOURCE_ROOT="${CI_SOURCE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
 case "${COMPONENT}" in
   zookeeper|hadoop|tez|hive|spark|hbase) ;;
@@ -44,11 +45,39 @@ repo_root="${REPO_CHECKOUT}/repo/openeuler-22.03-lts-sp4/bigtop-3.6"
 target="${repo_root}/${COMPONENT}/${VERSION}"
 common="${repo_root}/common/3.6.0"
 if [[ -e "${target}" ]]; then
-  grep -qx "component: ${COMPONENT}" "${target}/manifest.yaml"
-  grep -qx "version: ${VERSION}" "${target}/manifest.yaml"
-  grep -qx 'test_status: PASS' "${target}/manifest.yaml"
-  echo "Already promoted: ${target}"
-  exit 0
+  case "${COMPONENT}" in
+    tez|hive|spark|hbase)
+      set +e
+      python3 "${CI_SOURCE_ROOT}/scripts/ci/check-component-repo-fast-path.py" \
+        --component "${COMPONENT}" \
+        --version "${VERSION}" \
+        --repo-checkout "${REPO_CHECKOUT}" \
+        --components-file "${CI_SOURCE_ROOT}/ci/components.yaml"
+      check_status=$?
+      set -e
+      case "${check_status}" in
+        0)
+          echo "Already promoted and verified: ${target}"
+          exit 0
+          ;;
+        1)
+          echo "Replacing stale or incomplete RPM repository directory: ${target}"
+          rm -rf -- "${target}"
+          ;;
+        *)
+          echo "Unable to safely validate existing RPM repository directory: ${target}" >&2
+          exit "${check_status}"
+          ;;
+      esac
+      ;;
+    *)
+      grep -qx "component: ${COMPONENT}" "${target}/manifest.yaml"
+      grep -qx "version: ${VERSION}" "${target}/manifest.yaml"
+      grep -qx 'test_status: PASS' "${target}/manifest.yaml"
+      echo "Already promoted: ${target}"
+      exit 0
+      ;;
+  esac
 fi
 mkdir -p "${target}" "${common}"
 common_changed=false

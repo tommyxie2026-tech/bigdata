@@ -35,7 +35,9 @@ on:
     paths:
       - ".github/workflows/*components.yml"
       - ".github/workflows/build-one-component.yml"
+      - ".github/workflows/check-component-repo.yml"
       - "scripts/ci/*.sh"
+      - "scripts/ci/*component-repo-fast-path.py"
       - "!scripts/ci/*ambari*.sh"
       - "ci/components.yaml"
 
@@ -45,7 +47,9 @@ on:
     paths:
       - ".github/workflows/*components.yml"
       - ".github/workflows/build-one-component.yml"
+      - ".github/workflows/check-component-repo.yml"
       - "scripts/ci/*.sh"
+      - "scripts/ci/*component-repo-fast-path.py"
       - "!scripts/ci/*ambari*.sh"
       - "ci/components.yaml"
 
@@ -146,11 +150,20 @@ jobs:
       version: ${{ inputs.promote_version }}
       test_run_id: ${{ inputs.promote_test_run_id }}
 
-  tez_build:
-    name: Build tez 0.10.5
+  tez_repo_check:
+    name: Check tez 0.10.5 RPM repository
     if: >-
       github.event_name != 'workflow_dispatch' ||
       (inputs.promote_test_run_id == '' && inputs.start_component == 'tez')
+    uses: ./.github/workflows/check-component-repo.yml
+    with:
+      component: tez
+      version: 0.10.5
+
+  tez_build:
+    name: Build tez 0.10.5
+    needs: tez_repo_check
+    if: ${{ always() && needs.tez_repo_check.result == 'success' && needs.tez_repo_check.outputs.already_current != 'true' }}
     uses: ./.github/workflows/build-one-component.yml
     with:
       component: tez
@@ -170,7 +183,7 @@ jobs:
   tez_release:
     name: Release tez 0.10.5
     needs: tez_test
-    if: ${{ always() && needs.tez_test.result == 'success' }}
+    if: ${{ always() && needs.tez_test.result == 'success' && github.event_name != 'pull_request' }}
     permissions:
       contents: write
       actions: read
@@ -181,14 +194,60 @@ jobs:
       version: 0.10.5
       test_run_id: ${{ format('{0}', github.run_id) }}
 
-  hive_build:
-    name: Build hive 4.0.1
-    needs: tez_release
+  tez_gate:
+    name: Complete tez 0.10.5 stage
+    needs: [tez_repo_check, tez_build, tez_test, tez_release]
+    if: >-
+      always() &&
+      (github.event_name != 'workflow_dispatch' ||
+       (inputs.promote_test_run_id == '' && inputs.start_component == 'tez'))
+    outputs:
+      continue_chain: ${{ steps.gate.outputs.continue_chain }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Accept verified existing RPMs or a completed release
+        id: gate
+        env:
+          CHECK_RESULT: ${{ needs.tez_repo_check.result }}
+          ALREADY_CURRENT: ${{ needs.tez_repo_check.outputs.already_current }}
+          BUILD_RESULT: ${{ needs.tez_build.result }}
+          TEST_RESULT: ${{ needs.tez_test.result }}
+          RELEASE_RESULT: ${{ needs.tez_release.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          if [[ "${CHECK_RESULT}" == success && "${ALREADY_CURRENT}" == true && "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'continue_chain=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${CHECK_RESULT}" == success && "${BUILD_RESULT}" == success && "${TEST_RESULT}" == success && ( "${RELEASE_RESULT}" == success || ( "${EVENT_NAME}" == pull_request && "${RELEASE_RESULT}" == skipped ) ) ]]; then
+            echo 'continue_chain=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT_NAME}" == pull_request && "${IS_FORK_PR}" == true && "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'continue_chain=false' >> "${GITHUB_OUTPUT}"
+            echo 'Build is intentionally unavailable to fork PRs.'
+          else
+            echo "Tez stage did not pass: check=${CHECK_RESULT}, repo=${ALREADY_CURRENT}, build=${BUILD_RESULT}, test=${TEST_RESULT}, release=${RELEASE_RESULT}" >&2
+            exit 1
+          fi
+
+  hive_repo_check:
+    name: Check hive 4.0.1 RPM repository
+    needs: tez_gate
     if: >-
       always() &&
       (github.event_name != 'workflow_dispatch' || inputs.promote_test_run_id == '') &&
       ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'hive') ||
-       needs.tez_release.result == 'success')
+       (needs.tez_gate.result == 'success' && needs.tez_gate.outputs.continue_chain == 'true'))
+    uses: ./.github/workflows/check-component-repo.yml
+    with:
+      component: hive
+      version: 4.0.1
+
+  hive_build:
+    name: Build hive 4.0.1
+    needs: hive_repo_check
+    if: >-
+      always() &&
+      needs.hive_repo_check.result == 'success' &&
+      needs.hive_repo_check.outputs.already_current != 'true'
     uses: ./.github/workflows/build-one-component.yml
     with:
       component: hive
@@ -208,7 +267,7 @@ jobs:
   hive_release:
     name: Release hive 4.0.1
     needs: hive_test
-    if: ${{ always() && needs.hive_test.result == 'success' }}
+    if: ${{ always() && needs.hive_test.result == 'success' && github.event_name != 'pull_request' }}
     permissions:
       contents: write
       actions: read
@@ -219,14 +278,61 @@ jobs:
       version: 4.0.1
       test_run_id: ${{ format('{0}', github.run_id) }}
 
-  spark_build:
-    name: Build spark 3.5.8
-    needs: hive_release
+  hive_gate:
+    name: Complete hive 4.0.1 stage
+    needs: [tez_gate, hive_repo_check, hive_build, hive_test, hive_release]
+    if: >-
+      always() &&
+      (github.event_name != 'workflow_dispatch' ||
+       (inputs.promote_test_run_id == '' &&
+        (inputs.start_component == 'hive' ||
+         (needs.tez_gate.result == 'success' && needs.tez_gate.outputs.continue_chain == 'true'))))
+    outputs:
+      continue_chain: ${{ steps.gate.outputs.continue_chain }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Accept verified existing RPMs or a completed release
+        id: gate
+        env:
+          CHECK_RESULT: ${{ needs.hive_repo_check.result }}
+          ALREADY_CURRENT: ${{ needs.hive_repo_check.outputs.already_current }}
+          BUILD_RESULT: ${{ needs.hive_build.result }}
+          TEST_RESULT: ${{ needs.hive_test.result }}
+          RELEASE_RESULT: ${{ needs.hive_release.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          if [[ "${CHECK_RESULT}" == success && "${ALREADY_CURRENT}" == true && "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'continue_chain=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${CHECK_RESULT}" == success && "${BUILD_RESULT}" == success && "${TEST_RESULT}" == success && ( "${RELEASE_RESULT}" == success || ( "${EVENT_NAME}" == pull_request && "${RELEASE_RESULT}" == skipped ) ) ]]; then
+            echo 'continue_chain=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT_NAME}" == pull_request && "${IS_FORK_PR}" == true && "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'continue_chain=false' >> "${GITHUB_OUTPUT}"
+            echo 'Build is intentionally unavailable to fork PRs.'
+          else
+            echo "Hive stage did not pass: check=${CHECK_RESULT}, repo=${ALREADY_CURRENT}, build=${BUILD_RESULT}, test=${TEST_RESULT}, release=${RELEASE_RESULT}" >&2
+            exit 1
+          fi
+
+  spark_repo_check:
+    name: Check spark 3.5.8 RPM repository
+    needs: hive_gate
     if: >-
       always() &&
       (github.event_name != 'workflow_dispatch' || inputs.promote_test_run_id == '') &&
       ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'spark') ||
-       needs.hive_release.result == 'success')
+       (needs.hive_gate.result == 'success' && needs.hive_gate.outputs.continue_chain == 'true'))
+    uses: ./.github/workflows/check-component-repo.yml
+    with:
+      component: spark
+      version: 3.5.8
+
+  spark_build:
+    name: Build spark 3.5.8
+    needs: spark_repo_check
+    if: >-
+      always() && needs.spark_repo_check.result == 'success' &&
+      needs.spark_repo_check.outputs.already_current != 'true'
     uses: ./.github/workflows/build-one-component.yml
     with:
       component: spark
@@ -246,7 +352,7 @@ jobs:
   spark_release:
     name: Release spark 3.5.8
     needs: spark_test
-    if: ${{ always() && needs.spark_test.result == 'success' }}
+    if: ${{ always() && needs.spark_test.result == 'success' && github.event_name != 'pull_request' }}
     permissions:
       contents: write
       actions: read
@@ -257,14 +363,61 @@ jobs:
       version: 3.5.8
       test_run_id: ${{ format('{0}', github.run_id) }}
 
-  hbase_build:
-    name: Build hbase 2.6.5
-    needs: spark_release
+  spark_gate:
+    name: Complete spark 3.5.8 stage
+    needs: [hive_gate, spark_repo_check, spark_build, spark_test, spark_release]
+    if: >-
+      always() &&
+      (github.event_name != 'workflow_dispatch' ||
+       (inputs.promote_test_run_id == '' &&
+        (inputs.start_component == 'spark' ||
+         (needs.hive_gate.result == 'success' && needs.hive_gate.outputs.continue_chain == 'true'))))
+    outputs:
+      continue_chain: ${{ steps.gate.outputs.continue_chain }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Accept verified existing RPMs or a completed release
+        id: gate
+        env:
+          CHECK_RESULT: ${{ needs.spark_repo_check.result }}
+          ALREADY_CURRENT: ${{ needs.spark_repo_check.outputs.already_current }}
+          BUILD_RESULT: ${{ needs.spark_build.result }}
+          TEST_RESULT: ${{ needs.spark_test.result }}
+          RELEASE_RESULT: ${{ needs.spark_release.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          if [[ "${CHECK_RESULT}" == success && "${ALREADY_CURRENT}" == true && "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'continue_chain=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${CHECK_RESULT}" == success && "${BUILD_RESULT}" == success && "${TEST_RESULT}" == success && ( "${RELEASE_RESULT}" == success || ( "${EVENT_NAME}" == pull_request && "${RELEASE_RESULT}" == skipped ) ) ]]; then
+            echo 'continue_chain=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT_NAME}" == pull_request && "${IS_FORK_PR}" == true && "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'continue_chain=false' >> "${GITHUB_OUTPUT}"
+            echo 'Build is intentionally unavailable to fork PRs.'
+          else
+            echo "Spark stage did not pass: check=${CHECK_RESULT}, repo=${ALREADY_CURRENT}, build=${BUILD_RESULT}, test=${TEST_RESULT}, release=${RELEASE_RESULT}" >&2
+            exit 1
+          fi
+
+  hbase_repo_check:
+    name: Check hbase 2.6.5 RPM repository
+    needs: spark_gate
     if: >-
       always() &&
       (github.event_name != 'workflow_dispatch' || inputs.promote_test_run_id == '') &&
       ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'hbase') ||
-       needs.spark_release.result == 'success')
+       (needs.spark_gate.result == 'success' && needs.spark_gate.outputs.continue_chain == 'true'))
+    uses: ./.github/workflows/check-component-repo.yml
+    with:
+      component: hbase
+      version: 2.6.5
+
+  hbase_build:
+    name: Build hbase 2.6.5
+    needs: hbase_repo_check
+    if: >-
+      always() && needs.hbase_repo_check.result == 'success' &&
+      needs.hbase_repo_check.outputs.already_current != 'true'
     uses: ./.github/workflows/build-one-component.yml
     with:
       component: hbase
@@ -284,7 +437,7 @@ jobs:
   hbase_release:
     name: Release hbase 2.6.5
     needs: hbase_test
-    if: ${{ always() && needs.hbase_test.result == 'success' }}
+    if: ${{ always() && needs.hbase_test.result == 'success' && github.event_name != 'pull_request' }}
     permissions:
       contents: write
       actions: read
@@ -294,3 +447,35 @@ jobs:
       component: hbase
       version: 2.6.5
       test_run_id: ${{ format('{0}', github.run_id) }}
+
+  hbase_gate:
+    name: Complete hbase 2.6.5 stage
+    needs: [spark_gate, hbase_repo_check, hbase_build, hbase_test, hbase_release]
+    if: >-
+      always() &&
+      (github.event_name != 'workflow_dispatch' ||
+       (inputs.promote_test_run_id == '' &&
+        (inputs.start_component == 'hbase' ||
+         (needs.spark_gate.result == 'success' && needs.spark_gate.outputs.continue_chain == 'true'))))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Accept verified existing RPMs or a completed release
+        env:
+          CHECK_RESULT: ${{ needs.hbase_repo_check.result }}
+          ALREADY_CURRENT: ${{ needs.hbase_repo_check.outputs.already_current }}
+          BUILD_RESULT: ${{ needs.hbase_build.result }}
+          TEST_RESULT: ${{ needs.hbase_test.result }}
+          RELEASE_RESULT: ${{ needs.hbase_release.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          if [[ "${CHECK_RESULT}" == success && "${ALREADY_CURRENT}" == true && "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'continue_chain=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${CHECK_RESULT}" == success && "${BUILD_RESULT}" == success && "${TEST_RESULT}" == success && ( "${RELEASE_RESULT}" == success || ( "${EVENT_NAME}" == pull_request && "${RELEASE_RESULT}" == skipped ) ) ]]; then
+            echo 'continue_chain=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT_NAME}" == pull_request && "${IS_FORK_PR}" == true && "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'Build is intentionally unavailable to fork PRs.'
+          else
+            echo "HBase stage did not pass: check=${CHECK_RESULT}, repo=${ALREADY_CURRENT}, build=${BUILD_RESULT}, test=${TEST_RESULT}, release=${RELEASE_RESULT}" >&2
+            exit 1
+          fi
