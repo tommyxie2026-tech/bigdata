@@ -22,7 +22,10 @@ jobs:
     name: Build ${{ inputs.component }} ${{ inputs.version }}
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    # A cold Hive build compiles the Hadoop/ZooKeeper dependency chain before
+    # packaging Hive. Keep this bounded, but allow the first cache population
+    # to finish instead of killing the build at the old four-hour limit.
+    timeout-minutes: 480
 
     env:
       OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
@@ -44,6 +47,8 @@ jobs:
             /tmp/bigdata-component-cache/m2
             /tmp/bigdata-component-cache/gradle
           key: openeuler22-bigtop36-jdk8-${{ hashFiles('ci/components.yaml', 'scripts/ci/build-bigtop-component.sh') }}
+          restore-keys: |
+            openeuler22-bigtop36-jdk8-
 
       - name: Build RPMs
         shell: bash
