@@ -9,12 +9,24 @@ jdk: 8
 components:
   tez:
     version: 0.10.5
+    runtime_packages:
+      - tez
     build_task: tez-rpm
     wave: 3
     depends_on:
       - hadoop
   hive:
     version: 4.0.1
+    runtime_packages:
+      - hive
+      - hive-hbase
+      - hive-hcatalog
+      - hive-hcatalog-server
+      - hive-jdbc
+      - hive-metastore
+      - hive-server2
+      - hive-webhcat
+      - hive-webhcat-server
     build_task: hive-rpm
     wave: 3
     depends_on:
@@ -22,12 +34,31 @@ components:
       - tez
   spark:
     version: 3.5.8
+    runtime_packages:
+      - spark
+      - spark-core
+      - spark-datanucleus
+      - spark-external
+      - spark-history-server
+      - spark-master
+      - spark-python
+      - spark-sparkr
+      - spark-thriftserver
+      - spark-worker
+      - spark-yarn-shuffle
     build_task: spark-rpm
     wave: 4
     depends_on:
       - hadoop
   hbase:
     version: 2.6.5
+    runtime_packages:
+      - hbase
+      - hbase-master
+      - hbase-regionserver
+      - hbase-rest
+      - hbase-thrift
+      - hbase-thrift2
     build_task: hbase-rpm
     wave: 5
     depends_on:

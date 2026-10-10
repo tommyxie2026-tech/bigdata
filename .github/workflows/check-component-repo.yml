@@ -1,0 +1,71 @@
+name: Check Existing Component RPMs
+
+on:
+  workflow_call:
+    inputs:
+      component:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+    outputs:
+      already_current:
+        description: Whether main already contains this exact tested RPM set
+        value: ${{ jobs.check.outputs.already_current }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Verify existing ${{ inputs.component }} ${{ inputs.version }} RPMs
+    runs-on: ubuntu-latest
+    outputs:
+      already_current: ${{ steps.repo.outputs.already_current }}
+    steps:
+      - name: Checkout workflow and component config
+        uses: actions/checkout@v4
+
+      - name: Checkout repository metadata from main
+        uses: actions/checkout@v4
+        env:
+          GIT_LFS_SKIP_SMUDGE: '1'
+        with:
+          ref: main
+          path: rpm-repository
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            repo/openeuler-22.03-lts-sp4/bigtop-3.6/${{ inputs.component }}/${{ inputs.version }}/
+
+      - name: Verify repository content and set fast-path result
+        id: repo
+        shell: bash
+        env:
+          COMPONENT: ${{ inputs.component }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          set +e
+          python3 scripts/ci/check-component-repo-fast-path.py \
+            --component "${COMPONENT}" \
+            --version "${VERSION}" \
+            --repo-checkout "${GITHUB_WORKSPACE}/rpm-repository" \
+            --components-file "${GITHUB_WORKSPACE}/ci/components.yaml"
+          result=$?
+          set -e
+          case "${result}" in
+            0)
+              echo 'already_current=true' >> "${GITHUB_OUTPUT}"
+              echo "Fast path: ${COMPONENT} ${VERSION} already verified in main/repo." >> "${GITHUB_STEP_SUMMARY}"
+              ;;
+            1)
+              echo 'already_current=false' >> "${GITHUB_OUTPUT}"
+              echo "Normal Build/Test/Release required for ${COMPONENT} ${VERSION}." >> "${GITHUB_STEP_SUMMARY}"
+              ;;
+            *)
+              echo "Repository validation failed unexpectedly (exit ${result})." >&2
+              exit "${result}"
+              ;;
+          esac

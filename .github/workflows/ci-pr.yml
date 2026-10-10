@@ -54,6 +54,9 @@ jobs:
       - name: Maven download resilience contracts
         run: bash scripts/ci/test-maven-download-resilience.sh
 
+      - name: Component RPM repository fast-path contracts
+        run: python3 scripts/ci/test-component-repo-fast-path.py
+
       - name: Ambari CI contract tests
         shell: bash
         run: bash scripts/ci/test-ambari-ci.sh
