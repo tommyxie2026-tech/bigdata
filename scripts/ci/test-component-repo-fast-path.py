@@ -196,10 +196,29 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             result = self.run_check(repo, config)
         self.assertEqual(result.returncode, 1)
 
-    def test_fast_path_is_disabled_for_pull_requests(self) -> None:
-        text = CHECK_WORKFLOW.read_text()
-        self.assertIn("github.event_name != 'pull_request'", text)
-        self.assertIn("PR checks always exercise Build and Test", text)
+    def test_pull_requests_check_main_repository_for_fast_path(self) -> None:
+        jobs = subprocess.run(
+            [
+                "ruby",
+                "-ryaml",
+                "-rjson",
+                "-e",
+                'workflow = YAML.load_file(ARGV.fetch(0)); puts JSON.generate(workflow.fetch("jobs"))',
+                str(CHECK_WORKFLOW),
+            ],
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        check_steps = json.loads(jobs.stdout)["check"]["steps"]
+        repo_checkout = next(step for step in check_steps if step.get("name") == "Checkout repository metadata from main")
+        self.assertNotIn("if", repo_checkout)
+        verify = next(step for step in check_steps if step.get("id") == "repo")
+        self.assertNotIn("EVENT_NAME", verify.get("env", {}))
+        command = verify["run"]
+        self.assertIn("check-component-repo-fast-path.py", command)
+        self.assertNotIn("PR checks always exercise Build and Test", command)
+        self.assertNotIn("already_current=false", command.split("python3 scripts/ci/check-component-repo-fast-path.py", 1)[0])
 
     def test_each_component_uses_repository_gate_and_success_stage_gate(self) -> None:
         jobs = self.workflow_jobs()
@@ -255,6 +274,7 @@ class ComponentRepoFastPathTests(unittest.TestCase):
         jobs = self.workflow_jobs()
         cases = [
             ("success", "true", "skipped", "skipped", "skipped", "push", "false", 0, "continue_chain=true"),
+            ("success", "true", "skipped", "skipped", "skipped", "pull_request", "false", 0, "continue_chain=true"),
             ("success", "true", "failure", "skipped", "skipped", "push", "false", 1, ""),
             ("success", "false", "success", "success", "success", "push", "false", 0, "continue_chain=true"),
             ("success", "false", "success", "success", "skipped", "pull_request", "false", 0, "continue_chain=true"),
