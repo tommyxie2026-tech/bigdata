@@ -59,7 +59,13 @@ EOF
     fail "extra-enforcer-rules prefetch missing"
   grep -q -- '-Dartifact=com.huaweicloud:esdk-obs-java:3.20.4.2' "${root}/calls" ||
     fail "Huawei OBS SDK prefetch missing"
-  [[ "$(wc -l < "${root}/calls" | tr -d ' ')" -eq 3 ]] || fail "unexpected prefetch command count"
+  grep -q -- '-Dartifact=org.junit.jupiter:junit-jupiter-engine:5.8.2' "${root}/calls" ||
+    fail "JUnit Jupiter engine prefetch missing"
+  grep -q -- '-Dartifact=org.apache.maven:maven-core:3.6.3' "${root}/calls" ||
+    fail "Maven core prefetch missing"
+  grep -q -- '-Dartifact=org.powermock:powermock-api-mockito:1.7.4' "${root}/calls" ||
+    fail "PowerMock Mockito API prefetch missing"
+  [[ "$(wc -l < "${root}/calls" | tr -d ' ')" -eq 6 ]] || fail "unexpected prefetch command count"
 }
 
 test_component_build_bounds_and_prefetches_maven() {
