@@ -8,13 +8,17 @@ OUTPUT="$(mktemp -u /tmp/flink-output.XXXXXX)"
 CLUSTER_LOG="${EVIDENCE_ROOT}/flink-cluster.log"
 
 cleanup() {
-  runuser -u flink -- "${FLINK_HOME}/bin/stop-cluster.sh" >>"${CLUSTER_LOG}" 2>&1 || true
+  runuser -u flink -- env FLINK_LOG_DIR=/var/log/flink "${FLINK_HOME}/bin/stop-cluster.sh" >>"${CLUSTER_LOG}" 2>&1 || true
 }
 trap cleanup EXIT
 
 printf 'alpha beta alpha\ngamma beta\n' > "${INPUT}"
 chown flink:flink "${INPUT}"
-runuser -u flink -- "${FLINK_HOME}/bin/start-cluster.sh" >"${CLUSTER_LOG}" 2>&1
+# The RPM installs its writable service log directory at /var/log/flink.
+FLINK_LOG_DIR=/var/log/flink
+[[ -d "${FLINK_LOG_DIR}" ]]
+runuser -u flink -- test -w "${FLINK_LOG_DIR}"
+runuser -u flink -- env FLINK_LOG_DIR="${FLINK_LOG_DIR}" "${FLINK_HOME}/bin/start-cluster.sh" >"${CLUSTER_LOG}" 2>&1
 
 ready=false
 for _ in $(seq 1 60); do

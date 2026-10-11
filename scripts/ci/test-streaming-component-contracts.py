@@ -56,6 +56,13 @@ class StreamingComponentContracts(unittest.TestCase):
         self.assertIn("hadoop", flink["depends_on"])
         self.assertIn('[[ "${TEST_PROFILE}" == flink-local-job-smoke ]]', DISPATCHER)
 
+    def test_flink_uses_packaged_log_directory_for_daemons(self) -> None:
+        script = (ROOT / "scripts/ci/test-flink-rpm-openeuler-container.sh").read_text(encoding="utf-8")
+        self.assertIn("FLINK_LOG_DIR=/var/log/flink", script)
+        self.assertIn('runuser -u flink -- test -w "${FLINK_LOG_DIR}"', script)
+        self.assertIn('env FLINK_LOG_DIR="${FLINK_LOG_DIR}" "${FLINK_HOME}/bin/start-cluster.sh"', script)
+        self.assertIn("env FLINK_LOG_DIR=/var/log/flink", script)
+
     def test_flink_requires_health_job_submission_and_expected_output(self) -> None:
         script = (ROOT / "scripts/ci/test-flink-rpm-openeuler-container.sh").read_text(encoding="utf-8")
         for token in (
