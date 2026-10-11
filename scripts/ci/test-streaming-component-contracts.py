@@ -75,6 +75,9 @@ class StreamingComponentContracts(unittest.TestCase):
             "alpha",
             "beta",
             "gamma",
+            'find "${OUTPUT}" -maxdepth 1 -type f',
+            '"${result_file}"',
+            'cp "${result_file}" "${EVIDENCE_ROOT}/flink-job-result.txt"',
         ):
             with self.subTest(token=token):
                 self.assertIn(token, script)
