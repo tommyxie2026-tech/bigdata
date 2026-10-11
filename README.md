@@ -153,6 +153,119 @@ network ports, service ordering, smoke tests, and recovery procedures. The
 single-node Blueprint is not a substitute for that topology or its HA
 acceptance checks.
 
+## 快速部署（中文）
+
+本指南对应当前 **BIGDATA-1.0.0-RC1**，目标系统为 **openEuler 22.03 LTS SP4**，适用于实验或单机体验。它不是生产高可用部署流程，也不代表七节点集群已经通过验收。组件版本与已知限制见[第一阶段交付与验收说明](docs/phase1-delivery-design.md)。
+
+### 1. 准备主机和 RPM 仓库
+
+准备一台 openEuler 22.03 LTS SP4 主机，并配置好 DNS 和时间同步。单机实验建议至少 8 vCPU、32 GiB 内存，并为测试数据准备持久化存储；不要把数据放在临时文件系统中。
+
+通过 HTTPS 发布或镜像项目 RPM 仓库，然后在主机上创建 DNF 仓库配置。将 `<mirror>` 替换为实际仓库地址。Bigtop 组件仓库路径包含 `bigtop-3.6`；公共依赖仓库当前版本为 `3.6.0`，与组件版本分别管理。
+
+```ini
+# /etc/yum.repos.d/bigdata.repo
+[bigdata-common]
+name=Bigdata common dependencies
+baseurl=https://<mirror>/repo/openeuler-22.03-lts-sp4/bigtop-3.6/common/3.6.0/
+enabled=1
+gpgcheck=0
+
+[bigdata-hadoop]
+name=Bigdata Hadoop 3.4.3
+baseurl=https://<mirror>/repo/openeuler-22.03-lts-sp4/bigtop-3.6/hadoop/3.4.3/
+enabled=1
+gpgcheck=0
+
+[bigdata-zookeeper]
+name=Bigdata ZooKeeper 3.8.4
+baseurl=https://<mirror>/repo/openeuler-22.03-lts-sp4/bigtop-3.6/zookeeper/3.8.4/
+enabled=1
+gpgcheck=0
+
+[bigdata-ambari]
+name=Bigdata Ambari 3.0.0
+baseurl=https://<mirror>/repo/openeuler-22.03-lts-sp4/ambari/3.0.0/
+enabled=1
+gpgcheck=0
+```
+
+需要相应服务时，再添加 `bigtop-3.6` 下的 `tez/0.10.5`、`hive/4.0.1`、`spark/3.5.8` 和 `hbase/2.6.5` 仓库。生产环境应使用签名包、仓库认证，并配置可信签名密钥后设置 `gpgcheck=1`；RC 校验和不等同于 RPM 签名。刷新并检查仓库：
+
+```bash
+sudo dnf clean all
+sudo dnf makecache
+sudo dnf repolist
+```
+
+### 2. 安装并启动 Ambari
+
+从已批准的仓库安装 Ambari 和 JDK 17。注意区分 Java 运行时：当前 Hadoop 生态组件以 JDK 8 为基线，Ambari 使用 JDK 17。
+
+```bash
+sudo dnf install ambari-server ambari-agent java-17-openjdk
+sudo ambari-server setup
+sudo systemctl enable --now ambari-server
+```
+
+在每台受管主机上安装 Agent，将 Agent 指向 Ambari Server 后启动：
+
+```bash
+sudo dnf install ambari-agent java-17-openjdk
+# 在 /etc/ambari-agent/conf/ambari-agent.ini 中配置 Ambari Server 主机名
+sudo systemctl enable --now ambari-agent
+```
+
+访问 `http://<ambari-server>:8080`，首次登录后更换初始凭据并注册主机。共享环境应限制管理网访问，并在入口配置 TLS。
+
+### 3. 体验单节点 Blueprint
+
+仓库提供单节点 Blueprint 示例和辅助脚本：
+
+```bash
+cd ambari/scripts
+# 在当前 Shell 中设置以下环境变量；不要把密码提交到 Git。
+export AMBARI_HOST="<ambari-server>"
+export AMBARI_USER="admin"
+read -rsp "Ambari password: " AMBARI_PASSWORD; echo
+export AMBARI_PASSWORD
+export AMBARI_CLUSTER="bigdata-lab"
+./create-cluster.sh ../blueprints/single-node-hadoop.json
+```
+
+上面的命令会先向 Ambari 注册 Blueprint。若要提交建群请求，还需创建主机映射文件，并使用 Ambari 中登记的准确主机名：
+
+```json
+{
+  "blueprint": "single-node-hadoop",
+  "host_groups": [
+    { "name": "master", "hosts": [{ "fqdn": "<registered-hostname>" }] }
+  ]
+}
+```
+
+将其保存为 `host-mapping.json`，再提交请求：
+
+```bash
+./create-cluster.sh ../blueprints/single-node-hadoop.json host-mapping.json
+```
+
+该 Blueprint 是**有限示例**，并非覆盖全部 RPM 的完整部署定义。当前 BIGDATA/1.0 的 Stack 元数据仅部分覆盖 HDFS/YARN/Hive/Spark；ZooKeeper、Tez、HBase、高可用角色以及全部服务生命周期和检查脚本尚未在 Ambari 中完整集成并验证。因此请仅用于查看部署流程或受控实验，不要把提交 Blueprint 当作端到端安装成功。请参照[集群安装 Runbook](ambari/runbooks/install-cluster.md)；如果 Ambari 无法识别服务或组件，应停止部署并排查。
+
+### 4. 直接安装 RPM 进行包级体验
+
+若只想在实验主机上确认包可用，可用 DNF 安装所需包，例如：
+
+```bash
+sudo dnf install zookeeper-server hadoop hadoop-client
+```
+
+仅在启用了对应仓库后再安装 `hive`、`tez`、`spark` 或 `hbase`。包安装和版本检查不等于集群部署测试。启动守护进程前，请按[安装 Runbook](ambari/runbooks/install-cluster.md) 执行对应配置步骤；不要对已有数据目录重复执行初始化或格式化操作。
+
+### 生产部署
+
+生产化拓扑、资源规格、存储、网络端口、服务启动顺序、冒烟测试和恢复流程，请参照[第一阶段交付设计](docs/phase1-delivery-design.md)中的 3 Master + 3 Worker + 1 Gateway 方案。单节点 Blueprint 不能替代该拓扑或其 HA 验收。
+
 ## Documentation
 
 * [Technical Design](docs/technical-design.md) - Big data architecture, module design, repository planning, and engineering conventions.
