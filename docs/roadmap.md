@@ -1,5 +1,7 @@
 # Bigdata Platform 阶段路线图与任务拆分
 
+> 2026-10-11：本文件保留早期 Phase 设计与任务拆分。项目已具备 RPM 构建、入库与 RC1 发布基础；当前状态、下一代湖仓/实时/AI 计划、资源评估及阶段 Gate 见 [下一代数据与 AI 平台 Roadmap](next-generation-platform-roadmap.md)。下文“当前应进入 Phase 1”是历史建议，不能作为现状判断。
+
 ## 1. 文档目标
 
 本文档用于定义 Bigdata Platform 从设计规划到工程落地的阶段路线图、阶段目标、任务清单、交付物、验收标准和可并行 Agent 拆分方式。
