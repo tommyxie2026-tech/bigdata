@@ -62,6 +62,7 @@ class StreamingComponentContracts(unittest.TestCase):
         self.assertIn('runuser -u flink -- test -w "${FLINK_LOG_DIR}"', script)
         self.assertIn('env FLINK_LOG_DIR="${FLINK_LOG_DIR}" "${FLINK_HOME}/bin/start-cluster.sh"', script)
         self.assertIn("env FLINK_LOG_DIR=/var/log/flink", script)
+        self.assertLess(script.index("FLINK_LOG_DIR=/var/log/flink"), script.index("start-cluster.sh"))
 
     def test_flink_requires_health_job_submission_and_expected_output(self) -> None:
         script = (ROOT / "scripts/ci/test-flink-rpm-openeuler-container.sh").read_text(encoding="utf-8")
