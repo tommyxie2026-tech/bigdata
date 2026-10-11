@@ -57,6 +57,9 @@ jobs:
       - name: Component RPM repository fast-path contracts
         run: python3 scripts/ci/test-component-repo-fast-path.py
 
+      - name: Repository tarball release workflow contract
+        run: bash scripts/ci/test-repo-tarball-release-contract.sh
+
       - name: Ambari CI contract tests
         shell: bash
         run: bash scripts/ci/test-ambari-ci.sh

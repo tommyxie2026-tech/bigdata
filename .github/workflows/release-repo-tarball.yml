@@ -1,0 +1,176 @@
+name: Publish RPM Repository Tarball (RC1)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: publish-repo-tarball-rc1
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Validate and publish the complete RPM repository
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: BIGDATA-1.0.0-RC1
+      REPO_ROOT: repo/openeuler-22.03-lts-sp4/bigtop-3.6
+      ARCHIVE_NAME: bigdata-1.0.0-rc1-openeuler-22.03-lts-sp4-repo.tar.gz
+    steps:
+      - name: Require main and a successful Build Components run for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = refs/heads/main
+
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Tag ${RELEASE_TAG} already exists; refusing to overwrite a published release." >&2
+            exit 1
+          fi
+
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/build-components.yml/runs?head_sha=${GITHUB_SHA}&status=success&per_page=100" \
+            > "${RUNNER_TEMP}/build-runs.json"
+          python3 - "${RUNNER_TEMP}/build-runs.json" "${GITHUB_SHA}" "${RUNNER_TEMP}/verified-ci-run" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              runs = json.load(stream).get("workflow_runs", [])
+          matches = [
+              run for run in runs
+              if run.get("head_sha") == sys.argv[2]
+              and run.get("head_branch") == "main"
+              and run.get("event") == "push"
+              and run.get("conclusion") == "success"
+          ]
+          if not matches:
+              raise SystemExit("No successful Build Components push run exists for this main commit.")
+          run = max(matches, key=lambda item: item.get("run_number", 0))
+          print(f"Verified Build Components run {run['id']}: {run['html_url']}")
+          with open(sys.argv[3], "w", encoding="utf-8") as stream:
+              stream.write(f"{run['id']}\n{run['html_url']}\n")
+          PY
+
+      - name: Checkout the exact main commit and materialize Git LFS RPMs
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          lfs: true
+
+      - name: Verify the four component repositories and real RPM payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          specs=("tez:0.10.5" "hive:4.0.1" "spark:3.5.8" "hbase:2.6.5")
+          expected_rpms=0
+          for spec in "${specs[@]}"; do
+            component=${spec%%:*}
+            version=${spec#*:}
+            target="${REPO_ROOT}/${component}/${version}"
+            python3 scripts/ci/check-component-repo-fast-path.py \
+              --component "${component}" \
+              --version "${version}" \
+              --repo-checkout . \
+              --components-file ci/components.yaml
+            (
+              cd "${target}"
+              sha256sum -c SHA256SUMS
+            )
+            count=$(find "${target}" -maxdepth 1 -type f -name '*.rpm' | wc -l | tr -d ' ')
+            test "${count}" -gt 0
+            expected_rpms=$((expected_rpms + count))
+          done
+
+          python3 - "${REPO_ROOT}" <<'PY'
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          rpms = sorted(root.rglob("*.rpm"))
+          if not rpms:
+              raise SystemExit("No RPM files found in the repository tree.")
+          for path in rpms:
+              with path.open("rb") as stream:
+                  prefix = stream.read(256)
+              if prefix.startswith(b"version https://git-lfs.github.com/spec/v1\n"):
+                  raise SystemExit(f"Unmaterialized Git LFS pointer: {path}")
+              if not prefix.startswith(b"\xed\xab\xee\xdb"):
+                  raise SystemExit(f"File is not an RPM payload: {path}")
+          print(f"Verified {len(rpms)} materialized RPM files.")
+          PY
+
+          echo "RPM_COUNT=${expected_rpms}" >> "${GITHUB_ENV}"
+
+      - name: Create deterministic repo tarball, checksum, and manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          archive="${RUNNER_TEMP}/${ARCHIVE_NAME}"
+          manifest="${RUNNER_TEMP}/RELEASE-MANIFEST.yaml"
+          checksum="${RUNNER_TEMP}/${ARCHIVE_NAME}.sha256"
+          notes="${RUNNER_TEMP}/RELEASE-NOTES.md"
+
+          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
+            -cf - repo | gzip -n > "${archive}"
+          (
+            cd "${RUNNER_TEMP}"
+            sha256sum "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+          )
+          archive_sha=$(cut -d ' ' -f 1 "${checksum}")
+          readarray -t ci_info < "${RUNNER_TEMP}/verified-ci-run"
+          ci_run_id=${ci_info[0]}
+          ci_run_url=${ci_info[1]}
+          archive_bytes=$(stat -c '%s' "${archive}")
+
+          cat > "${manifest}" <<EOF
+          schema: bigdata.repo-tarball-release/v1
+          release: ${RELEASE_TAG}
+          source_commit: ${GITHUB_SHA}
+          ci_run_id: ${ci_run_id}
+          ci_run_url: ${ci_run_url}
+          os: openEuler 22.03 LTS SP4
+          repository_layout: split-runtime/v2
+          artifact: ${ARCHIVE_NAME}
+          artifact_bytes: ${archive_bytes}
+          artifact_sha256: ${archive_sha}
+          rpm_count: ${RPM_COUNT}
+          components:
+            tez: 0.10.5
+            hive: 4.0.1
+            spark: 3.5.8
+            hbase: 2.6.5
+          EOF
+
+          cat > "${notes}" <<EOF
+          Big Data RPM repository release candidate for openEuler 22.03 LTS SP4.
+
+          This prerelease contains the verified \`repo/\` tree for Tez 0.10.5, Hive 4.0.1, Spark 3.5.8, and HBase 2.6.5. It is a repository snapshot, not a source-code archive.
+
+          Source commit: \`${GITHUB_SHA}\`
+          Successful Build Components CI: [run ${ci_run_id}](${ci_run_url})
+          Runtime RPM count: ${RPM_COUNT}
+
+          Verify the tarball with the attached \`${ARCHIVE_NAME}.sha256\` file before extracting it.
+          EOF
+
+          echo "## ${RELEASE_TAG}" >> "${GITHUB_STEP_SUMMARY}"
+          cat "${manifest}" >> "${GITHUB_STEP_SUMMARY}"
+
+          gh release create "${RELEASE_TAG}" \
+            "${archive}" \
+            "${checksum}" \
+            "${manifest}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "BIGDATA 1.0.0 RC1" \
+            --prerelease \
+            --notes-file "${notes}"
