@@ -37,13 +37,15 @@ runuser -u flink -- "${FLINK_HOME}/bin/flink" run -m localhost:8081 \
   >"${EVIDENCE_ROOT}/flink-job.log" 2>&1
 echo 'job_submit: PASS' > "${EVIDENCE_ROOT}/job_submit.txt"
 
+result_file=""
 for _ in $(seq 1 30); do
-  [[ -s "${OUTPUT}" ]] && break
+  result_file="$(find "${OUTPUT}" -maxdepth 1 -type f -name 'part-*' -print -quit 2>/dev/null || true)"
+  [[ -n "${result_file}" && -s "${result_file}" ]] && break
   sleep 1
 done
-[[ -s "${OUTPUT}" ]]
-grep -Fq '(alpha,2)' "${OUTPUT}"
-grep -Fq '(beta,2)' "${OUTPUT}"
-grep -Fq '(gamma,1)' "${OUTPUT}"
-cp "${OUTPUT}" "${EVIDENCE_ROOT}/flink-job-result.txt"
+[[ -n "${result_file}" && -s "${result_file}" ]]
+grep -Fq '(alpha,2)' "${result_file}"
+grep -Fq '(beta,2)' "${result_file}"
+grep -Fq '(gamma,1)' "${result_file}"
+cp "${result_file}" "${EVIDENCE_ROOT}/flink-job-result.txt"
 echo 'job_result: PASS' > "${EVIDENCE_ROOT}/job_result.txt"
