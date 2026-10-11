@@ -222,7 +222,7 @@ class ComponentRepoFastPathTests(unittest.TestCase):
 
     def test_each_component_uses_repository_gate_and_success_stage_gate(self) -> None:
         jobs = self.workflow_jobs()
-        for component in ("tez", "hive", "spark", "hbase"):
+        for component in ("zookeeper", "hadoop", "tez", "hive", "spark", "hbase"):
             check = jobs[f"{component}_repo_check"]
             self.assertEqual(check["uses"], "./.github/workflows/check-component-repo.yml")
             build = jobs[f"{component}_build"]
@@ -234,6 +234,9 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             self.assertIn(f"{component}_build", gate["needs"])
             self.assertIn(f"{component}_test", gate["needs"])
             self.assertIn(f"{component}_release", gate["needs"])
+            self.assertEqual(build["uses"], "./.github/workflows/build-one-component.yml")
+            self.assertEqual(jobs[f"{component}_test"]["uses"], "./.github/workflows/test-components.yml")
+            self.assertEqual(jobs[f"{component}_release"]["uses"], "./.github/workflows/release-components.yml")
             command = "\n".join(step.get("run", "") for step in gate["steps"])
             self.assertIn('"${BUILD_RESULT}" == success', command)
             self.assertIn('"${TEST_RESULT}" == success', command)
@@ -241,7 +244,13 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             self.assertIn('"${ALREADY_CURRENT}" == true', command)
             self.assertIn('"${EVENT_NAME}" == pull_request', command)
 
-        for previous, following in (("tez", "hive"), ("hive", "spark"), ("spark", "hbase")):
+        for previous, following in (
+            ("zookeeper", "hadoop"),
+            ("hadoop", "tez"),
+            ("tez", "hive"),
+            ("hive", "spark"),
+            ("spark", "hbase"),
+        ):
             condition = jobs[f"{following}_repo_check"]["if"]
             self.assertIn(f"needs.{previous}_gate.outputs.continue_chain", condition)
 
@@ -252,8 +261,34 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             check=True,
         ).stdout
         versions = json.loads(config)["components"]
-        for component in ("tez", "hive", "spark", "hbase"):
+        self.assertEqual(
+            set(versions["zookeeper"]["runtime_packages"]),
+            {"zookeeper", "zookeeper-native", "zookeeper-rest", "zookeeper-server"},
+        )
+        self.assertEqual(
+            set(versions["hadoop"]["runtime_packages"]),
+            {
+                "hadoop", "hadoop-client", "hadoop-conf-pseudo", "hadoop-hdfs",
+                "hadoop-hdfs-datanode", "hadoop-hdfs-dfsrouter", "hadoop-hdfs-fuse",
+                "hadoop-hdfs-journalnode", "hadoop-hdfs-namenode",
+                "hadoop-hdfs-secondarynamenode", "hadoop-hdfs-zkfc", "hadoop-httpfs",
+                "hadoop-kms", "hadoop-libhdfs", "hadoop-libhdfspp", "hadoop-mapreduce",
+                "hadoop-mapreduce-historyserver", "hadoop-yarn", "hadoop-yarn-nodemanager",
+                "hadoop-yarn-proxyserver", "hadoop-yarn-resourcemanager", "hadoop-yarn-router",
+                "hadoop-yarn-timelineserver",
+            },
+        )
+        for component in ("zookeeper", "hadoop", "tez", "hive", "spark", "hbase"):
             self.assertEqual(jobs[f"{component}_build"]["with"]["version"], versions[component]["version"])
+
+        build_script = (ROOT / "scripts/ci/build-bigtop-component.sh").read_text()
+        test_script = (ROOT / "scripts/ci/test-bigtop-component.sh").read_text()
+        for component in ("hadoop", "zookeeper"):
+            self.assertIn(f"{component}-rpm-openeuler-container.sh", build_script)
+            self.assertIn(f"{component}-rpm-openeuler-container.sh", test_script)
+        workflow_text = COMPONENT_WORKFLOW.read_text()
+        for component in ("zookeeper", "hadoop"):
+            self.assertIn(f"          - {component}\n", workflow_text)
 
     def test_fast_path_contract_runs_in_ci_pr(self) -> None:
         workflow = subprocess.run(
@@ -282,7 +317,7 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             ("success", "false", "success", "failure", "skipped", "pull_request", "false", 1, ""),
             ("success", "false", "skipped", "skipped", "skipped", "pull_request", "true", 0, "continue_chain=false"),
         ]
-        for component in ("tez", "hive", "spark", "hbase"):
+        for component in ("zookeeper", "hadoop", "tez", "hive", "spark", "hbase"):
             gate = jobs[f"{component}_gate"]
             step = gate["steps"][0]
             command = step["run"]
