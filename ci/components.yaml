@@ -7,6 +7,46 @@ os_image: openeuler/openeuler:22.03-lts-sp4
 jdk: 8
 
 components:
+  zookeeper:
+    version: 3.8.4
+    runtime_packages:
+      - zookeeper
+      - zookeeper-native
+      - zookeeper-rest
+      - zookeeper-server
+    build_task: zookeeper-rpm
+    wave: 1
+    depends_on: []
+  hadoop:
+    version: 3.4.3
+    runtime_packages:
+      - hadoop
+      - hadoop-client
+      - hadoop-conf-pseudo
+      - hadoop-hdfs
+      - hadoop-hdfs-datanode
+      - hadoop-hdfs-dfsrouter
+      - hadoop-hdfs-fuse
+      - hadoop-hdfs-journalnode
+      - hadoop-hdfs-namenode
+      - hadoop-hdfs-secondarynamenode
+      - hadoop-hdfs-zkfc
+      - hadoop-httpfs
+      - hadoop-kms
+      - hadoop-libhdfs
+      - hadoop-libhdfspp
+      - hadoop-mapreduce
+      - hadoop-mapreduce-historyserver
+      - hadoop-yarn
+      - hadoop-yarn-nodemanager
+      - hadoop-yarn-proxyserver
+      - hadoop-yarn-resourcemanager
+      - hadoop-yarn-router
+      - hadoop-yarn-timelineserver
+    build_task: hadoop-rpm
+    wave: 2
+    depends_on:
+      - zookeeper
   tez:
     version: 0.10.5
     runtime_packages:

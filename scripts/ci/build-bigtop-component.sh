@@ -9,8 +9,21 @@ WORK_ROOT="${WORK_ROOT:-/work}"
 BIGTOP_DIR="${WORK_ROOT}/bigtop"
 
 case "${COMPONENT}" in
-  tez|hive|spark|hbase) ;;
+  zookeeper|hadoop|tez|hive|spark|hbase) ;;
   *) echo "unsupported component: ${COMPONENT}" >&2; exit 2 ;;
+esac
+
+# Keep the historically validated openEuler adaptations for the two base
+# components while running them through the same artifact contract/workflow.
+case "${COMPONENT}" in
+  zookeeper)
+    [[ "${BUILD_TASK}" == "zookeeper-rpm" ]]
+    exec bash /workspace/scripts/ci/build-zookeeper-rpm-openeuler-container.sh
+    ;;
+  hadoop)
+    [[ "${BUILD_TASK}" == "hadoop-rpm" ]]
+    exec bash /workspace/scripts/ci/build-hadoop-rpm-openeuler-container.sh
+    ;;
 esac
 
 cat /etc/os-release

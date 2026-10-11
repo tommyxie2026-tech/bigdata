@@ -7,6 +7,16 @@ ARTIFACT_ROOT="${ARTIFACT_ROOT:-/artifact}"
 EVIDENCE_ROOT="${EVIDENCE_ROOT:-/evidence}"
 REPO_DIR=/tmp/bigdata-repo
 
+# Reuse the base-component clean-container checks in the unified test stage.
+case "${COMPONENT}" in
+  zookeeper)
+    exec bash /workspace/scripts/ci/test-zookeeper-rpm-openeuler-container.sh
+    ;;
+  hadoop)
+    exec bash /workspace/scripts/ci/test-hadoop-rpm-openeuler-container.sh
+    ;;
+esac
+
 mkdir -p "${EVIDENCE_ROOT}" "${REPO_DIR}"
 
 dnf -y install createrepo_c dnf-utils rpm findutils procps-ng java-1.8.0-openjdk nc

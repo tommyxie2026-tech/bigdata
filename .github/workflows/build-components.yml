@@ -6,9 +6,11 @@ on:
       start_component:
         description: First component to build, or RPM repository maintenance
         required: true
-        default: tez
+        default: zookeeper
         type: choice
         options:
+          - zookeeper
+          - hadoop
           - tez
           - hive
           - spark
@@ -150,11 +152,175 @@ jobs:
       version: ${{ inputs.promote_version }}
       test_run_id: ${{ inputs.promote_test_run_id }}
 
+  zookeeper_repo_check:
+    name: Check ZooKeeper 3.8.4 RPM repository
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      (inputs.promote_test_run_id == '' && inputs.start_component == 'zookeeper')
+    uses: ./.github/workflows/check-component-repo.yml
+    with:
+      component: zookeeper
+      version: 3.8.4
+
+  zookeeper_build:
+    name: Build zookeeper 3.8.4
+    needs: zookeeper_repo_check
+    if: ${{ always() && needs.zookeeper_repo_check.result == 'success' && needs.zookeeper_repo_check.outputs.already_current != 'true' }}
+    uses: ./.github/workflows/build-one-component.yml
+    with:
+      component: zookeeper
+      version: 3.8.4
+      task: zookeeper-rpm
+
+  zookeeper_test:
+    name: Test zookeeper 3.8.4
+    needs: zookeeper_build
+    if: ${{ always() && needs.zookeeper_build.result == 'success' }}
+    uses: ./.github/workflows/test-components.yml
+    with:
+      component: zookeeper
+      version: 3.8.4
+      build_run_id: ${{ format('{0}', github.run_id) }}
+
+  zookeeper_release:
+    name: Release zookeeper 3.8.4
+    needs: zookeeper_test
+    if: ${{ always() && needs.zookeeper_test.result == 'success' && github.event_name != 'pull_request' }}
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/release-components.yml
+    with:
+      component: zookeeper
+      version: 3.8.4
+      test_run_id: ${{ format('{0}', github.run_id) }}
+
+  zookeeper_gate:
+    name: Complete zookeeper 3.8.4 stage
+    needs: [zookeeper_repo_check, zookeeper_build, zookeeper_test, zookeeper_release]
+    if: >-
+      always() &&
+      (github.event_name != 'workflow_dispatch' ||
+       (inputs.promote_test_run_id == '' && inputs.start_component == 'zookeeper'))
+    outputs:
+      continue_chain: ${{ steps.gate.outputs.continue_chain }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Accept verified existing RPMs or a completed release
+        id: gate
+        env:
+          CHECK_RESULT: ${{ needs.zookeeper_repo_check.result }}
+          ALREADY_CURRENT: ${{ needs.zookeeper_repo_check.outputs.already_current }}
+          BUILD_RESULT: ${{ needs.zookeeper_build.result }}
+          TEST_RESULT: ${{ needs.zookeeper_test.result }}
+          RELEASE_RESULT: ${{ needs.zookeeper_release.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          if [[ "${CHECK_RESULT}" == success && "${ALREADY_CURRENT}" == true && "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'continue_chain=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${CHECK_RESULT}" == success && "${BUILD_RESULT}" == success && "${TEST_RESULT}" == success && ( "${RELEASE_RESULT}" == success || ( "${EVENT_NAME}" == pull_request && "${RELEASE_RESULT}" == skipped ) ) ]]; then
+            echo 'continue_chain=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT_NAME}" == pull_request && "${IS_FORK_PR}" == true && "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'continue_chain=false' >> "${GITHUB_OUTPUT}"
+            echo 'Build is intentionally unavailable to fork PRs.'
+          else
+            echo "ZooKeeper stage did not pass: check=${CHECK_RESULT}, repo=${ALREADY_CURRENT}, build=${BUILD_RESULT}, test=${TEST_RESULT}, release=${RELEASE_RESULT}" >&2
+            exit 1
+          fi
+
+  hadoop_repo_check:
+    name: Check Hadoop 3.4.3 RPM repository
+    needs: zookeeper_gate
+    if: >-
+      always() &&
+      (github.event_name != 'workflow_dispatch' || inputs.promote_test_run_id == '') &&
+      ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'hadoop') ||
+       (needs.zookeeper_gate.result == 'success' && needs.zookeeper_gate.outputs.continue_chain == 'true'))
+    uses: ./.github/workflows/check-component-repo.yml
+    with:
+      component: hadoop
+      version: 3.4.3
+
+  hadoop_build:
+    name: Build hadoop 3.4.3
+    needs: hadoop_repo_check
+    if: ${{ always() && needs.hadoop_repo_check.result == 'success' && needs.hadoop_repo_check.outputs.already_current != 'true' }}
+    uses: ./.github/workflows/build-one-component.yml
+    with:
+      component: hadoop
+      version: 3.4.3
+      task: hadoop-rpm
+
+  hadoop_test:
+    name: Test hadoop 3.4.3
+    needs: hadoop_build
+    if: ${{ always() && needs.hadoop_build.result == 'success' }}
+    uses: ./.github/workflows/test-components.yml
+    with:
+      component: hadoop
+      version: 3.4.3
+      build_run_id: ${{ format('{0}', github.run_id) }}
+
+  hadoop_release:
+    name: Release hadoop 3.4.3
+    needs: hadoop_test
+    if: ${{ always() && needs.hadoop_test.result == 'success' && github.event_name != 'pull_request' }}
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/release-components.yml
+    with:
+      component: hadoop
+      version: 3.4.3
+      test_run_id: ${{ format('{0}', github.run_id) }}
+
+  hadoop_gate:
+    name: Complete hadoop 3.4.3 stage
+    needs: [zookeeper_gate, hadoop_repo_check, hadoop_build, hadoop_test, hadoop_release]
+    if: >-
+      always() &&
+      (github.event_name != 'workflow_dispatch' ||
+       (inputs.promote_test_run_id == '' &&
+        (inputs.start_component == 'hadoop' ||
+         (needs.zookeeper_gate.result == 'success' && needs.zookeeper_gate.outputs.continue_chain == 'true'))))
+    outputs:
+      continue_chain: ${{ steps.gate.outputs.continue_chain }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Accept verified existing RPMs or a completed release
+        id: gate
+        env:
+          CHECK_RESULT: ${{ needs.hadoop_repo_check.result }}
+          ALREADY_CURRENT: ${{ needs.hadoop_repo_check.outputs.already_current }}
+          BUILD_RESULT: ${{ needs.hadoop_build.result }}
+          TEST_RESULT: ${{ needs.hadoop_test.result }}
+          RELEASE_RESULT: ${{ needs.hadoop_release.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          if [[ "${CHECK_RESULT}" == success && "${ALREADY_CURRENT}" == true && "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'continue_chain=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${CHECK_RESULT}" == success && "${BUILD_RESULT}" == success && "${TEST_RESULT}" == success && ( "${RELEASE_RESULT}" == success || ( "${EVENT_NAME}" == pull_request && "${RELEASE_RESULT}" == skipped ) ) ]]; then
+            echo 'continue_chain=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT_NAME}" == pull_request && "${IS_FORK_PR}" == true && "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'continue_chain=false' >> "${GITHUB_OUTPUT}"
+            echo 'Build is intentionally unavailable to fork PRs.'
+          else
+            echo "Hadoop stage did not pass: check=${CHECK_RESULT}, repo=${ALREADY_CURRENT}, build=${BUILD_RESULT}, test=${TEST_RESULT}, release=${RELEASE_RESULT}" >&2
+            exit 1
+          fi
+
   tez_repo_check:
     name: Check tez 0.10.5 RPM repository
     if: >-
-      github.event_name != 'workflow_dispatch' ||
-      (inputs.promote_test_run_id == '' && inputs.start_component == 'tez')
+      always() &&
+      (github.event_name != 'workflow_dispatch' || inputs.promote_test_run_id == '') &&
+      ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'tez') ||
+       (needs.hadoop_gate.result == 'success' && needs.hadoop_gate.outputs.continue_chain == 'true'))
+    needs: hadoop_gate
     uses: ./.github/workflows/check-component-repo.yml
     with:
       component: tez
@@ -196,11 +362,13 @@ jobs:
 
   tez_gate:
     name: Complete tez 0.10.5 stage
-    needs: [tez_repo_check, tez_build, tez_test, tez_release]
+    needs: [hadoop_gate, tez_repo_check, tez_build, tez_test, tez_release]
     if: >-
       always() &&
       (github.event_name != 'workflow_dispatch' ||
-       (inputs.promote_test_run_id == '' && inputs.start_component == 'tez'))
+       (inputs.promote_test_run_id == '' &&
+        (inputs.start_component == 'tez' ||
+         (needs.hadoop_gate.result == 'success' && needs.hadoop_gate.outputs.continue_chain == 'true'))))
     outputs:
       continue_chain: ${{ steps.gate.outputs.continue_chain }}
     runs-on: ubuntu-latest
