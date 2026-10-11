@@ -662,6 +662,10 @@ jobs:
   kafka_prerequisite:
     name: Verify ZooKeeper RPM prerequisite for Kafka
     if: github.event_name == 'workflow_dispatch' && inputs.start_component == 'kafka'
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
     uses: ./.github/workflows/component-lifecycle.yml
     with:
       component: zookeeper
@@ -685,6 +689,10 @@ jobs:
        ((github.event_name != 'workflow_dispatch' || inputs.start_component == 'all') &&
         needs.zookeeper_gate.result == 'success' &&
         needs.zookeeper_gate.outputs.continue_chain == 'true'))
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
     uses: ./.github/workflows/component-lifecycle.yml
     with:
       component: kafka
@@ -700,6 +708,10 @@ jobs:
   flink_prerequisite:
     name: Verify Hadoop RPM prerequisite for Flink
     if: github.event_name == 'workflow_dispatch' && inputs.start_component == 'flink'
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
     uses: ./.github/workflows/component-lifecycle.yml
     with:
       component: hadoop
@@ -723,6 +735,10 @@ jobs:
        ((github.event_name != 'workflow_dispatch' || inputs.start_component == 'all') &&
         needs.hadoop_gate.result == 'success' &&
         needs.hadoop_gate.outputs.continue_chain == 'true'))
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
     uses: ./.github/workflows/component-lifecycle.yml
     with:
       component: flink

@@ -72,6 +72,12 @@ class StreamingLakehouseWorkflowTests(unittest.TestCase):
         self.assertNotIn("inputs.start_component == 'all'", self.jobs["kafka_prerequisite"]["if"])
         self.assertIn("inputs.start_component == 'flink'", self.jobs["flink_prerequisite"]["if"])
         self.assertNotIn("inputs.start_component == 'all'", self.jobs["flink_prerequisite"]["if"])
+        for job_name in ("kafka_prerequisite", "kafka", "flink_prerequisite", "flink"):
+            with self.subTest(job=job_name):
+                permissions = self.jobs[job_name]["permissions"]
+                self.assertEqual(permissions["contents"], "write")
+                self.assertEqual(permissions["actions"], "read")
+                self.assertEqual(permissions["pull-requests"], "write")
         lifecycle = yaml_json(ROOT / ".github/workflows/component-lifecycle.yml")["jobs"]
         repo_check = lifecycle["repo_check"]["with"]
         self.assertEqual(repo_check["component"], "${{ inputs.component }}")
