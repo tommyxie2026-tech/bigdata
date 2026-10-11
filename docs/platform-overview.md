@@ -1,5 +1,7 @@
 # Bigdata Platform 平台总览
 
+> 2026-10-11 基线说明：本文保留历史设计讨论。当前 openEuler/RPM 版本、七节点配置、Runbook 与验收入口以 [Phase 1 交付设计](phase1-delivery-design.md) 为准；旧 Ubuntu/DEB 和候选版本指令不可用于当前 RC1 部署。
+
 ## 1. 平台定位
 
 Bigdata Platform 是一套面向企业级数据处理场景的、可部署的私有化大数据平台方案，目标是同时支持传统数仓和实时数据湖两类核心场景，并能够在不同基础设施环境中灵活部署与交付。

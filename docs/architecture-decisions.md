@@ -1,5 +1,7 @@
 # Bigdata Platform 架构决策记录
 
+> 2026-10-11 基线说明：本文保留历史设计讨论。当前 openEuler/RPM 版本、七节点配置、Runbook 与验收入口以 [Phase 1 交付设计](phase1-delivery-design.md) 为准；旧 Ubuntu/DEB 和候选版本指令不可用于当前 RC1 部署。
+
 ## 1. 文档目标
 
 本文档记录 Bigdata Platform 在设计评审阶段已经确认的关键架构决策，作为后续文档修订、任务拆分和工程实施的基线。

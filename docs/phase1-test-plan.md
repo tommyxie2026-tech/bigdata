@@ -1,5 +1,7 @@
 # Phase 1 测试计划
 
+> 2026-10-11 基线说明：本文保留历史设计讨论。当前 openEuler/RPM 版本、七节点配置、Runbook 与验收入口以 [Phase 1 交付设计](phase1-delivery-design.md) 为准；旧 Ubuntu/DEB 和候选版本指令不可用于当前 RC1 部署。
+
 ## 1. 文档目标
 
 本文档定义 Bigdata Platform 第一阶段传统数仓物理机 HA 底座的测试目标、测试范围、测试环境、测试类型、验收标准和 Agent 分工。

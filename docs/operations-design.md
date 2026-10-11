@@ -1,5 +1,7 @@
 # Bigdata Platform 运维体系设计
 
+> 2026-10-11 基线说明：本文保留历史设计讨论。当前 openEuler/RPM 版本、七节点配置、Runbook 与验收入口以 [Phase 1 交付设计](phase1-delivery-design.md) 为准；旧 Ubuntu/DEB 和候选版本指令不可用于当前 RC1 部署。
+
 ## 1. 文档目标
 
 本文档用于定义 Bigdata Platform 的标准化运维体系，包括服务生命周期管理、配置变更、监控告警、巡检、容量管理、故障恢复和交付验收。

@@ -1,5 +1,7 @@
 # Bigtop 构建体系设计
 
+> 2026-10-11 基线说明：本文保留历史设计讨论。当前 openEuler/RPM 版本、七节点配置、Runbook 与验收入口以 [Phase 1 交付设计](phase1-delivery-design.md) 为准；旧 Ubuntu/DEB 和候选版本指令不可用于当前 RC1 部署。
+
 ## 1. 文档目标
 
 本文档定义 Bigdata Platform 第一阶段基于 Apache Bigtop 的真实组件构建、包管理、仓库发布和 Ambari 对接方案。
