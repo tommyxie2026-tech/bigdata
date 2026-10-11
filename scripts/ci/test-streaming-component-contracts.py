@@ -13,9 +13,15 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 CATALOG = yaml.safe_load((ROOT / "ci/components.yaml").read_text(encoding="utf-8"))
 DISPATCHER = (ROOT / "scripts/ci/test-bigtop-component.sh").read_text(encoding="utf-8")
+BUILD_SCRIPT = (ROOT / "scripts/ci/build-bigtop-component.sh").read_text(encoding="utf-8")
 
 
 class StreamingComponentContracts(unittest.TestCase):
+    def test_runtime_contract_excludes_source_rpms(self) -> None:
+        self.assertIn("! -name '*.src.rpm' ! -name '*.nosrc.rpm'", BUILD_SCRIPT)
+        self.assertIn('rpm_arch="$(rpm -qp --queryformat \'%{ARCH}\' "${rpm}")"', BUILD_SCRIPT)
+        self.assertIn("src|nosrc) continue ;;", BUILD_SCRIPT)
+
     def test_kafka_build_uses_configured_runtime_allowlist(self) -> None:
         kafka = CATALOG["components"]["kafka"]
         self.assertEqual(kafka["build_task"], "kafka-rpm")

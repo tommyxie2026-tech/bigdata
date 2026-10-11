@@ -146,13 +146,20 @@ bash /workspace/scripts/ci/retry-maven-downloads.sh \
 build_rc=$?
 set -e
 
-find "${BIGTOP_DIR}" -type f -name '*.rpm' ! -name '.rpm' -print \
+# SRPMs share the binary package NAME and must not enter runtime
+# artifact bundles or clean-install repositories.
+find "${BIGTOP_DIR}" -type f -name '*.rpm' ! -name '.rpm' \
+  ! -name '*.src.rpm' ! -name '*.nosrc.rpm' -print \
   -exec cp -v {} "${WORK_ROOT}/artifacts/rpms/" \; || true
 
 if [[ -n "${COMPONENT_RUNTIME_PACKAGES:-}" ]]; then
   for package in ${COMPONENT_RUNTIME_PACKAGES}; do
     matches=0
     while IFS= read -r rpm; do
+      rpm_arch="$(rpm -qp --queryformat '%{ARCH}' "${rpm}")"
+      case "${rpm_arch}" in
+        src|nosrc) continue ;;
+      esac
       rpm_name="$(rpm -qp --queryformat '%{NAME}' "${rpm}")"
       [[ "${rpm_name}" == "${package}" ]] && ((matches += 1))
     done < <(find "${WORK_ROOT}/artifacts/rpms" -type f -name '*.rpm' ! -name '.rpm')
