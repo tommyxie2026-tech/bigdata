@@ -15,6 +15,9 @@ on:
           - hive
           - spark
           - hbase
+          - kafka
+          - flink
+          - all
           - repo_maintenance
       promote_test_run_id:
         description: Existing successful Test run ID; when set, promote tested RPMs without rebuilding
@@ -38,8 +41,11 @@ on:
       - ".github/workflows/*components.yml"
       - ".github/workflows/build-one-component.yml"
       - ".github/workflows/check-component-repo.yml"
+      - ".github/workflows/component-lifecycle.yml"
       - "scripts/ci/*.sh"
       - "scripts/ci/*component-repo-fast-path.py"
+      - "scripts/ci/resolve-component-dependencies.py"
+      - "scripts/ci/validate-components.py"
       - "!scripts/ci/*ambari*.sh"
       - "ci/components.yaml"
 
@@ -50,8 +56,11 @@ on:
       - ".github/workflows/*components.yml"
       - ".github/workflows/build-one-component.yml"
       - ".github/workflows/check-component-repo.yml"
+      - ".github/workflows/component-lifecycle.yml"
       - "scripts/ci/*.sh"
       - "scripts/ci/*component-repo-fast-path.py"
+      - "scripts/ci/resolve-component-dependencies.py"
+      - "scripts/ci/validate-components.py"
       - "!scripts/ci/*ambari*.sh"
       - "ci/components.yaml"
 
@@ -156,7 +165,8 @@ jobs:
     name: Check ZooKeeper 3.8.4 RPM repository
     if: >-
       github.event_name != 'workflow_dispatch' ||
-      (inputs.promote_test_run_id == '' && inputs.start_component == 'zookeeper')
+      (inputs.promote_test_run_id == '' &&
+       (inputs.start_component == 'zookeeper' || inputs.start_component == 'all'))
     uses: ./.github/workflows/check-component-repo.yml
     with:
       component: zookeeper
@@ -202,7 +212,8 @@ jobs:
     if: >-
       always() &&
       (github.event_name != 'workflow_dispatch' ||
-       (inputs.promote_test_run_id == '' && inputs.start_component == 'zookeeper'))
+       (inputs.promote_test_run_id == '' &&
+        (inputs.start_component == 'zookeeper' || inputs.start_component == 'all')))
     outputs:
       continue_chain: ${{ steps.gate.outputs.continue_chain }}
     runs-on: ubuntu-latest
@@ -647,3 +658,79 @@ jobs:
             echo "HBase stage did not pass: check=${CHECK_RESULT}, repo=${ALREADY_CURRENT}, build=${BUILD_RESULT}, test=${TEST_RESULT}, release=${RELEASE_RESULT}" >&2
             exit 1
           fi
+
+  kafka_prerequisite:
+    name: Verify ZooKeeper RPM prerequisite for Kafka
+    if: github.event_name == 'workflow_dispatch' && inputs.start_component == 'kafka'
+    uses: ./.github/workflows/component-lifecycle.yml
+    with:
+      component: zookeeper
+      version: '3.8.4'
+      builder: bigtop
+      artifact_type: service-rpm
+      build_task: zookeeper-rpm
+      test_profile: legacy-smoke
+      jdk: '8'
+      jdk_package: java-1.8.0-openjdk-devel
+      source_identity: ''
+
+  kafka:
+    name: Kafka 3.4.1 Build Test Release
+    needs: [zookeeper_gate, kafka_prerequisite]
+    if: >-
+      always() &&
+      ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'kafka' &&
+        needs.kafka_prerequisite.result == 'success' &&
+        needs.kafka_prerequisite.outputs.stage_passed == 'true') ||
+       ((github.event_name != 'workflow_dispatch' || inputs.start_component == 'all') &&
+        needs.zookeeper_gate.result == 'success' &&
+        needs.zookeeper_gate.outputs.continue_chain == 'true'))
+    uses: ./.github/workflows/component-lifecycle.yml
+    with:
+      component: kafka
+      version: '3.4.1'
+      builder: bigtop
+      artifact_type: service-rpm
+      build_task: kafka-rpm
+      test_profile: kafka-kraft-smoke
+      jdk: '8'
+      jdk_package: java-1.8.0-openjdk-devel
+      source_identity: 19670ce6a3cc68833b7dd47697cd6272b66bb372
+
+  flink_prerequisite:
+    name: Verify Hadoop RPM prerequisite for Flink
+    if: github.event_name == 'workflow_dispatch' && inputs.start_component == 'flink'
+    uses: ./.github/workflows/component-lifecycle.yml
+    with:
+      component: hadoop
+      version: '3.4.3'
+      builder: bigtop
+      artifact_type: service-rpm
+      build_task: hadoop-rpm
+      test_profile: legacy-smoke
+      jdk: '8'
+      jdk_package: java-1.8.0-openjdk-devel
+      source_identity: ''
+
+  flink:
+    name: Flink 1.20.1 Build Test Release
+    needs: [hadoop_gate, flink_prerequisite]
+    if: >-
+      always() &&
+      ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'flink' &&
+        needs.flink_prerequisite.result == 'success' &&
+        needs.flink_prerequisite.outputs.stage_passed == 'true') ||
+       ((github.event_name != 'workflow_dispatch' || inputs.start_component == 'all') &&
+        needs.hadoop_gate.result == 'success' &&
+        needs.hadoop_gate.outputs.continue_chain == 'true'))
+    uses: ./.github/workflows/component-lifecycle.yml
+    with:
+      component: flink
+      version: '1.20.1'
+      builder: bigtop
+      artifact_type: service-rpm
+      build_task: flink-rpm
+      test_profile: flink-local-job-smoke
+      jdk: '11'
+      jdk_package: java-11-openjdk-devel
+      source_identity: 19670ce6a3cc68833b7dd47697cd6272b66bb372

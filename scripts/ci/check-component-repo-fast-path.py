@@ -224,8 +224,6 @@ def validate_primary(
             raise RepoMismatch(f"invalid or duplicate RPM metadata entry: {location!r}")
         if name in package_names:
             raise RepoMismatch(f"duplicate package name in primary metadata: {name}")
-        if name != component and not name.startswith(component + "-"):
-            raise RepoMismatch(f"unexpected non-component package in repository: {name}")
         if EXCLUDED_PACKAGE.search(name):
             raise RepoMismatch(f"non-runtime package in repository: {name}")
         if version_info.get("ver") != version:
@@ -253,6 +251,8 @@ def verify(args: argparse.Namespace) -> None:
         raise UnsafeInput(f"invalid component name: {args.component!r}")
     if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)+", args.version):
         raise UnsafeInput(f"invalid component version: {args.version!r}")
+    if args.source_identity and not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", args.source_identity):
+        raise UnsafeInput("source_identity must be a full immutable Git SHA or SHA256")
     configured, expected_packages = configured_component(args.components_file, args.component)
     if configured != args.version:
         raise RepoMismatch(f"workflow version {args.version} is stale; ci/components.yaml specifies {configured}")
@@ -262,7 +262,7 @@ def verify(args: argparse.Namespace) -> None:
         raise RepoMismatch(f"RPM repository directory does not exist: {target}")
     manifest = fields(target / "manifest.yaml")
     expected_manifest = {
-        "schema": "bigdata.rpm-repo/v1",
+        "schema": "bigdata.rpm-repo/v2" if args.source_identity else "bigdata.rpm-repo/v1",
         "component": args.component,
         "version": args.version,
         "bigtop_version": "3.6.0",
@@ -270,6 +270,12 @@ def verify(args: argparse.Namespace) -> None:
         "test_status": "PASS",
         "repository_layout": EXPECTED_LAYOUT,
     }
+    if args.source_identity:
+        expected_manifest["source_identity"] = args.source_identity
+    for key in ("artifact_type", "test_profile", "jdk", "jdk_package"):
+        expected = getattr(args, key)
+        if expected:
+            expected_manifest[key] = expected
     for key, expected in expected_manifest.items():
         if manifest.get(key) != expected:
             raise RepoMismatch(f"manifest {key} is {manifest.get(key)!r}, expected {expected!r}")
@@ -300,6 +306,15 @@ def main() -> int:
     parser.add_argument("--version", required=True)
     parser.add_argument("--repo-checkout", type=Path, required=True)
     parser.add_argument("--components-file", type=Path, required=True)
+    parser.add_argument(
+        "--source-identity",
+        default="",
+        help="expected immutable upstream identity; when set, the manifest must match it",
+    )
+    parser.add_argument("--artifact-type", default="")
+    parser.add_argument("--test-profile", default="")
+    parser.add_argument("--jdk", default="")
+    parser.add_argument("--jdk-package", default="")
     args = parser.parse_args()
     try:
         verify(args)

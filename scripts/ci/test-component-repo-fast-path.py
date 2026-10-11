@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CHECKER = ROOT / "scripts/ci/check-component-repo-fast-path.py"
 STAGER = ROOT / "scripts/ci/stage-tested-rpms.sh"
+FAST_PATH_RESULT = ROOT / "scripts/ci/set-component-repo-fast-path-result.sh"
 COMPONENTS = ROOT / "ci/components.yaml"
 COMPONENT_WORKFLOW = ROOT / ".github/workflows/build-components.yml"
 CHECK_WORKFLOW = ROOT / ".github/workflows/check-component-repo.yml"
@@ -59,6 +60,7 @@ def write_fixture(root: Path) -> Path:
         "rpm_count: 1\n"
         "test_status: PASS\n"
         "repository_layout: split-runtime/v2\n"
+        "source_identity: " + "a" * 40 + "\n"
     )
 
     primary = ET.Element(tag("metadata"), {"packages": "1"})
@@ -84,7 +86,7 @@ def write_fixture(root: Path) -> Path:
 
 class ComponentRepoFastPathTests(unittest.TestCase):
     def run_check(
-        self, repo: Path, components_file: Path = COMPONENTS
+        self, repo: Path, components_file: Path = COMPONENTS, source_identity: str = ""
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
@@ -98,6 +100,8 @@ class ComponentRepoFastPathTests(unittest.TestCase):
                 str(repo),
                 "--components-file",
                 str(components_file),
+                "--source-identity",
+                source_identity,
             ],
             text=True,
             capture_output=True,
@@ -133,6 +137,48 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             manifest.write_text(manifest.read_text().replace("version: 0.10.5", "version: 0.10.4"))
             result = self.run_check(repo)
         self.assertEqual(result.returncode, 1)
+
+    def test_source_identity_mismatch_is_a_safe_build_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = write_fixture(Path(directory))
+            result = self.run_check(repo, source_identity="b" * 40)
+        self.assertEqual(result.returncode, 1)
+
+    def test_clean_dnf_install_failure_never_accepts_fast_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "github-output"
+            result = subprocess.run(
+                ["bash", str(FAST_PATH_RESULT)],
+                env={
+                    **os.environ,
+                    "GITHUB_OUTPUT": str(output),
+                    "CHECK_RESULT": "0",
+                    "INSTALL_RESULT": "1",
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("already_current=false", output.read_text())
+
+    def test_exact_repo_and_clean_dnf_install_accept_fast_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "github-output"
+            result = subprocess.run(
+                ["bash", str(FAST_PATH_RESULT)],
+                env={
+                    **os.environ,
+                    "GITHUB_OUTPUT": str(output),
+                    "CHECK_RESULT": "0",
+                    "INSTALL_RESULT": "0",
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("already_current=true", output.read_text())
 
     def test_rpm_checksum_mismatch_is_a_safe_build_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -196,6 +242,20 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             result = self.run_check(repo, config)
         self.assertEqual(result.returncode, 1)
 
+    def test_integration_rpm_name_does_not_need_component_prefix(self) -> None:
+        """Connector RPMs are owned by the integration profile, not the engine name."""
+        source = CHECKER.read_text()
+        self.assertNotIn(
+            'if name != component and not name.startswith(component + "-"):', source
+        )
+        self.assertIn("package_names != expected_packages", source)
+
+    def test_stage_selects_only_configured_noncomponent_package_names(self) -> None:
+        source = STAGER.read_text()
+        self.assertIn("runtime_packages", source)
+        self.assertIn('"${name}" == "${package}"-*', source)
+        self.assertNotIn('"${COMPONENT}-"*) cp', source)
+
     def test_pull_requests_check_main_repository_for_fast_path(self) -> None:
         jobs = subprocess.run(
             [
@@ -211,7 +271,10 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             check=True,
         )
         check_steps = json.loads(jobs.stdout)["check"]["steps"]
-        repo_checkout = next(step for step in check_steps if step.get("name") == "Checkout repository metadata from main")
+        repo_checkout = next(
+            step for step in check_steps
+            if step.get("name") == "Checkout component and common repositories from main"
+        )
         self.assertNotIn("if", repo_checkout)
         verify = next(step for step in check_steps if step.get("id") == "repo")
         self.assertNotIn("EVENT_NAME", verify.get("env", {}))
@@ -372,6 +435,7 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             (tested / "evidence/SHA256SUMS").write_text(f"{rpm_hash}  rpms/{release_rpm}\n")
             (test_evidence / "evidence.md").write_text(
                 "status: PASS\ncomponent: tez\nversion: 0.10.5\n"
+                "artifact_type: service-rpm\ntest_profile: legacy-smoke\n"
             )
             (target / "manifest.yaml").write_text(
                 "component: tez\nversion: 0.10.5\ntest_status: PASS\n"
@@ -407,6 +471,79 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             self.assertFalse((target / "tez-0.10.5-1.noarch.rpm").exists())
             self.assertTrue((target / release_rpm).exists())
             self.assertIn(rpm_hash, (target / "SHA256SUMS").read_text())
+
+    def test_stager_promotes_configured_connector_package_and_rejects_extras(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_root = root / "source"
+            (source_root / "ci").mkdir(parents=True)
+            (source_root / "ci/components.yaml").write_text(
+                "schema: bigdata.ci.components/v1\ncomponents:\n  iceberg:\n"
+                "    version: 1.6.1\n    runtime_packages:\n"
+                "      - bigdata-iceberg-flink\n"
+            )
+            tested = root / "tested"
+            (tested / "rpms").mkdir(parents=True)
+            (tested / "evidence").mkdir()
+            evidence_dir = root / "test-evidence"
+            evidence_dir.mkdir()
+            selected = "bigdata-iceberg-flink-1.6.1-1.noarch.rpm"
+            extra = "not-allowlisted-0.1-1.noarch.rpm"
+            (tested / "rpms" / selected).write_bytes(b"connector rpm")
+            (tested / "rpms" / extra).write_bytes(b"unrelated rpm")
+            selected_hash = hashlib.sha256((tested / "rpms" / selected).read_bytes()).hexdigest()
+            extra_hash = hashlib.sha256((tested / "rpms" / extra).read_bytes()).hexdigest()
+            (tested / "evidence/SHA256SUMS").write_text(
+                f"{selected_hash}  rpms/{selected}\n{extra_hash}  rpms/{extra}\n"
+            )
+            identity = "b" * 40
+            (evidence_dir / "evidence.md").write_text(
+                "status: PASS\ncomponent: iceberg\nversion: 1.6.1\n"
+                "artifact_type: integration-rpm\ntest_profile: iceberg-flink-smoke\n"
+                f"source_identity: {identity}\n"
+                "build_run_id: 123456\ntest_run_id: 456789\n"
+            )
+            (root / "bin").mkdir()
+            createrepo = root / "bin/createrepo_c"
+            createrepo.write_text(
+                "#!/usr/bin/env bash\n"
+                'target="${@: -1}"\n'
+                'mkdir -p "${target}/repodata"\n'
+                "printf '%s\\n' '<repomd/>' > \"${target}/repodata/repomd.xml\"\n"
+            )
+            createrepo.chmod(0o755)
+            repo = root / "repo-checkout"
+            result = subprocess.run(
+                ["bash", str(STAGER)],
+                env={
+                    **os.environ,
+                    "PATH": f"{root / 'bin'}:{os.environ['PATH']}",
+                    "COMPONENT": "iceberg",
+                    "VERSION": "1.6.1",
+                    "TEST_RUN_ID": "456789",
+                    "BUILD_RUN_ID": "123456",
+                    "SOURCE_SHA": "c" * 40,
+                    "SOURCE_IDENTITY": identity,
+                    "ARTIFACT_TYPE": "integration-rpm",
+                    "TEST_PROFILE": "iceberg-flink-smoke",
+                    "COMPONENT_JDK": "17",
+                    "COMPONENT_JDK_PACKAGE": "java-17-openjdk-devel",
+                    "REPO_CHECKOUT": str(repo),
+                    "TESTED_RPMS_DIR": str(tested),
+                    "TEST_EVIDENCE_DIR": str(evidence_dir),
+                    "CI_SOURCE_ROOT": str(source_root),
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            target = repo / "repo/openeuler-22.03-lts-sp4/bigtop-3.6/iceberg/1.6.1"
+            self.assertEqual({path.name for path in target.glob("*.rpm")}, {selected})
+            manifest = (target / "manifest.yaml").read_text()
+            self.assertIn("schema: bigdata.rpm-repo/v2", manifest)
+            self.assertIn(f"source_identity: {identity}", manifest)
+            self.assertIn("artifact_type: integration-rpm", manifest)
 
 
 if __name__ == "__main__":

@@ -9,9 +9,29 @@ on:
       version:
         required: true
         type: string
+      source_identity:
+        required: false
+        type: string
+        default: ''
+      artifact_type:
+        required: false
+        type: string
+        default: ''
+      test_profile:
+        required: false
+        type: string
+        default: ''
+      jdk:
+        required: false
+        type: string
+        default: ''
+      jdk_package:
+        required: false
+        type: string
+        default: ''
     outputs:
       already_current:
-        description: Whether main already contains this exact tested RPM set
+        description: Whether main contains the exact tested, installable RPM set
         value: ${{ jobs.check.outputs.already_current }}
 
 permissions:
@@ -27,24 +47,42 @@ jobs:
       - name: Checkout workflow and component config
         uses: actions/checkout@v4
 
-      - name: Checkout repository metadata from main
-        uses: actions/checkout@v4
+      - name: Resolve component dependency repositories
+        id: dependency-repos
+        shell: bash
         env:
-          GIT_LFS_SKIP_SMUDGE: '1'
+          COMPONENT: ${{ inputs.component }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check pyyaml
+          python3 scripts/ci/resolve-component-dependencies.py \
+            --config ci/components.yaml \
+            --component "${COMPONENT}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Checkout component and common repositories from main
+        uses: actions/checkout@v4
         with:
           ref: main
           path: rpm-repository
-          lfs: false
+          lfs: true
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             repo/openeuler-22.03-lts-sp4/bigtop-3.6/${{ inputs.component }}/${{ inputs.version }}/
+            repo/openeuler-22.03-lts-sp4/bigtop-3.6/common/3.6.0/
+            ${{ steps.dependency-repos.outputs.sparse_paths }}
 
-      - name: Verify repository content and set fast-path result
+      - name: Verify content, source identity, and clean DNF installation
         id: repo
         shell: bash
         env:
           COMPONENT: ${{ inputs.component }}
           VERSION: ${{ inputs.version }}
+          SOURCE_IDENTITY: ${{ inputs.source_identity }}
+          ARTIFACT_TYPE: ${{ inputs.artifact_type }}
+          TEST_PROFILE: ${{ inputs.test_profile }}
+          COMPONENT_JDK: ${{ inputs.jdk }}
+          COMPONENT_JDK_PACKAGE: ${{ inputs.jdk_package }}
         run: |
           set -euo pipefail
           set +e
@@ -52,20 +90,40 @@ jobs:
             --component "${COMPONENT}" \
             --version "${VERSION}" \
             --repo-checkout "${GITHUB_WORKSPACE}/rpm-repository" \
-            --components-file "${GITHUB_WORKSPACE}/ci/components.yaml"
-          result=$?
+            --components-file "${GITHUB_WORKSPACE}/ci/components.yaml" \
+            --source-identity "${SOURCE_IDENTITY}" \
+            --artifact-type "${ARTIFACT_TYPE}" \
+            --test-profile "${TEST_PROFILE}" \
+            --jdk "${COMPONENT_JDK}" \
+            --jdk-package "${COMPONENT_JDK_PACKAGE}"
+          check_result=$?
           set -e
-          case "${result}" in
-            0)
-              echo 'already_current=true' >> "${GITHUB_OUTPUT}"
-              echo "Fast path: ${COMPONENT} ${VERSION} already verified in main/repo." >> "${GITHUB_STEP_SUMMARY}"
-              ;;
-            1)
-              echo 'already_current=false' >> "${GITHUB_OUTPUT}"
-              echo "Normal Build/Test/Release required for ${COMPONENT} ${VERSION}." >> "${GITHUB_STEP_SUMMARY}"
-              ;;
-            *)
-              echo "Repository validation failed unexpectedly (exit ${result})." >&2
-              exit "${result}"
-              ;;
-          esac
+
+          install_result=125
+          if [[ "${check_result}" -eq 0 ]]; then
+          read -r -a package_names <<< "${{ steps.dependency-repos.outputs.packages }}"
+            package_list=$(printf '%s\n' "${package_names[@]}")
+            repo_root="${GITHUB_WORKSPACE}/rpm-repository/repo/openeuler-22.03-lts-sp4/bigtop-3.6"
+            if docker pull openeuler/openeuler:22.03-lts-sp4 && \
+               docker run --rm \
+                -v "${repo_root}:/bigdata-repo:ro" \
+                -v "${GITHUB_WORKSPACE}/scripts/ci/verify-component-repo-install.sh:/verify-component-repo-install.sh:ro" \
+                -e COMPONENT="${COMPONENT}" \
+                -e VERSION="${VERSION}" \
+                -e PACKAGE_LIST="${package_list}" \
+                -e DEPENDENCY_REPO_PATHS="${{ steps.dependency-repos.outputs.dependency_repos }}" \
+                openeuler/openeuler:22.03-lts-sp4 \
+                bash /verify-component-repo-install.sh; then
+              install_result=0
+            else
+              install_result=1
+            fi
+          fi
+
+          CHECK_RESULT="${check_result}" INSTALL_RESULT="${install_result}" \
+            bash scripts/ci/set-component-repo-fast-path-result.sh
+          if grep -qx 'already_current=true' "${GITHUB_OUTPUT}"; then
+            echo "Fast path accepted after exact RPM/manifest/checksum and clean DNF install." >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "Normal Build/Test/Release required for ${COMPONENT} ${VERSION}." >> "${GITHUB_STEP_SUMMARY}"
+          fi

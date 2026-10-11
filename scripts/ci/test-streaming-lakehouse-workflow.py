@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+"""Contract tests for the first streaming/lakehouse workflow DAG."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+WORKFLOW = ROOT / ".github/workflows/build-components.yml"
+COMPONENTS = ROOT / "ci/components.yaml"
+
+
+def yaml_json(path: Path) -> dict:
+    result = subprocess.run(
+        ["ruby", "-ryaml", "-rjson", "-e", "puts JSON.generate(YAML.load_file(ARGV.fetch(0)))", str(path)],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return json.loads(result.stdout)
+
+
+class StreamingLakehouseWorkflowTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.workflow = yaml_json(WORKFLOW)
+        cls.jobs = cls.workflow["jobs"]
+        cls.catalog = yaml_json(COMPONENTS)["components"]
+
+    def test_dispatch_exposes_kafka_and_flink(self) -> None:
+        on = self.workflow.get("on") or self.workflow.get("true")
+        choices = on["workflow_dispatch"]["inputs"]["start_component"]["options"]
+        self.assertIn("kafka", choices)
+        self.assertIn("flink", choices)
+        self.assertIn("all", choices)
+
+    def test_kafka_kraft_uses_zookeeper_package_prerequisite(self) -> None:
+        # KRaft avoids a ZooKeeper quorum at runtime, but the pinned Bigtop RPM
+        # still has a hard package Requires edge on ZooKeeper.
+        kafka = self.catalog["kafka"]
+        self.assertEqual(kafka["test_profile"], "kafka-kraft-smoke")
+        self.assertIn("zookeeper", kafka["depends_on"])
+        self.assertIn("kafka_prerequisite", self.jobs["kafka"].get("needs", []))
+        self.assertEqual(self.workflow["jobs"]["kafka_prerequisite"]["with"]["component"], "zookeeper")
+
+    def test_flink_depends_on_hadoop(self) -> None:
+        self.assertIn("hadoop", self.catalog["flink"]["depends_on"])
+        self.assertIn("flink_prerequisite", self.jobs["flink"].get("needs", []))
+
+    def test_hadoop_failure_does_not_block_kafka(self) -> None:
+        self.assertNotIn("flink_prerequisite", self.jobs["kafka"].get("needs", []))
+        self.assertNotIn("kafka_prerequisite", self.jobs["flink"].get("needs", []))
+
+    def test_dispatch_starts_selected_component_and_descendants_only(self) -> None:
+        kafka_if = self.jobs["kafka"]["if"]
+        flink_if = self.jobs["flink"]["if"]
+        self.assertIn("inputs.start_component == 'kafka'", kafka_if)
+        self.assertIn("inputs.start_component == 'flink'", flink_if)
+        self.assertIn("inputs.start_component == 'all'", kafka_if)
+        self.assertIn("inputs.start_component == 'all'", flink_if)
+        self.assertIn("needs.zookeeper_gate.outputs.continue_chain == 'true'", kafka_if)
+        self.assertIn("needs.hadoop_gate.outputs.continue_chain == 'true'", flink_if)
+        self.assertEqual(self.jobs["kafka"]["needs"], ["zookeeper_gate", "kafka_prerequisite"])
+        self.assertEqual(self.jobs["flink"]["needs"], ["hadoop_gate", "flink_prerequisite"])
+        # Main/all runs reuse the already-completed base stages; only targeted
+        # starts invoke a second prerequisite lifecycle.
+        self.assertIn("inputs.start_component == 'kafka'", self.jobs["kafka_prerequisite"]["if"])
+        self.assertNotIn("inputs.start_component == 'all'", self.jobs["kafka_prerequisite"]["if"])
+        self.assertIn("inputs.start_component == 'flink'", self.jobs["flink_prerequisite"]["if"])
+        self.assertNotIn("inputs.start_component == 'all'", self.jobs["flink_prerequisite"]["if"])
+        lifecycle = yaml_json(ROOT / ".github/workflows/component-lifecycle.yml")["jobs"]
+        repo_check = lifecycle["repo_check"]["with"]
+        self.assertEqual(repo_check["component"], "${{ inputs.component }}")
+        self.assertEqual(repo_check["version"], "${{ inputs.version }}")
+        self.assertEqual(repo_check["source_identity"], "${{ inputs.source_identity }}")
+        self.assertEqual(repo_check["artifact_type"], "${{ inputs.artifact_type }}")
+        self.assertEqual(repo_check["test_profile"], "${{ inputs.test_profile }}")
+        self.assertEqual(repo_check["jdk"], "${{ inputs.jdk }}")
+        self.assertEqual(repo_check["jdk_package"], "${{ inputs.jdk_package }}")
+        zookeeper_if = self.jobs["zookeeper_repo_check"]["if"]
+        self.assertIn("inputs.start_component == 'all'", zookeeper_if)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
