@@ -20,7 +20,7 @@ diagnose_failure() {
   done
   if [[ -d "${OUTPUT}" ]]; then
     echo "--- Flink output files ---" >&2
-    find "${OUTPUT}" -maxdepth 2 -type f -printf '%p (%s bytes)\n' >&2 || true
+    find "${OUTPUT}" -maxdepth 2 -printf '%y %p (%s bytes)\n' >&2 || true
     while IFS= read -r output_file; do
       [[ -f "${output_file}" ]] || continue
       echo "--- ${output_file} ---" >&2
@@ -76,6 +76,20 @@ for _ in $(seq 1 30); do
 done
 [[ -n "${result_file}" && -s "${result_file}" ]] || {
   echo "No non-empty Flink part file appeared under ${OUTPUT}." >&2
+  echo "--- Flink job submission/result log ---" >&2
+  tail -n 100 "${JOB_LOG}" >&2 || true
+  echo "--- Flink output directory listing ---" >&2
+  if [[ -d "${OUTPUT}" ]]; then
+    find "${OUTPUT}" -maxdepth 2 -printf '%y %p (%s bytes)\n' >&2 || true
+    while IFS= read -r output_file; do
+      [[ -f "${output_file}" ]] || continue
+      echo "--- ${output_file} ---" >&2
+      head -c 4096 "${output_file}" >&2 || true
+      echo >&2
+    done < <(find "${OUTPUT}" -maxdepth 2 -type f -print 2>/dev/null)
+  else
+    echo "Output directory was not created." >&2
+  fi
   exit 1
 }
 for expected in '(alpha,2)' '(beta,2)' '(gamma,1)'; do
