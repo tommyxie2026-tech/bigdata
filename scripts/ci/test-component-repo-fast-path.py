@@ -479,27 +479,27 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             source_root = root / "source"
             (source_root / "ci").mkdir(parents=True)
             (source_root / "ci/components.yaml").write_text(
-                "schema: bigdata.ci.components/v1\\n"
-                "components:\\n"
-                "  kafka:\\n"
-                "    version: 3.4.1\\n"
-                "    runtime_packages:\\n"
-                "      - kafka\\n"
-                "      - kafka-server\\n"
-                "  flink:\\n"
-                "    version: 1.20.1\\n"
-                "    runtime_packages:\\n"
-                "      - flink\\n"
-                "      - flink-jobmanager\\n"
-                "      - flink-taskmanager\\n"
+                "schema: bigdata.ci.components/v1\n"
+                "components:\n"
+                "  kafka:\n"
+                "    version: 3.4.1\n"
+                "    runtime_packages:\n"
+                "      - kafka\n"
+                "      - kafka-server\n"
+                "  flink:\n"
+                "    version: 1.20.1\n"
+                "    runtime_packages:\n"
+                "      - flink\n"
+                "      - flink-jobmanager\n"
+                "      - flink-taskmanager\n"
             )
             (root / "bin").mkdir()
             createrepo = root / "bin/createrepo_c"
             createrepo.write_text(
-                "#!/usr/bin/env bash\\n"
-                'target="${@: -1}"\\n'
-                'mkdir -p "${target}/repodata"\\n'
-                "printf '%s\\\\n' '<repomd/>' > \\\"${target}/repodata/repomd.xml\\\"\\n"
+                "#!/usr/bin/env bash\n"
+                'target="${@: -1}"\n'
+                'mkdir -p "${target}/repodata"\n'
+                "printf '%s\\n' '<repomd/>' > \\"${target}/repodata/repomd.xml\\"\n"
             )
             createrepo.chmod(0o755)
             repo = root / "repo-checkout"
@@ -522,10 +522,10 @@ class ComponentRepoFastPathTests(unittest.TestCase):
                         path.write_bytes(payload)
                         hashes.append((hashlib.sha256(payload).hexdigest(), name))
                     (tested / "evidence/SHA256SUMS").write_text(
-                        "".join(f"{digest}  rpms/{name}\\n" for digest, name in hashes)
+                        "".join(f"{digest}  rpms/{name}\n" for digest, name in hashes)
                     )
                     (evidence_dir / "evidence.md").write_text(
-                        f"status: PASS\\ncomponent: {component}\\nversion: {version}\\n"
+                        f"status: PASS\ncomponent: {component}\nversion: {version}\n"
                     )
                     result = subprocess.run(
                         ["bash", str(STAGER)],
