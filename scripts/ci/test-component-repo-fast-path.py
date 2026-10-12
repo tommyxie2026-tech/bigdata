@@ -497,9 +497,8 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             createrepo = root / "bin/createrepo_c"
             createrepo.write_text(
                 "#!/usr/bin/env bash\n"
-                'target="${@: -1}"\n'
-                'mkdir -p "${target}/repodata"\n'
-                "printf '%s\\n' '<repomd/>' > \\"${target}/repodata/repomd.xml\\"\n"
+                "mkdir -p ./repodata\n"
+                "printf '<repomd/>' > ./repodata/repomd.xml\n"
             )
             createrepo.chmod(0o755)
             repo = root / "repo-checkout"
