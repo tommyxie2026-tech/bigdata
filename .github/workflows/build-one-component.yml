@@ -12,6 +12,30 @@ on:
       task:
         required: true
         type: string
+      builder:
+        required: false
+        type: string
+        default: bigtop
+      artifact_type:
+        required: false
+        type: string
+        default: service-rpm
+      test_profile:
+        required: false
+        type: string
+        default: legacy-smoke
+      jdk:
+        required: false
+        type: string
+        default: '8'
+      jdk_package:
+        required: false
+        type: string
+        default: java-1.8.0-openjdk-devel
+      source_identity:
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -37,13 +61,26 @@ jobs:
           free -h
           docker version
 
+      - name: Resolve runtime package contract
+        id: catalog
+        shell: bash
+        env:
+          COMPONENT: ${{ inputs.component }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check pyyaml
+          python3 scripts/ci/resolve-component-dependencies.py \
+            --config ci/components.yaml \
+            --component "${COMPONENT}" \
+            --github-output "${GITHUB_OUTPUT}"
+
       - name: Restore Maven and Gradle downloads
         uses: actions/cache@v4
         with:
           path: |
             /tmp/bigdata-component-cache/m2
             /tmp/bigdata-component-cache/gradle
-          key: openeuler22-bigtop36-jdk8-${{ hashFiles('ci/components.yaml', 'scripts/ci/build-bigtop-component.sh') }}
+          key: openeuler22-bigtop36-jdk${{ inputs.jdk }}-${{ hashFiles('ci/components.yaml', 'scripts/ci/build-bigtop-component.sh') }}
 
       - name: Build RPMs
         shell: bash
@@ -57,6 +94,14 @@ jobs:
             -e VERSION="${{ inputs.version }}" \
             -e BUILD_TASK="${{ inputs.task }}" \
             -e BIGTOP_REF=branch-3.6 \
+            -e BUILDER="${{ inputs.builder }}" \
+            -e ARTIFACT_TYPE="${{ inputs.artifact_type }}" \
+            -e TEST_PROFILE="${{ inputs.test_profile }}" \
+            -e COMPONENT_JDK="${{ inputs.jdk }}" \
+            -e COMPONENT_JDK_PACKAGE="${{ inputs.jdk_package }}" \
+            -e EXPECTED_SOURCE_IDENTITY="${{ inputs.source_identity }}" \
+            -e COMPONENT_RUNTIME_PACKAGES="${{ steps.catalog.outputs.packages }}" \
+            -e BUILD_RUN_ID="${GITHUB_RUN_ID}" \
             -e WORK_ROOT=/work \
             -v "${GITHUB_WORKSPACE}:/workspace:ro" \
             -v "${WORK_ROOT}:/work" \

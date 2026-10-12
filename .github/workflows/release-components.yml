@@ -12,6 +12,26 @@ on:
       test_run_id:
         required: true
         type: string
+      artifact_type:
+        required: false
+        type: string
+        default: service-rpm
+      test_profile:
+        required: false
+        type: string
+        default: legacy-smoke
+      jdk:
+        required: false
+        type: string
+        default: '8'
+      jdk_package:
+        required: false
+        type: string
+        default: java-1.8.0-openjdk
+      source_identity:
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       component:
@@ -25,6 +45,8 @@ on:
           - hive
           - spark
           - hbase
+          - kafka
+          - flink
       version:
         description: Component version
         required: true
@@ -32,6 +54,31 @@ on:
       test_run_id:
         description: Successful Test Components run ID
         required: true
+        type: string
+      artifact_type:
+        description: Artifact contract
+        required: false
+        default: ''
+        type: string
+      test_profile:
+        description: Passing clean-environment test profile
+        required: false
+        default: ''
+        type: string
+      jdk:
+        description: Component build/test JDK version
+        required: false
+        default: ''
+        type: string
+      jdk_package:
+        description: Component JDK RPM used by the test
+        required: false
+        default: ''
+        type: string
+      source_identity:
+        description: Immutable source commit or archive checksum
+        required: false
+        default: ''
         type: string
       publish_github_release:
         description: Publish GitHub prereleases
@@ -54,6 +101,11 @@ jobs:
 
     env:
       TEST_RUN_ID: ${{ inputs.test_run_id }}
+      ARTIFACT_TYPE: ${{ inputs.artifact_type || '' }}
+      TEST_PROFILE: ${{ inputs.test_profile || '' }}
+      COMPONENT_JDK: ${{ inputs.jdk || '8' }}
+      COMPONENT_JDK_PACKAGE: ${{ inputs.jdk_package || 'java-1.8.0-openjdk' }}
+      EXPECTED_SOURCE_IDENTITY: ${{ inputs.source_identity || '' }}
       RELEASE_ROOT: /tmp/bigdata-release
 
     steps:
@@ -88,6 +140,51 @@ jobs:
           find /tmp/tested-rpms -type f -name '*.rpm' -exec cp -v {} "${RELEASE_ROOT}/rpms/" \;
           cp -a /tmp/test-evidence/. "${RELEASE_ROOT}/evidence/"
 
+          test_evidence="${RELEASE_ROOT}/evidence/evidence.md"
+          grep -qx 'status: PASS' "${test_evidence}"
+          grep -qx "component: ${{ inputs.component }}" "${test_evidence}"
+          grep -qx "version: ${{ inputs.version }}" "${test_evidence}"
+          evidence_artifact_type="$(awk -F ': ' '$1 == "artifact_type" { print $2 }' "${test_evidence}")"
+          evidence_test_profile="$(awk -F ': ' '$1 == "test_profile" { print $2 }' "${test_evidence}")"
+          evidence_jdk="$(awk -F ': ' '$1 == "toolchain_jdk" { print $2 }' "${test_evidence}")"
+          evidence_jdk_package="$(awk -F ': ' '$1 == "jdk_package" { print $2 }' "${test_evidence}")"
+          if [[ -n "${TEST_PROFILE}" && "${TEST_PROFILE}" != "${evidence_test_profile}" ]]; then
+            echo "Requested test profile does not match the uploaded test evidence." >&2
+            exit 1
+          fi
+          evidence_build_run_id="$(awk -F ': ' '$1 == "build_run_id" { print $2 }' "${test_evidence}")"
+          evidence_test_run_id="$(awk -F ': ' '$1 == "test_run_id" { print $2 }' "${test_evidence}")"
+          evidence_source_identity="$(awk -F ': ' '$1 == "source_identity" { print $2 }' "${test_evidence}")"
+          if [[ "${evidence_test_profile}" != legacy-smoke ]]; then
+            grep -qx "artifact_type: ${evidence_artifact_type}" "${test_evidence}"
+            grep -qx "test_profile: ${evidence_test_profile}" "${test_evidence}"
+            grep -qx "toolchain_jdk: ${evidence_jdk}" "${test_evidence}"
+            grep -qx "jdk_package: ${evidence_jdk_package}" "${test_evidence}"
+            grep -qx "test_run_id: ${TEST_RUN_ID}" "${test_evidence}"
+            [[ -n "${evidence_artifact_type}" && -n "${evidence_test_profile}" && -n "${evidence_jdk}" && -n "${evidence_jdk_package}" ]]
+            [[ "${evidence_test_run_id}" == "${TEST_RUN_ID}" && "${evidence_build_run_id}" =~ ^[0-9]+$ ]]
+            if [[ -n "${ARTIFACT_TYPE}" && "${ARTIFACT_TYPE}" != "${evidence_artifact_type}" ]]; then
+              echo "Requested artifact type does not match the uploaded test evidence." >&2
+              exit 1
+            fi
+            if [[ -n "${EXPECTED_SOURCE_IDENTITY}" && "${EXPECTED_SOURCE_IDENTITY}" != "${evidence_source_identity}" ]]; then
+              echo "Requested source identity does not match the uploaded test evidence." >&2
+              exit 1
+            fi
+          fi
+          source_identity="$(awk -F ': ' '$1 == "source_identity" { print $2 }' "${test_evidence}")"
+          build_run_id="$(awk -F ': ' '$1 == "build_run_id" { print $2 }' "${test_evidence}")"
+          ARTIFACT_TYPE="${evidence_artifact_type:-${ARTIFACT_TYPE:-service-rpm}}"
+          TEST_PROFILE="${evidence_test_profile:-${TEST_PROFILE:-legacy-smoke}}"
+          COMPONENT_JDK="${evidence_jdk:-${COMPONENT_JDK:-8}}"
+          COMPONENT_JDK_PACKAGE="${evidence_jdk_package:-${COMPONENT_JDK_PACKAGE:-java-1.8.0-openjdk}}"
+          if [[ -n "${EXPECTED_SOURCE_IDENTITY}" && "${source_identity}" != "${EXPECTED_SOURCE_IDENTITY}" ]]; then
+            echo "Test evidence source identity ${source_identity} does not match ${EXPECTED_SOURCE_IDENTITY}." >&2
+            exit 1
+          fi
+          [[ "${build_run_id}" =~ ^[0-9]+$ ]]
+          [[ "${TEST_RUN_ID}" =~ ^[0-9]+$ ]]
+
           rpm_count=$(find "${RELEASE_ROOT}/rpms" -type f -name '*.rpm' | wc -l)
           test "${rpm_count}" -gt 0
 
@@ -97,14 +194,19 @@ jobs:
           )
 
           cat > "${RELEASE_ROOT}/release-manifest.yaml" <<EOF
-          schema: bigdata.release/v1
+          schema: bigdata.release/v2
           component: ${{ inputs.component }}
           component_version: ${{ inputs.version }}
           bigtop_version: 3.6.0
-          ambari_version: 3.0.0
+          artifact_type: ${ARTIFACT_TYPE}
+          source_identity: ${source_identity}
+          test_profile: ${TEST_PROFILE}
+          jdk: ${COMPONENT_JDK}
+          jdk_package: ${COMPONENT_JDK_PACKAGE}
+          build_run_id: ${build_run_id}
+          test_run_id: ${TEST_RUN_ID}
           os: openEuler 22.03 LTS SP4
           package_format: RPM
-          test_run_id: ${TEST_RUN_ID}
           rpm_count: ${rpm_count}
           status: RELEASE_CANDIDATE
           EOF
@@ -156,9 +258,17 @@ jobs:
           VERSION: ${{ inputs.version }}
           TEST_RUN_ID: ${{ inputs.test_run_id }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          SOURCE_IDENTITY: ${{ inputs.source_identity || '' }}
+          ARTIFACT_TYPE: ${{ inputs.artifact_type || 'service-rpm' }}
+          TEST_PROFILE: ${{ inputs.test_profile || 'legacy-smoke' }}
+          COMPONENT_JDK: ${{ inputs.jdk || '8' }}
+          COMPONENT_JDK_PACKAGE: ${{ inputs.jdk_package || 'java-1.8.0-openjdk' }}
           REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
         run: |
           set -euo pipefail
+          BUILD_RUN_ID="$(awk -F ': ' '$1 == "build_run_id" { print $2 }' /tmp/test-evidence/evidence.md)"
+          [[ "${BUILD_RUN_ID}" =~ ^[0-9]+$ ]]
+          export BUILD_RUN_ID
           cd "${REPO_CHECKOUT}"
           git lfs install --local
           branch="ci/rpm-repo-${COMPONENT}-${VERSION}-${GITHUB_RUN_ID}"

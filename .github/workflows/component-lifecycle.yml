@@ -1,0 +1,143 @@
+name: New Component Lifecycle
+
+on:
+  workflow_call:
+    inputs:
+      component:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      builder:
+        required: true
+        type: string
+      artifact_type:
+        required: true
+        type: string
+      build_task:
+        required: true
+        type: string
+      test_profile:
+        required: true
+        type: string
+      jdk:
+        required: true
+        type: string
+      jdk_package:
+        required: true
+        type: string
+      source_identity:
+        required: true
+        type: string
+    outputs:
+      stage_passed:
+        description: True only for a verified fast path or completed lifecycle
+        value: ${{ jobs.gate.outputs.stage_passed }}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  repo_check:
+    name: Check ${{ inputs.component }} repository fast path
+    uses: ./.github/workflows/check-component-repo.yml
+    with:
+      component: ${{ inputs.component }}
+      version: ${{ inputs.version }}
+      source_identity: ${{ inputs.source_identity }}
+      artifact_type: ${{ inputs.artifact_type }}
+      test_profile: ${{ inputs.test_profile }}
+      jdk: ${{ inputs.jdk }}
+      jdk_package: ${{ inputs.jdk_package }}
+
+  build:
+    name: Build ${{ inputs.component }} ${{ inputs.version }}
+    needs: repo_check
+    if: ${{ always() && needs.repo_check.result == 'success' && needs.repo_check.outputs.already_current != 'true' }}
+    uses: ./.github/workflows/build-one-component.yml
+    with:
+      component: ${{ inputs.component }}
+      version: ${{ inputs.version }}
+      task: ${{ inputs.build_task }}
+      builder: ${{ inputs.builder }}
+      artifact_type: ${{ inputs.artifact_type }}
+      test_profile: ${{ inputs.test_profile }}
+      jdk: ${{ inputs.jdk }}
+      jdk_package: ${{ inputs.jdk_package }}
+      source_identity: ${{ inputs.source_identity }}
+
+  test:
+    name: Test ${{ inputs.component }} ${{ inputs.version }}
+    needs: build
+    if: ${{ always() && needs.build.result == 'success' }}
+    uses: ./.github/workflows/test-components.yml
+    with:
+      component: ${{ inputs.component }}
+      version: ${{ inputs.version }}
+      build_run_id: ${{ format('{0}', github.run_id) }}
+      test_profile: ${{ inputs.test_profile }}
+      artifact_type: ${{ inputs.artifact_type }}
+      jdk: ${{ inputs.jdk }}
+      jdk_package: ${{ inputs.jdk_package }}
+      source_identity: ${{ inputs.source_identity }}
+
+  release:
+    name: Release Candidate ${{ inputs.component }} ${{ inputs.version }}
+    needs: test
+    if: ${{ always() && needs.test.result == 'success' && github.event_name != 'pull_request' }}
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/release-components.yml
+    with:
+      component: ${{ inputs.component }}
+      version: ${{ inputs.version }}
+      test_run_id: ${{ format('{0}', github.run_id) }}
+      artifact_type: ${{ inputs.artifact_type }}
+      test_profile: ${{ inputs.test_profile }}
+      jdk: ${{ inputs.jdk }}
+      jdk_package: ${{ inputs.jdk_package }}
+      source_identity: ${{ inputs.source_identity }}
+
+  gate:
+    name: Complete ${{ inputs.component }} stage
+    needs: [repo_check, build, test, release]
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      stage_passed: ${{ steps.gate.outputs.stage_passed }}
+    steps:
+      - name: Accept only verified fast path or successful lifecycle
+        id: gate
+        env:
+          CHECK_RESULT: ${{ needs.repo_check.result }}
+          ALREADY_CURRENT: ${{ needs.repo_check.outputs.already_current }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          RELEASE_RESULT: ${{ needs.release.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${CHECK_RESULT}" == success && "${ALREADY_CURRENT}" == true && \
+                "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && \
+                "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'stage_passed=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${CHECK_RESULT}" == success && "${BUILD_RESULT}" == success && \
+                  "${TEST_RESULT}" == success && \
+                  ( "${RELEASE_RESULT}" == success || \
+                    ( "${EVENT_NAME}" == pull_request && "${RELEASE_RESULT}" == skipped ) ) ]]; then
+            echo 'stage_passed=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT_NAME}" == pull_request && "${IS_FORK_PR}" == true && \
+                  "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && \
+                  "${RELEASE_RESULT}" == skipped ]]; then
+            echo 'stage_passed=false' >> "${GITHUB_OUTPUT}"
+            echo 'Build/Test/Release are intentionally unavailable to fork PRs.'
+          else
+            echo "Component stage failed: check=${CHECK_RESULT}, fast_path=${ALREADY_CURRENT}, build=${BUILD_RESULT}, test=${TEST_RESULT}, release=${RELEASE_RESULT}" >&2
+            exit 1
+          fi

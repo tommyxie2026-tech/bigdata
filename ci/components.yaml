@@ -104,3 +104,34 @@ components:
     depends_on:
       - hadoop
       - zookeeper
+  kafka:
+    builder: bigtop
+    artifact_type: service-rpm
+    version: 3.4.1
+    source_identity: 19670ce6a3cc68833b7dd47697cd6272b66bb372
+    runtime_packages:
+      - kafka
+      - kafka-server
+    build_task: kafka-rpm
+    wave: 6
+    test_profile: kafka-kraft-smoke
+    jdk: 8
+    jdk_package: java-1.8.0-openjdk-devel
+    depends_on:
+      - zookeeper
+  flink:
+    builder: bigtop
+    artifact_type: service-rpm
+    version: 1.20.1
+    source_identity: 19670ce6a3cc68833b7dd47697cd6272b66bb372
+    runtime_packages:
+      - flink
+      - flink-jobmanager
+      - flink-taskmanager
+    build_task: flink-rpm
+    wave: 6
+    test_profile: flink-local-job-smoke
+    jdk: 11
+    jdk_package: java-11-openjdk-devel
+    depends_on:
+      - hadoop

@@ -12,6 +12,26 @@ on:
       build_run_id:
         required: true
         type: string
+      test_profile:
+        required: false
+        type: string
+        default: legacy-smoke
+      artifact_type:
+        required: false
+        type: string
+        default: service-rpm
+      jdk:
+        required: false
+        type: string
+        default: '8'
+      jdk_package:
+        required: false
+        type: string
+        default: java-1.8.0-openjdk
+      source_identity:
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       component:
@@ -25,6 +45,8 @@ on:
           - hive
           - spark
           - hbase
+          - kafka
+          - flink
       version:
         description: Component version
         required: true
@@ -32,6 +54,31 @@ on:
       build_run_id:
         description: Successful Build Components run ID
         required: true
+        type: string
+      test_profile:
+        description: Component-specific clean-environment test profile
+        required: false
+        default: legacy-smoke
+        type: string
+      artifact_type:
+        description: Artifact contract from the component catalog
+        required: false
+        default: service-rpm
+        type: string
+      jdk:
+        description: Component build/test JDK version
+        required: false
+        default: '8'
+        type: string
+      jdk_package:
+        description: Component JDK runtime RPM
+        required: false
+        default: java-1.8.0-openjdk
+        type: string
+      source_identity:
+        description: Immutable source commit or archive checksum
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -52,12 +99,39 @@ jobs:
       ARTIFACT_ROOT: /tmp/bigdata-component-artifact
       EVIDENCE_ROOT: /tmp/bigdata-component-test
       BUILD_RUN_ID: ${{ inputs.build_run_id }}
+      TEST_PROFILE: ${{ inputs.test_profile }}
+      COMPONENT_JDK: ${{ inputs.jdk || '8' }}
+      COMPONENT_JDK_PACKAGE: ${{ inputs.jdk_package || 'java-1.8.0-openjdk' }}
+      ARTIFACT_TYPE: ${{ inputs.artifact_type || 'service-rpm' }}
+      EXPECTED_SOURCE_IDENTITY: ${{ inputs.source_identity || '' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+
+      - name: Resolve runtime package contract
+        id: catalog
+        shell: bash
+        env:
+          COMPONENT: ${{ inputs.component }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check pyyaml
+          python3 scripts/ci/resolve-component-dependencies.py \
+            --config ci/components.yaml \
+            --component "${COMPONENT}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Checkout dependency RPM repositories
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: dependency-repository
+          lfs: true
+          sparse-checkout-cone-mode: false
+          sparse-checkout: ${{ steps.catalog.outputs.sparse_paths }}
 
       - name: Download component RPMs
         uses: actions/download-artifact@v4
@@ -77,9 +151,19 @@ jobs:
           docker run --rm \
             -e COMPONENT="${{ inputs.component }}" \
             -e VERSION="${{ inputs.version }}" \
+            -e TEST_PROFILE="${{ inputs.test_profile || 'legacy-smoke' }}" \
+            -e ARTIFACT_TYPE="${{ inputs.artifact_type || 'service-rpm' }}" \
+            -e COMPONENT_JDK="${{ inputs.jdk || '8' }}" \
+            -e COMPONENT_JDK_PACKAGE="${{ inputs.jdk_package || 'java-1.8.0-openjdk' }}" \
+            -e EXPECTED_SOURCE_IDENTITY="${{ inputs.source_identity || '' }}" \
+            -e COMPONENT_RUNTIME_PACKAGES="${{ steps.catalog.outputs.packages }}" \
+            -e BUILD_RUN_ID="${BUILD_RUN_ID}" \
+            -e TEST_RUN_ID="${GITHUB_RUN_ID}" \
+            -e DEPENDENCY_REPO_PATHS="${{ steps.catalog.outputs.dependency_repos }}" \
             -e ARTIFACT_ROOT=/artifact \
             -e EVIDENCE_ROOT=/evidence \
             -v "${GITHUB_WORKSPACE}:/workspace:ro" \
+            -v "${GITHUB_WORKSPACE}/dependency-repository/repo/openeuler-22.03-lts-sp4/bigtop-3.6:/dependency-repos:ro" \
             -v "${ARTIFACT_ROOT}:/artifact:ro" \
             -v "${EVIDENCE_ROOT}:/evidence" \
             "${OPENEULER_IMAGE}" \
