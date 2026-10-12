@@ -253,7 +253,7 @@ class ComponentRepoFastPathTests(unittest.TestCase):
     def test_stage_selects_only_configured_noncomponent_package_names(self) -> None:
         source = STAGER.read_text()
         self.assertIn("runtime_packages", source)
-        self.assertIn('"${name}" == "${package}"-*', source)
+        self.assertIn('"${name}" == "${package}-${VERSION}-"*', source)
         self.assertNotIn('"${COMPONENT}-"*) cp', source)
 
     def test_pull_requests_check_main_repository_for_fast_path(self) -> None:
@@ -471,6 +471,82 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             self.assertFalse((target / "tez-0.10.5-1.noarch.rpm").exists())
             self.assertTrue((target / release_rpm).exists())
             self.assertIn(rpm_hash, (target / "SHA256SUMS").read_text())
+
+
+    def test_stager_distinguishes_runtime_packages_with_shared_prefixes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_root = root / "source"
+            (source_root / "ci").mkdir(parents=True)
+            (source_root / "ci/components.yaml").write_text(
+                "schema: bigdata.ci.components/v1\n"
+                "components:\n"
+                "  kafka:\n"
+                "    version: 3.4.1\n"
+                "    runtime_packages:\n"
+                "      - kafka\n"
+                "      - kafka-server\n"
+                "  flink:\n"
+                "    version: 1.20.1\n"
+                "    runtime_packages:\n"
+                "      - flink\n"
+                "      - flink-jobmanager\n"
+                "      - flink-taskmanager\n"
+            )
+            (root / "bin").mkdir()
+            createrepo = root / "bin/createrepo_c"
+            createrepo.write_text(
+                "#!/usr/bin/env bash\n"
+                "mkdir -p ./repodata\n"
+                "printf '<repomd/>' > ./repodata/repomd.xml\n"
+            )
+            createrepo.chmod(0o755)
+            repo = root / "repo-checkout"
+            cases = (
+                ("kafka", "3.4.1", ("kafka", "kafka-server")),
+                ("flink", "1.20.1", ("flink", "flink-jobmanager", "flink-taskmanager")),
+            )
+            for component, version, packages in cases:
+                with self.subTest(component=component):
+                    tested = root / f"tested-{component}"
+                    (tested / "rpms").mkdir(parents=True)
+                    (tested / "evidence").mkdir()
+                    evidence_dir = root / f"test-evidence-{component}"
+                    evidence_dir.mkdir()
+                    names = tuple(f"{package}-{version}-1.noarch.rpm" for package in packages)
+                    hashes = []
+                    for index, name in enumerate(names):
+                        payload = f"{component} runtime rpm {index}".encode()
+                        path = tested / "rpms" / name
+                        path.write_bytes(payload)
+                        hashes.append((hashlib.sha256(payload).hexdigest(), name))
+                    (tested / "evidence/SHA256SUMS").write_text(
+                        "".join(f"{digest}  rpms/{name}\n" for digest, name in hashes)
+                    )
+                    (evidence_dir / "evidence.md").write_text(
+                        f"status: PASS\ncomponent: {component}\nversion: {version}\n"
+                    )
+                    result = subprocess.run(
+                        ["bash", str(STAGER)],
+                        env={
+                            **os.environ,
+                            "PATH": f"{root / 'bin'}:{os.environ['PATH']}",
+                            "COMPONENT": component,
+                            "VERSION": version,
+                            "TEST_RUN_ID": "123456",
+                            "SOURCE_SHA": "a" * 40,
+                            "REPO_CHECKOUT": str(repo),
+                            "TESTED_RPMS_DIR": str(tested),
+                            "TEST_EVIDENCE_DIR": str(evidence_dir),
+                            "CI_SOURCE_ROOT": str(source_root),
+                        },
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+                    target = repo / f"repo/openeuler-22.03-lts-sp4/bigtop-3.6/{component}/{version}"
+                    self.assertEqual({path.name for path in target.glob("*.rpm")}, set(names))
 
     def test_stager_promotes_configured_connector_package_and_rejects_extras(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
