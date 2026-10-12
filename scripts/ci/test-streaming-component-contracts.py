@@ -75,7 +75,7 @@ class StreamingComponentContracts(unittest.TestCase):
             "alpha",
             "beta",
             "gamma",
-            'find "${OUTPUT}" -maxdepth 1 -type f',
+            'find "${OUTPUT}" -type f -name \'part-*\'',
             '"${result_file}"',
             'cp "${result_file}" "${EVIDENCE_ROOT}/flink-job-result.txt"',
         ):
