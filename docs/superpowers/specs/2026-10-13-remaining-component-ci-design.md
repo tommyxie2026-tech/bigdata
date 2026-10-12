@@ -17,10 +17,11 @@ Extend the existing idempotent RPM lifecycle to the remaining approved query and
 
 ## Proposed scope and batches
 
-### Batch 1: Hue feasibility and Iceberg
+### Batch 1: query services, Hue feasibility, and Iceberg
 
 1. **Hue feasibility gate:** confirm a maintained upstream release, source integrity, supported Python/runtime dependencies on openEuler 22.03 LTS SP4, and an RPM packaging path. If feasible, package Hue as a service RPM, install it in a clean image, start it with disposable metadata storage, check its HTTP health/UI endpoint, and verify a configured HiveServer2 or Trino connection. If not feasible, report the concrete blocker and stop Hue packaging without claiming success.
-2. **Iceberg:** model it as an integration artifact, not a daemon. Pin Iceberg and each engine connector against the repository's Spark 3.5.8 and Flink 1.20.1 baseline. Build an allow-listed JAR/runtime RPM set and run actual table create/write/read checks in supported engines. Advertise only engine/catalog combinations that pass; begin with the compatibility matrix approved in implementation review.
+2. **Trino service:** preserve the previously approved query-service scope. Since Bigtop 3.6 has no Trino package definition, use a separately pinned custom RPM recipe after confirming its JDK/runtime support. The clean-image smoke must install and start a single-node coordinator/worker, pass health, and run a minimal query.
+3. **Iceberg:** model it as an integration artifact, not a daemon. Pin Iceberg and each engine connector against the repository's Spark 3.5.8 and Flink 1.20.1 baseline. Build an allow-listed JAR/runtime RPM set and run actual table create/write/read checks in supported engines. Advertise only engine/catalog combinations that pass; begin with the compatibility matrix approved in implementation review.
 
 ### Batch 2: Hudi and Paimon
 
@@ -61,13 +62,14 @@ Extend the existing idempotent RPM lifecycle to the remaining approved query and
 ## Acceptance criteria
 
 1. Hue feasibility is recorded with upstream/runtime evidence before implementation; an infeasible route is reported without a false green pipeline.
-2. Component configuration rejects missing versions, floating refs, incomplete artifact allow-lists, and invalid dependency edges.
-3. Hue's service package is promotable only after clean install, startup, health, and endpoint-connection tests pass.
-4. Iceberg, Hudi, and Paimon artifacts are promotable only for explicitly pinned engine/catalog combinations whose table write/read tests pass.
-5. A complete, checksum-valid, installable and provenance-valid unchanged repository set takes the fast path and avoids Build/Test/Release; incomplete or corrupted state does not.
-6. Component dispatch runs only the selected component and declared prerequisites/descendants; unrelated components remain on verified fast paths.
-7. Promotion PRs contain only declared runtime artifacts plus checksums, a provenance manifest, and valid repository metadata.
-8. Existing component behavior and prior successful artifact evidence remain unchanged.
+2. Trino has a pinned source/runtime, clean install/startup, health, and query smoke before it is promotable.
+3. Component configuration rejects missing versions, floating refs, incomplete artifact allow-lists, and invalid dependency edges.
+4. Hue's service package is promotable only after clean install, startup, health, and endpoint-connection tests pass.
+5. Iceberg, Hudi, and Paimon artifacts are promotable only for explicitly pinned engine/catalog combinations whose table write/read tests pass.
+6. A complete, checksum-valid, installable and provenance-valid unchanged repository set takes the fast path and avoids Build/Test/Release; incomplete or corrupted state does not.
+7. Component dispatch runs only the selected component and declared prerequisites/descendants; unrelated components remain on verified fast paths.
+8. Promotion PRs contain only declared runtime artifacts plus checksums, a provenance manifest, and valid repository metadata.
+9. Existing component behavior and prior successful artifact evidence remain unchanged.
 
 ## Risks and open questions for implementation review
 
