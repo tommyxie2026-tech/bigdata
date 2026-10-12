@@ -113,7 +113,7 @@ for package in "${runtime_packages[@]}"; do
     case "${name}" in
       *.src.rpm|*-debuginfo-*|*-debugsource-*|*-doc-*|*-devel-*|*-test-*|*-tests-*|*-javadoc-*) continue ;;
     esac
-    [[ "${name}" == "${package}"-* ]] && matches+=("${rpm}")
+    [[ "${name}" == "${package}-${VERSION}-"* ]] && matches+=("${rpm}")
   done
   if [[ "${#matches[@]}" -ne 1 ]]; then
     if [[ "${#matches[@]}" -eq 0 ]]; then
