@@ -38,6 +38,7 @@ on:
 permissions:
   contents: read
   actions: read
+  pull-requests: read
 
 jobs:
   repo_check:
@@ -52,10 +53,42 @@ jobs:
       jdk: ${{ inputs.jdk }}
       jdk_package: ${{ inputs.jdk_package }}
 
+  pr_test_reuse:
+    name: Reuse verified merged PR test artifacts for ${{ inputs.component }}
+    needs: repo_check
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.repo_check.result == 'success' &&
+      needs.repo_check.outputs.already_current != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      test_run_id: ${{ steps.lookup.outputs.test_run_id }}
+    steps:
+      - name: Checkout merged workflow code
+        uses: actions/checkout@v4
+
+      - name: Find a successful same-tree PR Build/Test run
+        id: lookup
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COMPONENT: ${{ inputs.component }}
+          VERSION: ${{ inputs.version }}
+        run: python3 scripts/ci/reuse_merged_pr_test_artifacts.py
+
   build:
     name: Build ${{ inputs.component }} ${{ inputs.version }}
-    needs: repo_check
-    if: ${{ always() && needs.repo_check.result == 'success' && needs.repo_check.outputs.already_current != 'true' }}
+    needs: [repo_check, pr_test_reuse]
+    if: >-
+      always() &&
+      needs.repo_check.result == 'success' &&
+      needs.repo_check.outputs.already_current != 'true' &&
+      needs.pr_test_reuse.outputs.test_run_id == ''
     uses: ./.github/workflows/build-one-component.yml
     with:
       component: ${{ inputs.component }}
@@ -70,7 +103,7 @@ jobs:
 
   test:
     name: Test ${{ inputs.component }} ${{ inputs.version }}
-    needs: build
+    needs: [build, pr_test_reuse]
     if: ${{ always() && needs.build.result == 'success' }}
     uses: ./.github/workflows/test-components.yml
     with:
@@ -85,8 +118,11 @@ jobs:
 
   release:
     name: Release Candidate ${{ inputs.component }} ${{ inputs.version }}
-    needs: test
-    if: ${{ always() && needs.test.result == 'success' && github.event_name != 'pull_request' }}
+    needs: [test, pr_test_reuse]
+    if: >-
+      always() &&
+      github.event_name != 'pull_request' &&
+      (needs.test.result == 'success' || needs.pr_test_reuse.outputs.test_run_id != '')
     permissions:
       contents: write
       actions: read
@@ -95,7 +131,7 @@ jobs:
     with:
       component: ${{ inputs.component }}
       version: ${{ inputs.version }}
-      test_run_id: ${{ format('{0}', github.run_id) }}
+      test_run_id: ${{ needs.pr_test_reuse.outputs.test_run_id || format('{0}', github.run_id) }}
       artifact_type: ${{ inputs.artifact_type }}
       test_profile: ${{ inputs.test_profile }}
       jdk: ${{ inputs.jdk }}
@@ -104,7 +140,7 @@ jobs:
 
   gate:
     name: Complete ${{ inputs.component }} stage
-    needs: [repo_check, build, test, release]
+    needs: [repo_check, pr_test_reuse, build, test, release]
     if: always()
     runs-on: ubuntu-latest
     outputs:
@@ -115,6 +151,7 @@ jobs:
         env:
           CHECK_RESULT: ${{ needs.repo_check.result }}
           ALREADY_CURRENT: ${{ needs.repo_check.outputs.already_current }}
+          PR_TEST_RUN_ID: ${{ needs.pr_test_reuse.outputs.test_run_id }}
           BUILD_RESULT: ${{ needs.build.result }}
           TEST_RESULT: ${{ needs.test.result }}
           RELEASE_RESULT: ${{ needs.release.result }}
@@ -127,6 +164,11 @@ jobs:
                 "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && \
                 "${RELEASE_RESULT}" == skipped ]]; then
             echo 'stage_passed=true' >> "${GITHUB_OUTPUT}"
+          elif [[ "${CHECK_RESULT}" == success && "${BUILD_RESULT}" == skipped && \
+                  "${TEST_RESULT}" == skipped && "${RELEASE_RESULT}" == success && \
+                  "${PR_TEST_RUN_ID}" =~ ^[0-9]+$ ]]; then
+            echo 'stage_passed=true' >> "${GITHUB_OUTPUT}"
+            echo "Promoted verified PR test artifacts from run ${PR_TEST_RUN_ID}." >> "${GITHUB_STEP_SUMMARY}"
           elif [[ "${CHECK_RESULT}" == success && "${BUILD_RESULT}" == success && \
                   "${TEST_RESULT}" == success && \
                   ( "${RELEASE_RESULT}" == success || \
