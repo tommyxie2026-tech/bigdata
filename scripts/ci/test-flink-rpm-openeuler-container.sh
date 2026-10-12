@@ -70,7 +70,7 @@ echo 'job_submit: PASS' > "${EVIDENCE_ROOT}/job_submit.txt"
 SMOKE_STAGE=wordcount-output
 result_file=""
 for _ in $(seq 1 30); do
-  result_file="$(find "${OUTPUT}" -maxdepth 1 -type f -name 'part-*' -print -quit 2>/dev/null || true)"
+  result_file="$(find "${OUTPUT}" -type f -name 'part-*' -print -quit 2>/dev/null || true)"
   [[ -n "${result_file}" && -s "${result_file}" ]] && break
   sleep 1
 done
