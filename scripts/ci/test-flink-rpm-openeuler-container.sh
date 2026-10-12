@@ -68,13 +68,13 @@ runuser -u flink -- "${FLINK_HOME}/bin/flink" run -m localhost:8081 \
 echo 'job_submit: PASS' > "${EVIDENCE_ROOT}/job_submit.txt"
 
 SMOKE_STAGE=wordcount-output
-result_file=""
+result_files=()
 for _ in $(seq 1 30); do
-  result_file="$(find "${OUTPUT}" -type f -name 'part-*' -print -quit 2>/dev/null || true)"
-  [[ -n "${result_file}" && -s "${result_file}" ]] && break
+  mapfile -t result_files < <(find "${OUTPUT}" -type f -name 'part-*' -size +0c -print 2>/dev/null | sort)
+  [[ ${#result_files[@]} -gt 0 ]] && break
   sleep 1
 done
-[[ -n "${result_file}" && -s "${result_file}" ]] || {
+[[ ${#result_files[@]} -gt 0 ]] || {
   echo "No non-empty Flink part file appeared under ${OUTPUT}." >&2
   echo "--- Flink job submission/result log ---" >&2
   tail -n 100 "${JOB_LOG}" >&2 || true
@@ -92,11 +92,14 @@ done
   fi
   exit 1
 }
+result_file="${EVIDENCE_ROOT}/flink-job-result.txt"
+cat "${result_files[@]}" > "${result_file}"
 for expected in '(alpha,2)' '(beta,2)' '(gamma,1)'; do
   grep -Fq "${expected}" "${result_file}" || {
-    echo "Expected WordCount result ${expected} missing from ${result_file}." >&2
+    echo "Expected WordCount result ${expected} missing from combined Flink part files." >&2
+    echo "--- combined Flink output ---" >&2
+    cat "${result_file}" >&2
     exit 1
   }
 done
-cp "${result_file}" "${EVIDENCE_ROOT}/flink-job-result.txt"
 echo 'job_result: PASS' > "${EVIDENCE_ROOT}/job_result.txt"
