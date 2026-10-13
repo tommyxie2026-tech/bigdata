@@ -9,8 +9,6 @@ set -euo pipefail
 : "${COMPONENT_RUNTIME_PACKAGES:?COMPONENT_RUNTIME_PACKAGES is required}"
 REPO_DIR=/tmp/bigdata-iceberg-rpm-repo
 LOG_DIR="${EVIDENCE_ROOT}/logs"
-SPARK_RPM=bigdata-iceberg-spark-${VERSION}-1.noarch.rpm
-FLINK_RPM=bigdata-iceberg-flink-${VERSION}-1.noarch.rpm
 [[ "${COMPONENT}" == iceberg && "${VERSION}" == 1.12.0 ]]
 [[ "${TEST_PROFILE}" == iceberg-cross-engine-smoke ]]
 [[ "${ARTIFACT_TYPE}" == integration-rpm ]]
@@ -81,7 +79,8 @@ dnf -y --enablerepo=iceberg-ci install "${runtime_packages[@]}"
 rpm -q bigdata-iceberg-spark bigdata-iceberg-flink spark flink
 rpm -ql bigdata-iceberg-spark | grep -Fx '/usr/lib/spark/jars/iceberg-spark-runtime-3.5_2.12-1.12.0.jar'
 rpm -ql bigdata-iceberg-flink | grep -Fx '/usr/lib/flink/lib/iceberg-flink-runtime-1.20-1.12.0.jar'
-[[ -x /usr/bin/spark-sql && -x /usr/bin/flink ]]
+command -v spark-sql >/dev/null
+command -v flink >/dev/null
 warehouse=file:///tmp/iceberg-spark-ci-warehouse
 spark-sql --master 'local[2]' \
   --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
