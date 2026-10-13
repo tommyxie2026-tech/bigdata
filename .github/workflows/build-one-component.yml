@@ -121,7 +121,6 @@ jobs:
             -e JDK_RUNTIME_ARCHIVE_URL="${{ steps.catalog.outputs.jdk_runtime_archive_url }}" \
             -e JDK_RUNTIME_ARCHIVE_SHA256="${{ steps.catalog.outputs.jdk_runtime_archive_sha256 }}" \
             -e COMPONENT_RUNTIME_PACKAGES="${{ steps.catalog.outputs.packages }}" \
-            -e COMPONENT_ADAPTER="${{ steps.adapter.outputs.script }}" \
             -e BUILD_RUN_ID="${GITHUB_RUN_ID}" \
             -e WORK_ROOT=/work \
             -v "${GITHUB_WORKSPACE}:/workspace:ro" \
@@ -129,7 +128,7 @@ jobs:
             -v /tmp/bigdata-component-cache/m2:/root/.m2 \
             -v /tmp/bigdata-component-cache/gradle:/root/.gradle \
             "${OPENEULER_IMAGE}" \
-            bash "/workspace/scripts/ci/${COMPONENT_ADAPTER}"
+            bash "/workspace/scripts/ci/${{ steps.adapter.outputs.script }}"
 
       - name: Publish summary
         if: always()

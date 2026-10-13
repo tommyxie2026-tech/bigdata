@@ -17,6 +17,13 @@ BUILD_SCRIPT = (ROOT / "scripts/ci/build-bigtop-component.sh").read_text(encodin
 
 
 class StreamingComponentContracts(unittest.TestCase):
+    def test_reusable_workflows_expand_resolved_adapter_before_entering_container(self) -> None:
+        for name in ("build-one-component.yml", "test-components.yml"):
+            workflow = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
+            with self.subTest(workflow=name):
+                self.assertIn('bash "/workspace/scripts/ci/${{ steps.adapter.outputs.script }}"', workflow)
+                self.assertNotIn('bash "/workspace/scripts/ci/${COMPONENT_ADAPTER}"', workflow)
+
     def test_runtime_contract_excludes_source_rpms(self) -> None:
         self.assertIn("! -name '*.src.rpm' ! -name '*.nosrc.rpm'", BUILD_SCRIPT)
         self.assertIn('rpm_arch="$(rpm -qp --queryformat \'%{ARCH}\' "${rpm}")"', BUILD_SCRIPT)

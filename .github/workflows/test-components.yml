@@ -189,7 +189,6 @@ jobs:
             -e JDK_RUNTIME_ARCHIVE_URL="${{ steps.catalog.outputs.jdk_runtime_archive_url }}" \
             -e JDK_RUNTIME_ARCHIVE_SHA256="${{ steps.catalog.outputs.jdk_runtime_archive_sha256 }}" \
             -e COMPONENT_RUNTIME_PACKAGES="${{ steps.catalog.outputs.packages }}" \
-            -e COMPONENT_ADAPTER="${{ steps.adapter.outputs.script }}" \
             -e BUILD_RUN_ID="${BUILD_RUN_ID}" \
             -e TEST_RUN_ID="${GITHUB_RUN_ID}" \
             -e DEPENDENCY_REPO_PATHS="${{ steps.catalog.outputs.dependency_repos }}" \
@@ -200,7 +199,7 @@ jobs:
             -v "${ARTIFACT_ROOT}:/artifact:ro" \
             -v "${EVIDENCE_ROOT}:/evidence" \
             "${OPENEULER_IMAGE}" \
-            bash "/workspace/scripts/ci/${COMPONENT_ADAPTER}"
+            bash "/workspace/scripts/ci/${{ steps.adapter.outputs.script }}"
 
       - name: Publish summary
         if: always()
