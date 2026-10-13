@@ -47,6 +47,7 @@ on:
           - hbase
           - kafka
           - flink
+          - trino
       version:
         description: Component version
         required: true
@@ -104,7 +105,7 @@ jobs:
       ARTIFACT_TYPE: ${{ inputs.artifact_type || '' }}
       TEST_PROFILE: ${{ inputs.test_profile || '' }}
       COMPONENT_JDK: ${{ inputs.jdk || '8' }}
-      COMPONENT_JDK_PACKAGE: ${{ inputs.jdk_package || 'java-1.8.0-openjdk' }}
+      COMPONENT_JDK_PACKAGE: ${{ inputs.jdk_package }}
       EXPECTED_SOURCE_IDENTITY: ${{ inputs.source_identity || '' }}
       RELEASE_ROOT: /tmp/bigdata-release
 
@@ -179,7 +180,12 @@ jobs:
             grep -qx "toolchain_jdk: ${evidence_jdk}" "${test_evidence}"
             grep -qx "jdk_package: ${evidence_jdk_package}" "${test_evidence}"
             grep -qx "test_run_id: ${TEST_RUN_ID}" "${test_evidence}"
-            [[ -n "${evidence_artifact_type}" && -n "${evidence_test_profile}" && -n "${evidence_jdk}" && -n "${evidence_jdk_package}" ]]
+            [[ -n "${evidence_artifact_type}" && -n "${evidence_test_profile}" && -n "${evidence_jdk}" ]]
+            if [[ -z "${evidence_jdk_package}" ]]; then
+              expected_jdk_archive_sha="${{ steps.catalog.outputs.jdk_runtime_archive_sha256 }}"
+              evidence_jdk_archive_sha="$(awk -F ': ' '$1 == "jdk_runtime_archive_sha256" { print $2 }' "${test_evidence}")"
+              [[ -n "${expected_jdk_archive_sha}" && "${evidence_jdk_archive_sha}" == "${expected_jdk_archive_sha}" ]]
+            fi
             [[ "${evidence_test_run_id}" == "${TEST_RUN_ID}" && "${evidence_build_run_id}" =~ ^[0-9]+$ ]]
             if [[ -n "${ARTIFACT_TYPE}" && "${ARTIFACT_TYPE}" != "${evidence_artifact_type}" ]]; then
               echo "Requested artifact type does not match the uploaded test evidence." >&2
@@ -195,7 +201,11 @@ jobs:
           ARTIFACT_TYPE="${evidence_artifact_type:-${ARTIFACT_TYPE:-service-rpm}}"
           TEST_PROFILE="${evidence_test_profile:-${TEST_PROFILE:-legacy-smoke}}"
           COMPONENT_JDK="${evidence_jdk:-${COMPONENT_JDK:-8}}"
-          COMPONENT_JDK_PACKAGE="${evidence_jdk_package:-${COMPONENT_JDK_PACKAGE:-java-1.8.0-openjdk}}"
+          if [[ -n "${evidence_jdk_archive_sha:-}" ]]; then
+            COMPONENT_JDK_PACKAGE="${evidence_jdk_package}"
+          else
+            COMPONENT_JDK_PACKAGE="${evidence_jdk_package:-${COMPONENT_JDK_PACKAGE:-java-1.8.0-openjdk}}"
+          fi
           if [[ -n "${EXPECTED_SOURCE_IDENTITY}" && "${source_identity}" != "${EXPECTED_SOURCE_IDENTITY}" ]]; then
             echo "Test evidence source identity ${source_identity} does not match ${EXPECTED_SOURCE_IDENTITY}." >&2
             exit 1
@@ -222,6 +232,7 @@ jobs:
           test_profile: ${TEST_PROFILE}
           jdk: ${COMPONENT_JDK}
           jdk_package: ${COMPONENT_JDK_PACKAGE}
+          jdk_runtime_archive_sha256: ${{ steps.catalog.outputs.jdk_runtime_archive_sha256 }}
           build_run_id: ${build_run_id}
           test_run_id: ${TEST_RUN_ID}
           os: openEuler 22.03 LTS SP4
@@ -279,10 +290,11 @@ jobs:
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           SOURCE_IDENTITY: ${{ inputs.source_identity || '' }}
           COMPATIBILITY_IDENTITY: ${{ steps.catalog.outputs.compatibility_identity }}
+          JDK_RUNTIME_ARCHIVE_SHA256: ${{ steps.catalog.outputs.jdk_runtime_archive_sha256 }}
           ARTIFACT_TYPE: ${{ inputs.artifact_type || 'service-rpm' }}
           TEST_PROFILE: ${{ inputs.test_profile || 'legacy-smoke' }}
           COMPONENT_JDK: ${{ inputs.jdk || '8' }}
-          COMPONENT_JDK_PACKAGE: ${{ inputs.jdk_package || 'java-1.8.0-openjdk' }}
+          COMPONENT_JDK_PACKAGE: ${{ inputs.jdk_package }}
           REPO_CHECKOUT: ${{ github.workspace }}/rpm-repository-pr
         run: |
           set -euo pipefail

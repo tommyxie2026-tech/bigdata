@@ -185,6 +185,18 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("already_current=false", output.read_text())
 
+    def test_integer_release_version_is_read_from_component_catalog(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run(
+                ["python3", str(CHECKER), "--component", "trino", "--version", "483",
+                 "--repo-checkout", directory, "--components-file", str(COMPONENTS)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("RPM repository directory does not exist", result.stderr)
+
     def test_exact_repo_and_clean_dnf_install_accept_fast_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "github-output"

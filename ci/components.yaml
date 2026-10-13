@@ -135,3 +135,25 @@ components:
     jdk_package: java-11-openjdk-devel
     depends_on:
       - hadoop
+  trino:
+    builder: custom
+    artifact_type: service-rpm
+    version: '483'
+    source_identity: 5533573115277b8c452348f28dcf011aea14dd71
+    runtime_packages:
+      - trino-server-rpm
+    build_task: trino-rpm
+    wave: 7
+    test_profile: trino-single-node-smoke
+    jdk: '25'
+    jdk_package: ''
+    jdk_runtime_archive:
+      url: https://api.adoptium.net/v3/binary/version/jdk-25.0.4%2B7/linux/x64/jdk/hotspot/normal/eclipse
+      sha256: e58fcdcd637b25c03ca84cbbcefc70d11efb8f4b4cbd05decc9f661769d77f94
+    runtime:
+      java: '25'
+    source:
+      type: git
+      url: https://github.com/trinodb/trino-packages.git
+      ref: 5533573115277b8c452348f28dcf011aea14dd71
+    depends_on: []

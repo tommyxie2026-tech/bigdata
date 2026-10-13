@@ -15,12 +15,12 @@ except ImportError as error:  # pragma: no cover - exercised in CI setup
     raise SystemExit("PyYAML is required; install it with python3 -m pip install pyyaml") from error
 
 
-VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+){1,3}(?:[-+][A-Za-z0-9.-]+)?$")
+VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+){0,3}(?:[-+][A-Za-z0-9.-]+)?$")
 PACKAGE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9+_.-]*$")
 TOKEN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 IMMUTABLE_GIT_REF = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
-SUPPORTED_JDKS = {"8", "11", "17", "21"}
+SUPPORTED_JDKS = {"8", "11", "17", "21", "25"}
 SUPPORTED_PROFILES = {
     "legacy-smoke",
     "kafka-kraft-smoke",
@@ -82,9 +82,23 @@ def validate_component(name: str, entry: Any) -> list[str]:
                 f"component {name}: unsupported or missing test_profile {profile!r}")
         jdk = str(entry.get("jdk", ""))
         require(jdk in SUPPORTED_JDKS, f"component {name}: unsupported JDK {jdk!r}")
-        require(isinstance(entry.get("jdk_package"), str)
-                and bool(PACKAGE.fullmatch(entry["jdk_package"])),
-                f"component {name}: jdk_package is required and must be an RPM package name")
+        jdk_package = entry.get("jdk_package")
+        runtime_archive = entry.get("jdk_runtime_archive")
+        if runtime_archive is None:
+            require(isinstance(jdk_package, str) and bool(PACKAGE.fullmatch(jdk_package)),
+                    f"component {name}: jdk_package is required and must be an RPM package name")
+        else:
+            require(isinstance(jdk_package, str) and jdk_package == "",
+                    f"component {name}: use either jdk_package or jdk_runtime_archive, not both")
+            require(isinstance(runtime_archive, dict)
+                    and set(runtime_archive) == {"url", "sha256"},
+                    f"component {name}: jdk_runtime_archive requires only url and sha256")
+            require(isinstance(runtime_archive.get("url"), str)
+                    and runtime_archive["url"].startswith("https://"),
+                    f"component {name}: jdk_runtime_archive.url must use HTTPS")
+            require(isinstance(runtime_archive.get("sha256"), str)
+                    and bool(SHA256.fullmatch(runtime_archive["sha256"])),
+                    f"component {name}: jdk_runtime_archive.sha256 must be a 64-character SHA256")
         identity = entry.get("source_identity")
         if builder == "bigtop":
             require(isinstance(identity, str) and bool(IMMUTABLE_GIT_REF.fullmatch(identity)),

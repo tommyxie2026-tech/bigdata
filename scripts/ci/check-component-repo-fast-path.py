@@ -74,9 +74,12 @@ def configured_component(path: Path, component: str) -> tuple[str, set[str]]:
             in_runtime_packages = False
             continue
         if in_target:
-            match = re.fullmatch(r"    version:\s*([0-9]+(?:\.[0-9]+)+)\s*", line)
+            match = re.fullmatch(
+                r"    version:\s*(?:'([0-9]+(?:\.[0-9]+){0,3})'|([0-9]+(?:\.[0-9]+){0,3}))\s*",
+                line,
+            )
             if match:
-                version = match.group(1)
+                version = match.group(1) or match.group(2)
                 continue
             if line == "    runtime_packages:":
                 in_runtime_packages = True
@@ -249,7 +252,7 @@ def validate_primary(
 def verify(args: argparse.Namespace) -> None:
     if not re.fullmatch(r"[a-z0-9_-]+", args.component):
         raise UnsafeInput(f"invalid component name: {args.component!r}")
-    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)+", args.version):
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,3}", args.version):
         raise UnsafeInput(f"invalid component version: {args.version!r}")
     if args.source_identity and not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", args.source_identity):
         raise UnsafeInput("source_identity must be a full immutable Git SHA or SHA256")

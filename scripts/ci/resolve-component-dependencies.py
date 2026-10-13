@@ -15,7 +15,7 @@ import yaml
 REPO_PREFIX = "repo/openeuler-22.03-lts-sp4/bigtop-3.6/"
 
 
-def resolve(config_path: Path, component: str) -> tuple[list[str], list[str], list[str], list[str], str]:
+def resolve(config_path: Path, component: str) -> tuple[list[str], list[str], list[str], list[str], str, dict[str, str]]:
     with config_path.open(encoding="utf-8") as stream:
         components = yaml.safe_load(stream)["components"]
     if component not in components:
@@ -42,21 +42,31 @@ def resolve(config_path: Path, component: str) -> tuple[list[str], list[str], li
     dependency_dirs.append("common/3.6.0")
     sparse_paths = [f"{REPO_PREFIX}{directory}/" for directory in dependency_dirs]
     compatibility = components[component].get("compatibility")
+    runtime_archive = components[component].get("jdk_runtime_archive")
     compatibility_identity = ""
-    if compatibility is not None:
+    if runtime_archive is not None:
+        identity_data = {"jdk_runtime_archive": runtime_archive}
+        if compatibility is not None:
+            identity_data["compatibility"] = compatibility
+        canonical = json.dumps(identity_data, sort_keys=True, separators=(",", ":"))
+        compatibility_identity = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    elif compatibility is not None:
         canonical = json.dumps(compatibility, sort_keys=True, separators=(",", ":"))
         compatibility_identity = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    return package_list, dependency_dirs, sparse_paths, dependency_packages, compatibility_identity
+    return (package_list, dependency_dirs, sparse_paths, dependency_packages, compatibility_identity,
+            runtime_archive or {})
 
 
 def write_output(output_path: Path, package_list: list[str], dependency_dirs: list[str],
                  sparse_paths: list[str], dependency_packages: list[str],
-                 compatibility_identity: str) -> None:
+                 compatibility_identity: str, runtime_archive: dict[str, str]) -> None:
     with output_path.open("a", encoding="utf-8") as stream:
         stream.write("packages=" + " ".join(package_list) + "\n")
         stream.write("dependency_repos=" + ",".join(dependency_dirs) + "\n")
         stream.write("dependency_packages=" + " ".join(dependency_packages) + "\n")
         stream.write("compatibility_identity=" + compatibility_identity + "\n")
+        stream.write("jdk_runtime_archive_url=" + runtime_archive.get("url", "") + "\n")
+        stream.write("jdk_runtime_archive_sha256=" + runtime_archive.get("sha256", "") + "\n")
         stream.write("sparse_paths<<BIGDATA_SPARSE_PATHS\n")
         stream.write("\n".join(sparse_paths) + "\n")
         stream.write("BIGDATA_SPARSE_PATHS\n")
@@ -69,11 +79,11 @@ def main() -> int:
     parser.add_argument("--github-output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        packages, dependencies, sparse_paths, dependency_packages, compatibility_identity = resolve(
+        packages, dependencies, sparse_paths, dependency_packages, compatibility_identity, runtime_archive = resolve(
             args.config, args.component
         )
         write_output(args.github_output, packages, dependencies, sparse_paths, dependency_packages,
-                     compatibility_identity)
+                     compatibility_identity, runtime_archive)
     except (OSError, KeyError, TypeError, ValueError, yaml.YAMLError) as error:
         print(f"cannot resolve component dependencies: {error}", file=sys.stderr)
         return 1

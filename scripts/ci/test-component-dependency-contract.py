@@ -85,6 +85,37 @@ class ComponentDependencyContracts(unittest.TestCase):
             )
             self.assertIn(f"compatibility_identity={expected}", output.read_text(encoding="utf-8"))
 
+    def test_pinned_jdk_archive_is_emitted_and_bound_to_fast_path_identity(self) -> None:
+        archive = {
+            "url": "https://example.invalid/jre.tar.gz",
+            "sha256": "a" * 64,
+        }
+        expected = hashlib.sha256(
+            json.dumps({"jdk_runtime_archive": archive}, sort_keys=True,
+                       separators=(",", ":")).encode()
+        ).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / "components.yaml"
+            config.write_text(
+                "schema: bigdata.ci.components/v1\ncomponents:\n"
+                "  trino:\n    version: '483'\n    runtime_packages: [trino-server-rpm]\n"
+                "    depends_on: []\n    jdk_runtime_archive:\n"
+                "      url: https://example.invalid/jre.tar.gz\n"
+                f"      sha256: {'a' * 64}\n",
+                encoding="utf-8",
+            )
+            output = Path(directory) / "github-output"
+            subprocess.run(
+                [sys.executable, str(RESOLVER), "--config", str(config), "--component", "trino",
+                 "--github-output", str(output)],
+                cwd=ROOT,
+                check=True,
+            )
+            content = output.read_text(encoding="utf-8")
+            self.assertIn("jdk_runtime_archive_url=https://example.invalid/jre.tar.gz", content)
+            self.assertIn(f"jdk_runtime_archive_sha256={'a' * 64}", content)
+            self.assertIn(f"compatibility_identity={expected}", content)
+
     def test_repo_install_script_configures_dependency_repositories(self) -> None:
         script = (ROOT / "scripts/ci/verify-component-repo-install.sh").read_text(encoding="utf-8")
         self.assertIn("DEPENDENCY_REPO_PATHS", script)
@@ -105,6 +136,8 @@ class ComponentDependencyContracts(unittest.TestCase):
         check = (ROOT / ".github/workflows/check-component-repo.yml").read_text(encoding="utf-8")
         for workflow in (build, test):
             self.assertIn("COMPONENT_COMPATIBILITY_IDENTITY", workflow)
+            self.assertIn("JDK_RUNTIME_ARCHIVE_URL", workflow)
+            self.assertIn("JDK_RUNTIME_ARCHIVE_SHA256", workflow)
         self.assertIn("expected_compatibility_identity", release)
         self.assertIn("COMPATIBILITY_IDENTITY:", release)
         self.assertIn("--compatibility-identity", check)
