@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import unittest
 from pathlib import Path
 import sys
@@ -90,6 +91,33 @@ class TrinoLifecycleContractTests(unittest.TestCase):
         for workflow in (build, test):
             self.assertIn("JDK_RUNTIME_ARCHIVE_URL", workflow)
             self.assertIn("JDK_RUNTIME_ARCHIVE_SHA256", workflow)
+
+    def test_stager_accepts_runtime_rpms_with_or_without_release_segment(self) -> None:
+        stager = (ROOT / "scripts/ci/stage-tested-rpms.sh").read_text()
+        condition_line = next(
+            (
+                line.strip()
+                for line in stager.splitlines()
+                if line.strip().startswith('if [[ "${name}" == "${package}-${VERSION}-"*')
+            ),
+            None,
+        )
+        self.assertIsNotNone(condition_line, "runtime RPM matching must support both RPM filename forms")
+        condition = condition_line.removeprefix("if ").removesuffix("; then")
+        script = f"""
+set -euo pipefail
+package=trino-server-rpm
+VERSION=483
+names=(trino-server-rpm-483.noarch.rpm trino-server-rpm-483-1.noarch.rpm trino-server-rpm-482.noarch.rpm other-483.noarch.rpm)
+expected=(1 1 0 0)
+for i in "${!names[@]}"; do
+  name="${names[i]}"
+  if {condition}; then matched=1; else matched=0; fi
+  [[ "${matched}" -eq "${expected[i]}" ]]
+done
+"""
+        result = subprocess.run(["bash", "-c", script], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_release_and_repo_manifest_retain_runtime_archive_provenance(self) -> None:
         release = (ROOT / ".github/workflows/release-components.yml").read_text()

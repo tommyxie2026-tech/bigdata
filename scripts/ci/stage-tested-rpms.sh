@@ -124,7 +124,11 @@ for package in "${runtime_packages[@]}"; do
     case "${name}" in
       *.src.rpm|*-debuginfo-*|*-debugsource-*|*-doc-*|*-devel-*|*-test-*|*-tests-*|*-javadoc-*) continue ;;
     esac
-    [[ "${name}" == "${package}-${VERSION}-"* ]] && matches+=("${rpm}")
+    # Most RPMs include a release segment after the version; Trino's pinned
+    # package deliberately uses package-version.arch.rpm without that segment.
+    if [[ "${name}" == "${package}-${VERSION}-"* || "${name}" == "${package}-${VERSION}."* ]]; then
+      matches+=("${rpm}")
+    fi
   done
   if [[ "${#matches[@]}" -ne 1 ]]; then
     if [[ "${#matches[@]}" -eq 0 ]]; then
