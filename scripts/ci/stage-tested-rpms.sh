@@ -191,7 +191,7 @@ bigtop_version: 3.6.0
 artifact_type: ${ARTIFACT_TYPE}
 test_profile: ${TEST_PROFILE}
 jdk: ${COMPONENT_JDK}
-jdk_package: ${COMPONENT_JDK_PACKAGE}
+jdk_package: "${COMPONENT_JDK_PACKAGE}"
 jdk_runtime_archive_sha256: ${JDK_RUNTIME_ARCHIVE_SHA256}
 source_identity: ${SOURCE_IDENTITY}
 compatibility_identity: ${COMPATIBILITY_IDENTITY}

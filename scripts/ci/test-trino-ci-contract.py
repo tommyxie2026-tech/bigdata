@@ -119,6 +119,15 @@ done
         result = subprocess.run(["bash", "-c", script], capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_stager_quotes_empty_optional_jdk_package_in_manifest(self) -> None:
+        stager = (ROOT / "scripts/ci/stage-tested-rpms.sh").read_text()
+        manifest_line = next(
+            line.strip() for line in stager.splitlines() if line.strip().startswith("jdk_package:")
+        )
+        self.assertEqual(manifest_line, 'jdk_package: "${COMPONENT_JDK_PACKAGE}"')
+        rendered = manifest_line.replace("${COMPONENT_JDK_PACKAGE}", "")
+        self.assertEqual(yaml.safe_load(rendered)["jdk_package"], "")
+
     def test_release_and_repo_manifest_retain_runtime_archive_provenance(self) -> None:
         release = (ROOT / ".github/workflows/release-components.yml").read_text()
         stager = (ROOT / "scripts/ci/stage-tested-rpms.sh").read_text()
