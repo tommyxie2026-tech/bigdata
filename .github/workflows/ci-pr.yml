@@ -71,6 +71,8 @@ jobs:
         run: |
           python3 scripts/ci/test-streaming-lakehouse-workflow.py
           python3 scripts/ci/test-streaming-component-contracts.py
+          python3 scripts/ci/test-trino-ci-contract.py
+          bash scripts/ci/test-pinned-java-runtime.sh
 
       - name: Repository tarball release workflow contract
         run: bash scripts/ci/test-repo-tarball-release-contract.sh

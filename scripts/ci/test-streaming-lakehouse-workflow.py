@@ -38,6 +38,24 @@ class StreamingLakehouseWorkflowTests(unittest.TestCase):
         self.assertIn("flink", choices)
         self.assertIn("all", choices)
 
+    def test_dispatch_exposes_trino_as_an_independent_lifecycle(self) -> None:
+        on = self.workflow.get("on") or self.workflow.get("true")
+        choices = on["workflow_dispatch"]["inputs"]["start_component"]["options"]
+        self.assertIn("trino", choices)
+        trino = self.jobs["trino"]
+        self.assertIn("inputs.start_component == 'trino'", trino["if"])
+        self.assertIn("inputs.start_component == 'all'", trino["if"])
+        self.assertEqual(trino["with"]["component"], "trino")
+        self.assertEqual(trino["with"]["version"], "483")
+        self.assertEqual(trino["with"]["builder"], "custom")
+        self.assertEqual(trino["with"]["source_identity"], self.catalog["trino"]["source_identity"])
+        self.assertNotIn("needs", trino)
+
+    def test_ci_pr_runs_trino_runtime_and_lifecycle_contracts(self) -> None:
+        ci_pr = (ROOT / ".github/workflows/ci-pr.yml").read_text(encoding="utf-8")
+        self.assertIn("test-pinned-java-runtime.sh", ci_pr)
+        self.assertIn("test-trino-ci-contract.py", ci_pr)
+
     def test_kafka_kraft_uses_zookeeper_package_prerequisite(self) -> None:
         # KRaft avoids a ZooKeeper quorum at runtime, but the pinned Bigtop RPM
         # still has a hard package Requires edge on ZooKeeper.

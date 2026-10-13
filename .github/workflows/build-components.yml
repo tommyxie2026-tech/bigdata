@@ -17,6 +17,7 @@ on:
           - hbase
           - kafka
           - flink
+          - trino
           - all
           - repo_maintenance
       promote_test_run_id:
@@ -750,3 +751,24 @@ jobs:
       jdk: '11'
       jdk_package: java-11-openjdk-devel
       source_identity: 19670ce6a3cc68833b7dd47697cd6272b66bb372
+
+  trino:
+    name: Trino 483 Build Test Release
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      inputs.start_component == 'trino' || inputs.start_component == 'all'
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/component-lifecycle.yml
+    with:
+      component: trino
+      version: '483'
+      builder: custom
+      artifact_type: service-rpm
+      build_task: trino-rpm
+      test_profile: trino-single-node-smoke
+      jdk: '25'
+      jdk_package: ''
+      source_identity: 5533573115277b8c452348f28dcf011aea14dd71

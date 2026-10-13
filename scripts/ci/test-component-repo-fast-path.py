@@ -86,7 +86,8 @@ def write_fixture(root: Path) -> Path:
 
 class ComponentRepoFastPathTests(unittest.TestCase):
     def run_check(
-        self, repo: Path, components_file: Path = COMPONENTS, source_identity: str = ""
+        self, repo: Path, components_file: Path = COMPONENTS, source_identity: str = "",
+        compatibility_identity: str = "",
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
@@ -102,6 +103,8 @@ class ComponentRepoFastPathTests(unittest.TestCase):
                 str(components_file),
                 "--source-identity",
                 source_identity,
+                "--compatibility-identity",
+                compatibility_identity,
             ],
             text=True,
             capture_output=True,
@@ -144,6 +147,26 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             result = self.run_check(repo, source_identity="b" * 40)
         self.assertEqual(result.returncode, 1)
 
+    def test_exact_compatibility_identity_hits_fast_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = write_fixture(Path(directory))
+            manifest = next(repo.rglob("manifest.yaml"))
+            text = manifest.read_text().replace("schema: bigdata.rpm-repo/v1", "schema: bigdata.rpm-repo/v2")
+            text += "compatibility_identity: " + "c" * 64 + "\n"
+            manifest.write_text(text)
+            result = self.run_check(repo, source_identity="a" * 40, compatibility_identity="c" * 64)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+
+    def test_changed_compatibility_identity_is_a_safe_build_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = write_fixture(Path(directory))
+            manifest = next(repo.rglob("manifest.yaml"))
+            text = manifest.read_text().replace("schema: bigdata.rpm-repo/v1", "schema: bigdata.rpm-repo/v2")
+            text += "compatibility_identity: " + "c" * 64 + "\n"
+            manifest.write_text(text)
+            result = self.run_check(repo, source_identity="a" * 40, compatibility_identity="d" * 64)
+        self.assertEqual(result.returncode, 1)
+
     def test_clean_dnf_install_failure_never_accepts_fast_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "github-output"
@@ -161,6 +184,18 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("already_current=false", output.read_text())
+
+    def test_integer_release_version_is_read_from_component_catalog(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run(
+                ["python3", str(CHECKER), "--component", "trino", "--version", "483",
+                 "--repo-checkout", directory, "--components-file", str(COMPONENTS)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("RPM repository directory does not exist", result.stderr)
 
     def test_exact_repo_and_clean_dnf_install_accept_fast_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -557,6 +592,7 @@ class ComponentRepoFastPathTests(unittest.TestCase):
                 "schema: bigdata.ci.components/v1\ncomponents:\n  iceberg:\n"
                 "    version: 1.6.1\n    runtime_packages:\n"
                 "      - bigdata-iceberg-flink\n"
+                "    compatibility:\n      engines: [flink]\n"
             )
             tested = root / "tested"
             (tested / "rpms").mkdir(parents=True)
@@ -577,6 +613,7 @@ class ComponentRepoFastPathTests(unittest.TestCase):
                 "status: PASS\ncomponent: iceberg\nversion: 1.6.1\n"
                 "artifact_type: integration-rpm\ntest_profile: iceberg-flink-smoke\n"
                 f"source_identity: {identity}\n"
+                f"compatibility_identity: {'c' * 64}\n"
                 "build_run_id: 123456\ntest_run_id: 456789\n"
             )
             (root / "bin").mkdir()
@@ -600,6 +637,7 @@ class ComponentRepoFastPathTests(unittest.TestCase):
                     "BUILD_RUN_ID": "123456",
                     "SOURCE_SHA": "c" * 40,
                     "SOURCE_IDENTITY": identity,
+                    "COMPATIBILITY_IDENTITY": "c" * 64,
                     "ARTIFACT_TYPE": "integration-rpm",
                     "TEST_PROFILE": "iceberg-flink-smoke",
                     "COMPONENT_JDK": "17",
@@ -619,6 +657,7 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             manifest = (target / "manifest.yaml").read_text()
             self.assertIn("schema: bigdata.rpm-repo/v2", manifest)
             self.assertIn(f"source_identity: {identity}", manifest)
+            self.assertIn(f"compatibility_identity: {'c' * 64}", manifest)
             self.assertIn("artifact_type: integration-rpm", manifest)
 
 
