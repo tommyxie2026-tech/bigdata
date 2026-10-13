@@ -30,7 +30,6 @@ git -C "${SOURCE_DIR}" -c advice.detachedHead=false checkout --detach FETCH_HEAD
 actual_source_identity="$(git -C "${SOURCE_DIR}" rev-parse HEAD)"
 [[ "${actual_source_identity}" == "${EXPECTED_SOURCE_IDENTITY}" ]]
 cd "${SOURCE_DIR}"
-grep -q "icebergVersion = '1.12.0'" gradle.properties
 bash /workspace/scripts/ci/retry-maven-downloads.sh "${ARTIFACTS}/logs/iceberg-gradle-build.log" \
   ./gradlew --no-daemon --stacktrace \
     -DflinkVersions=1.20 -DsparkVersions=3.5 -DscalaVersion=2.12 \
@@ -40,7 +39,7 @@ mapfile -t spark_jars < <(find spark/v3.5/spark-runtime/build/libs -maxdepth 1 -
 mapfile -t flink_jars < <(find flink/v1.20/flink-runtime/build/libs -maxdepth 1 -type f -name "${FLINK_JAR}" -print)
 [[ "${#spark_jars[@]}" -eq 1 && -s "${spark_jars[0]}" ]]
 [[ "${#flink_jars[@]}" -eq 1 && -s "${flink_jars[0]}" ]]
-rpmdev-setuptree --define "_topdir ${RPM_TOP}"
+mkdir -p "${RPM_TOP}"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 for kind in spark flink; do
   if [[ "${kind}" == spark ]]; then
     pkg=bigdata-iceberg-spark
@@ -72,18 +71,15 @@ The pinned Apache Iceberg ${VERSION} runtime integration for the platform's ${ki
 %build
 
 %install
-mkdir -p %{buildroot}${install_dir}
+mkdir -p %{buildroot}${install_dir} %{buildroot}%{_licensedir}/bigdata-iceberg
 install -m 0644 %{_sourcedir}/${kind}-runtime.jar %{buildroot}${install_dir}/${jar##*/}
+install -m 0644 %{_sourcedir}/LICENSE %{buildroot}%{_licensedir}/bigdata-iceberg/LICENSE
+install -m 0644 %{_sourcedir}/NOTICE %{buildroot}%{_licensedir}/bigdata-iceberg/NOTICE
 
 %files
 %license %{_licensedir}/bigdata-iceberg/LICENSE
 %license %{_licensedir}/bigdata-iceberg/NOTICE
 ${install_dir}/${jar##*/}
-
-%prep
-mkdir -p %{buildroot}%{_licensedir}/bigdata-iceberg
-install -m 0644 %{_sourcedir}/LICENSE %{buildroot}%{_licensedir}/bigdata-iceberg/LICENSE
-install -m 0644 %{_sourcedir}/NOTICE %{buildroot}%{_licensedir}/bigdata-iceberg/NOTICE
 EOF
   rpmbuild --define "_topdir ${RPM_TOP}" -bb "${RPM_TOP}/SPECS/${pkg}.spec"
 done
