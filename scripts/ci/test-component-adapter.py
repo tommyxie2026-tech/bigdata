@@ -26,6 +26,8 @@ class ComponentAdapterTests(unittest.TestCase):
             "test-bigtop-component.sh",
             "build-trino-rpm-openeuler-container.sh",
             "test-trino-rpm-openeuler-container.sh",
+            "build-iceberg-rpm-openeuler-container.sh",
+            "test-iceberg-rpm-openeuler-container.sh",
         ):
             (self.scripts / filename).write_text("#!/bin/bash\n", encoding="utf-8")
 
@@ -49,6 +51,16 @@ class ComponentAdapterTests(unittest.TestCase):
             "custom", "trino", "test", "trino-rpm", "trino-single-node-smoke", self.scripts
         )
         self.assertEqual(path, (self.scripts / "test-trino-rpm-openeuler-container.sh").resolve())
+
+    def test_iceberg_custom_adapter_resolves_pinned_rpm_scripts(self) -> None:
+        build = ADAPTER.resolve_adapter(
+            "custom", "iceberg", "build", "iceberg-rpm", "iceberg-cross-engine-smoke", self.scripts
+        )
+        test = ADAPTER.resolve_adapter(
+            "custom", "iceberg", "test", "iceberg-rpm", "iceberg-cross-engine-smoke", self.scripts
+        )
+        self.assertEqual(build, (self.scripts / "build-iceberg-rpm-openeuler-container.sh").resolve())
+        self.assertEqual(test, (self.scripts / "test-iceberg-rpm-openeuler-container.sh").resolve())
 
     def test_custom_task_mismatch_fails_closed(self) -> None:
         with self.assertRaises(ValueError):
