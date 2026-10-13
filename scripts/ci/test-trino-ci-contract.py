@@ -5,14 +5,29 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+import sys
 
 import yaml
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts" / "ci"))
+from trino_query_client import collect_query_response
 
 
 class TrinoLifecycleContractTests(unittest.TestCase):
+    def test_select_result_rows_are_collected_across_all_pages(self) -> None:
+        pages = iter([
+            {"data": [[1]], "nextUri": "http://trino/page/2"},
+            {"stats": {"state": "FINISHED"}},
+        ])
+        result = collect_query_response(
+            {"columns": [{"name": "_col0"}], "nextUri": "http://trino/page/1"},
+            lambda _url: next(pages),
+        )
+        self.assertEqual(result["data"], [[1]])
+        self.assertEqual(result["columns"][0]["name"], "_col0")
+
     def test_catalog_pins_source_jdk_and_exact_rpm(self) -> None:
         component = yaml.safe_load((ROOT / "ci/components.yaml").read_text())["components"]["trino"]
         self.assertEqual(component["version"], "483")
@@ -36,21 +51,27 @@ class TrinoLifecycleContractTests(unittest.TestCase):
 
     def test_clean_test_requires_health_and_sql_query(self) -> None:
         script = (ROOT / "scripts/ci/test-trino-rpm-openeuler-container.sh").read_text()
+        query_client = (ROOT / "scripts/ci/trino_query_client.py").read_text()
         for fragment in (
             "trino-server-rpm-${VERSION}.noarch.rpm",
             "/v1/info",
             'd.get("nodeVersion",{}).get("version")',
-            "/v1/statement",
-            "SELECT 1",
             'attempt % 30 == 0',
             'cd "${ARTIFACT_ROOT}" && sha256sum -c evidence/SHA256SUMS',
             'util-linux',
             'runuser -u trino -- env JAVA_HOME=',
+            'trino_query_client.py',
             "health_check: PASS",
             "query: PASS",
-            'str(rows[0][0]) != "1"',
         ):
             self.assertIn(fragment, script)
+        for fragment in (
+            "/v1/statement",
+            'data=b"SELECT 1"',
+            "rows.extend(current.get(\"data\") or [])",
+            'str(rows[0][0]) != "1"',
+        ):
+            self.assertIn(fragment, query_client)
 
     def test_build_and_test_install_checksum_pinned_jdk_runtime(self) -> None:
         helper = (ROOT / "scripts/ci/install-pinned-java-runtime.sh").read_text()

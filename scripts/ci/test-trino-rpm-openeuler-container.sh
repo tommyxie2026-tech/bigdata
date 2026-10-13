@@ -75,24 +75,7 @@ for attempt in $(seq 1 180); do
 done
 [[ "${health_ok}" == true ]] || { cat "${LOG_DIR}/launcher.log" >&2; exit 1; }
 echo 'health_check: PASS' > "${EVIDENCE_ROOT}/health-check.txt"
-python3 - <<'PY' | tee "${LOG_DIR}/query.log"
-import json, time, urllib.request
-request = urllib.request.Request("http://127.0.0.1:8080/v1/statement", data=b"SELECT 1", method="POST", headers={"X-Trino-User": "ci", "Content-Type": "text/plain; charset=utf-8"})
-with urllib.request.urlopen(request, timeout=30) as response:
-    result = json.load(response)
-deadline = time.monotonic() + 90
-while result.get("nextUri"):
-    if time.monotonic() > deadline:
-        raise SystemExit("Trino SELECT 1 timed out")
-    with urllib.request.urlopen(result["nextUri"], timeout=30) as response:
-        result = json.load(response)
-    if result.get("error"):
-        raise SystemExit(json.dumps(result["error"]))
-rows = result.get("data") or []
-if result.get("error") or len(rows) != 1 or len(rows[0]) != 1 or str(rows[0][0]) != "1":
-    raise SystemExit(f"unexpected Trino query response: {result}")
-print(json.dumps({"query": "SELECT 1", "data": rows}))
-PY
+python3 /workspace/scripts/ci/trino_query_client.py | tee "${LOG_DIR}/query.log"
 echo 'query: PASS' > "${EVIDENCE_ROOT}/query-result.txt"
 cat > "${EVIDENCE_ROOT}/evidence.md" <<EOF
 # CI Evidence — Trino RPM Install and SQL Smoke
