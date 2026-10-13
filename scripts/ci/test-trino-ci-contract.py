@@ -110,10 +110,10 @@ package=trino-server-rpm
 VERSION=483
 names=(trino-server-rpm-483.noarch.rpm trino-server-rpm-483-1.noarch.rpm trino-server-rpm-482.noarch.rpm other-483.noarch.rpm)
 expected=(1 1 0 0)
-for i in "${!names[@]}"; do
-  name="${names[i]}"
+for i in "${{!names[@]}}"; do
+  name="${{names[i]}}"
   if {condition}; then matched=1; else matched=0; fi
-  [[ "${matched}" -eq "${expected[i]}" ]]
+  [[ "${{matched}}" -eq "${{expected[i]}}" ]]
 done
 """
         result = subprocess.run(["bash", "-c", script], capture_output=True, text=True, check=False)
