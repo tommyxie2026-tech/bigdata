@@ -39,6 +39,7 @@ class TrinoLifecycleContractTests(unittest.TestCase):
         for fragment in (
             "trino-server-rpm-${VERSION}.noarch.rpm",
             "/v1/info",
+            'd.get("nodeVersion",{}).get("version")',
             "/v1/statement",
             "SELECT 1",
             'attempt % 30 == 0',
