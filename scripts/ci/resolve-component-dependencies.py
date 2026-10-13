@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -13,7 +15,7 @@ import yaml
 REPO_PREFIX = "repo/openeuler-22.03-lts-sp4/bigtop-3.6/"
 
 
-def resolve(config_path: Path, component: str) -> tuple[list[str], list[str], list[str], list[str]]:
+def resolve(config_path: Path, component: str) -> tuple[list[str], list[str], list[str], list[str], str]:
     with config_path.open(encoding="utf-8") as stream:
         components = yaml.safe_load(stream)["components"]
     if component not in components:
@@ -39,15 +41,22 @@ def resolve(config_path: Path, component: str) -> tuple[list[str], list[str], li
     })
     dependency_dirs.append("common/3.6.0")
     sparse_paths = [f"{REPO_PREFIX}{directory}/" for directory in dependency_dirs]
-    return package_list, dependency_dirs, sparse_paths, dependency_packages
+    compatibility = components[component].get("compatibility")
+    compatibility_identity = ""
+    if compatibility is not None:
+        canonical = json.dumps(compatibility, sort_keys=True, separators=(",", ":"))
+        compatibility_identity = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return package_list, dependency_dirs, sparse_paths, dependency_packages, compatibility_identity
 
 
 def write_output(output_path: Path, package_list: list[str], dependency_dirs: list[str],
-                 sparse_paths: list[str], dependency_packages: list[str]) -> None:
+                 sparse_paths: list[str], dependency_packages: list[str],
+                 compatibility_identity: str) -> None:
     with output_path.open("a", encoding="utf-8") as stream:
         stream.write("packages=" + " ".join(package_list) + "\n")
         stream.write("dependency_repos=" + ",".join(dependency_dirs) + "\n")
         stream.write("dependency_packages=" + " ".join(dependency_packages) + "\n")
+        stream.write("compatibility_identity=" + compatibility_identity + "\n")
         stream.write("sparse_paths<<BIGDATA_SPARSE_PATHS\n")
         stream.write("\n".join(sparse_paths) + "\n")
         stream.write("BIGDATA_SPARSE_PATHS\n")
@@ -60,14 +69,18 @@ def main() -> int:
     parser.add_argument("--github-output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        packages, dependencies, sparse_paths, dependency_packages = resolve(args.config, args.component)
-        write_output(args.github_output, packages, dependencies, sparse_paths, dependency_packages)
+        packages, dependencies, sparse_paths, dependency_packages, compatibility_identity = resolve(
+            args.config, args.component
+        )
+        write_output(args.github_output, packages, dependencies, sparse_paths, dependency_packages,
+                     compatibility_identity)
     except (OSError, KeyError, TypeError, ValueError, yaml.YAMLError) as error:
         print(f"cannot resolve component dependencies: {error}", file=sys.stderr)
         return 1
     print(
         f"{args.component}: packages={len(packages)}, "
-        f"dependency_repos={len(dependencies)}, dependency_packages={len(dependency_packages)}"
+        f"dependency_repos={len(dependencies)}, dependency_packages={len(dependency_packages)}, "
+        f"compatibility_identity={compatibility_identity or 'none'}"
     )
     return 0
 

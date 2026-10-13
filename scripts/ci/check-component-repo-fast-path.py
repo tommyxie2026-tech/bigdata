@@ -253,6 +253,8 @@ def verify(args: argparse.Namespace) -> None:
         raise UnsafeInput(f"invalid component version: {args.version!r}")
     if args.source_identity and not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", args.source_identity):
         raise UnsafeInput("source_identity must be a full immutable Git SHA or SHA256")
+    if args.compatibility_identity and not re.fullmatch(r"[0-9a-f]{64}", args.compatibility_identity):
+        raise UnsafeInput("compatibility_identity must be a SHA256 digest")
     configured, expected_packages = configured_component(args.components_file, args.component)
     if configured != args.version:
         raise RepoMismatch(f"workflow version {args.version} is stale; ci/components.yaml specifies {configured}")
@@ -262,7 +264,7 @@ def verify(args: argparse.Namespace) -> None:
         raise RepoMismatch(f"RPM repository directory does not exist: {target}")
     manifest = fields(target / "manifest.yaml")
     expected_manifest = {
-        "schema": "bigdata.rpm-repo/v2" if args.source_identity else "bigdata.rpm-repo/v1",
+        "schema": "bigdata.rpm-repo/v2" if args.source_identity or args.compatibility_identity else "bigdata.rpm-repo/v1",
         "component": args.component,
         "version": args.version,
         "bigtop_version": "3.6.0",
@@ -272,12 +274,14 @@ def verify(args: argparse.Namespace) -> None:
     }
     if args.source_identity:
         expected_manifest["source_identity"] = args.source_identity
+    if args.compatibility_identity:
+        expected_manifest["compatibility_identity"] = args.compatibility_identity
     for key in ("artifact_type", "test_profile", "jdk", "jdk_package"):
         expected = getattr(args, key)
         if expected:
             expected_manifest[key] = expected
     for key, expected in expected_manifest.items():
-        if manifest.get(key) != expected:
+        if manifest.get(key, "") != expected:
             raise RepoMismatch(f"manifest {key} is {manifest.get(key)!r}, expected {expected!r}")
     if not re.fullmatch(r"[0-9a-f]{40}", manifest.get("promotion_workflow_commit", "")):
         raise RepoMismatch("manifest has no valid promotion workflow commit")
@@ -310,6 +314,11 @@ def main() -> int:
         "--source-identity",
         default="",
         help="expected immutable upstream identity; when set, the manifest must match it",
+    )
+    parser.add_argument(
+        "--compatibility-identity",
+        default="",
+        help="expected compatibility metadata SHA256; when set, the manifest must match it",
     )
     parser.add_argument("--artifact-type", default="")
     parser.add_argument("--test-profile", default="")

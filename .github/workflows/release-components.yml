@@ -114,6 +114,18 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
+      - name: Resolve component compatibility identity
+        id: catalog
+        env:
+          COMPONENT: ${{ inputs.component }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check pyyaml
+          python3 scripts/ci/resolve-component-dependencies.py \
+            --config ci/components.yaml \
+            --component "${COMPONENT}" \
+            --github-output "${GITHUB_OUTPUT}"
+
       - name: Download tested RPMs
         uses: actions/download-artifact@v4
         with:
@@ -155,6 +167,12 @@ jobs:
           evidence_build_run_id="$(awk -F ': ' '$1 == "build_run_id" { print $2 }' "${test_evidence}")"
           evidence_test_run_id="$(awk -F ': ' '$1 == "test_run_id" { print $2 }' "${test_evidence}")"
           evidence_source_identity="$(awk -F ': ' '$1 == "source_identity" { print $2 }' "${test_evidence}")"
+          evidence_compatibility_identity="$(awk -F ': ' '$1 == "compatibility_identity" { print $2 }' "${test_evidence}")"
+          expected_compatibility_identity="${{ steps.catalog.outputs.compatibility_identity }}"
+          if [[ "${evidence_compatibility_identity}" != "${expected_compatibility_identity}" ]]; then
+            echo "Test evidence compatibility identity does not match current component configuration." >&2
+            exit 1
+          fi
           if [[ "${evidence_test_profile}" != legacy-smoke ]]; then
             grep -qx "artifact_type: ${evidence_artifact_type}" "${test_evidence}"
             grep -qx "test_profile: ${evidence_test_profile}" "${test_evidence}"
@@ -200,6 +218,7 @@ jobs:
           bigtop_version: 3.6.0
           artifact_type: ${ARTIFACT_TYPE}
           source_identity: ${source_identity}
+          compatibility_identity: ${evidence_compatibility_identity}
           test_profile: ${TEST_PROFILE}
           jdk: ${COMPONENT_JDK}
           jdk_package: ${COMPONENT_JDK_PACKAGE}
@@ -259,6 +278,7 @@ jobs:
           TEST_RUN_ID: ${{ inputs.test_run_id }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           SOURCE_IDENTITY: ${{ inputs.source_identity || '' }}
+          COMPATIBILITY_IDENTITY: ${{ steps.catalog.outputs.compatibility_identity }}
           ARTIFACT_TYPE: ${{ inputs.artifact_type || 'service-rpm' }}
           TEST_PROFILE: ${{ inputs.test_profile || 'legacy-smoke' }}
           COMPONENT_JDK: ${{ inputs.jdk || '8' }}

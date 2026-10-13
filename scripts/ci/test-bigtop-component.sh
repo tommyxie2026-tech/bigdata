@@ -10,6 +10,7 @@ ARTIFACT_TYPE="${ARTIFACT_TYPE:-service-rpm}"
 COMPONENT_JDK="${COMPONENT_JDK:-8}"
 COMPONENT_JDK_PACKAGE="${COMPONENT_JDK_PACKAGE:-java-1.8.0-openjdk}"
 EXPECTED_SOURCE_IDENTITY="${EXPECTED_SOURCE_IDENTITY:-}"
+COMPONENT_COMPATIBILITY_IDENTITY="${COMPONENT_COMPATIBILITY_IDENTITY:-}"
 BUILD_RUN_ID="${BUILD_RUN_ID:?BUILD_RUN_ID required}"
 TEST_RUN_ID="${TEST_RUN_ID:?TEST_RUN_ID required}"
 COMPONENT_RUNTIME_PACKAGES="${COMPONENT_RUNTIME_PACKAGES:-}"
@@ -46,6 +47,7 @@ dnf -y install createrepo_c dnf-utils rpm findutils procps-ng "${test_jdk_packag
 build_evidence="${ARTIFACT_ROOT}/evidence/evidence.md"
 [[ -s "${build_evidence}" ]]
 source_identity="$(awk -F ': ' '$1 == "source_identity" { print $2 }' "${build_evidence}")"
+compatibility_identity="$(awk -F ': ' '$1 == "compatibility_identity" { print $2 }' "${build_evidence}")"
 grep -qx "component: ${COMPONENT}" "${build_evidence}"
 grep -qx "version: ${VERSION}" "${build_evidence}"
 grep -qx "artifact_type: ${ARTIFACT_TYPE}" "${build_evidence}"
@@ -53,6 +55,10 @@ grep -qx "test_profile: ${TEST_PROFILE}" "${build_evidence}"
 grep -qx "build_run_id: ${BUILD_RUN_ID}" "${build_evidence}"
 if [[ -n "${EXPECTED_SOURCE_IDENTITY}" && "${source_identity}" != "${EXPECTED_SOURCE_IDENTITY}" ]]; then
   echo "Build artifact source identity ${source_identity} does not match ${EXPECTED_SOURCE_IDENTITY}." >&2
+  exit 1
+fi
+if [[ "${compatibility_identity}" != "${COMPONENT_COMPATIBILITY_IDENTITY}" ]]; then
+  echo "Build artifact compatibility identity does not match the current component configuration." >&2
   exit 1
 fi
 
@@ -195,6 +201,7 @@ version: ${VERSION}
 artifact_type: ${ARTIFACT_TYPE}
 test_profile: ${TEST_PROFILE}
 source_identity: ${source_identity}
+compatibility_identity: ${compatibility_identity}
 build_run_id: ${BUILD_RUN_ID}
 test_run_id: ${TEST_RUN_ID}
 runtime_packages: ${COMPONENT_RUNTIME_PACKAGES}

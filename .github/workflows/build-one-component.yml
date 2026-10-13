@@ -117,6 +117,7 @@ jobs:
             -e COMPONENT_JDK="${{ inputs.jdk }}" \
             -e COMPONENT_JDK_PACKAGE="${{ inputs.jdk_package }}" \
             -e EXPECTED_SOURCE_IDENTITY="${{ inputs.source_identity }}" \
+            -e COMPONENT_COMPATIBILITY_IDENTITY="${{ steps.catalog.outputs.compatibility_identity }}" \
             -e COMPONENT_RUNTIME_PACKAGES="${{ steps.catalog.outputs.packages }}" \
             -e COMPONENT_ADAPTER="${{ steps.adapter.outputs.script }}" \
             -e BUILD_RUN_ID="${GITHUB_RUN_ID}" \

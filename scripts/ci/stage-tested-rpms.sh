@@ -11,18 +11,23 @@ TESTED_RPMS_DIR="${TESTED_RPMS_DIR:-/tmp/tested-rpms}"
 TEST_EVIDENCE_DIR="${TEST_EVIDENCE_DIR:-/tmp/test-evidence}"
 CI_SOURCE_ROOT="${CI_SOURCE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 SOURCE_IDENTITY="${SOURCE_IDENTITY:-}"
+COMPATIBILITY_IDENTITY="${COMPATIBILITY_IDENTITY:-}"
 ARTIFACT_TYPE="${ARTIFACT_TYPE:-service-rpm}"
 TEST_PROFILE="${TEST_PROFILE:-legacy-smoke}"
 COMPONENT_JDK="${COMPONENT_JDK:-8}"
 COMPONENT_JDK_PACKAGE="${COMPONENT_JDK_PACKAGE:-java-1.8.0-openjdk}"
 
 case "${COMPONENT}" in
-  zookeeper|hadoop|tez|hive|spark|hbase|kafka|flink|trino|hue|iceberg|hudi) ;;
+  zookeeper|hadoop|tez|hive|spark|hbase|kafka|flink|trino|hue|iceberg|hudi|paimon) ;;
   *) echo "Unsupported component: ${COMPONENT}" >&2; exit 2 ;;
 esac
 [[ "${VERSION}" =~ ^[0-9]+(\.[0-9]+)+$ ]]
 [[ "${TEST_RUN_ID}" =~ ^[0-9]+$ ]]
 [[ "${SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]]
+if [[ -n "${COMPATIBILITY_IDENTITY}" ]]; then
+  [[ "${COMPATIBILITY_IDENTITY}" =~ ^[0-9a-f]{64}$ ]]
+  grep -qx "compatibility_identity: ${COMPATIBILITY_IDENTITY}" "${TEST_EVIDENCE_DIR}/evidence.md"
+fi
 
 grep -qx 'status: PASS' "${TEST_EVIDENCE_DIR}/evidence.md"
 grep -qx "component: ${COMPONENT}" "${TEST_EVIDENCE_DIR}/evidence.md"
@@ -67,6 +72,7 @@ if [[ -e "${target}" ]]; then
         --repo-checkout "${REPO_CHECKOUT}" \
         --components-file "${CI_SOURCE_ROOT}/ci/components.yaml" \
         --source-identity "${SOURCE_IDENTITY}" \
+        --compatibility-identity "${COMPATIBILITY_IDENTITY}" \
         --artifact-type "${ARTIFACT_TYPE}" \
         --test-profile "${TEST_PROFILE}" \
         --jdk "${COMPONENT_JDK}" \
@@ -167,7 +173,7 @@ EOF
 fi
 
 manifest_schema=bigdata.rpm-repo/v1
-if [[ -n "${SOURCE_IDENTITY}" ]]; then manifest_schema=bigdata.rpm-repo/v2; fi
+if [[ -n "${SOURCE_IDENTITY}" || -n "${COMPATIBILITY_IDENTITY}" ]]; then manifest_schema=bigdata.rpm-repo/v2; fi
 cat > "${target}/manifest.yaml" <<EOF
 schema: ${manifest_schema}
 component: ${COMPONENT}
@@ -178,6 +184,7 @@ test_profile: ${TEST_PROFILE}
 jdk: ${COMPONENT_JDK}
 jdk_package: ${COMPONENT_JDK_PACKAGE}
 source_identity: ${SOURCE_IDENTITY}
+compatibility_identity: ${COMPATIBILITY_IDENTITY}
 build_run_id: ${BUILD_RUN_ID:-${TEST_RUN_ID}}
 test_run_id: ${TEST_RUN_ID}
 os: openEuler 22.03 LTS SP4

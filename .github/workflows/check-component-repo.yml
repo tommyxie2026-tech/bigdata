@@ -83,6 +83,7 @@ jobs:
           TEST_PROFILE: ${{ inputs.test_profile }}
           COMPONENT_JDK: ${{ inputs.jdk }}
           COMPONENT_JDK_PACKAGE: ${{ inputs.jdk_package }}
+          COMPATIBILITY_IDENTITY: ${{ steps.dependency-repos.outputs.compatibility_identity }}
         run: |
           set -euo pipefail
           set +e
@@ -92,6 +93,7 @@ jobs:
             --repo-checkout "${GITHUB_WORKSPACE}/rpm-repository" \
             --components-file "${GITHUB_WORKSPACE}/ci/components.yaml" \
             --source-identity "${SOURCE_IDENTITY}" \
+            --compatibility-identity "${COMPATIBILITY_IDENTITY}" \
             --artifact-type "${ARTIFACT_TYPE}" \
             --test-profile "${TEST_PROFILE}" \
             --jdk "${COMPONENT_JDK}" \
