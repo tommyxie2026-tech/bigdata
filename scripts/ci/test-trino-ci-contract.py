@@ -42,6 +42,7 @@ class TrinoLifecycleContractTests(unittest.TestCase):
             "/v1/statement",
             "SELECT 1",
             'attempt % 30 == 0',
+            'cd "${ARTIFACT_ROOT}" && sha256sum -c evidence/SHA256SUMS',
             "health_check: PASS",
             "query: PASS",
             'str(rows[0][0]) != "1"',

@@ -32,7 +32,7 @@ rpm_files=("${ARTIFACT_ROOT}"/rpms/*.rpm)
 [[ "${#rpm_files[@]}" -eq 1 && "${rpm_files[0]##*/}" == "${RPM_NAME}" ]]
 [[ "$(rpm -qp --queryformat '%{NAME}' "${rpm_files[0]}")" == trino-server-rpm ]]
 [[ "$(rpm -qp --queryformat '%{VERSION}' "${rpm_files[0]}")" == "${VERSION}" ]]
-sha256sum -c "${ARTIFACT_ROOT}/evidence/SHA256SUMS"
+(cd "${ARTIFACT_ROOT}" && sha256sum -c evidence/SHA256SUMS)
 cp -v "${rpm_files[0]}" "${REPO_DIR}/"
 createrepo_c --no-database "${REPO_DIR}"
 cat > /etc/yum.repos.d/trino-ci.repo <<EOF
