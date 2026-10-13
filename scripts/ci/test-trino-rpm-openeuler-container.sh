@@ -15,7 +15,7 @@ RPM_NAME="trino-server-rpm-${VERSION}.noarch.rpm"
 grep -qi openEuler /etc/os-release
 mkdir -p "${EVIDENCE_ROOT}" "${LOG_DIR}" "${REPO_DIR}"
 dnf -y install ca-certificates coreutils curl createrepo_c dnf-utils \
-  findutils procps-ng python3 rpm shadow-utils sudo tar
+  findutils procps-ng python3 rpm shadow-utils sudo tar util-linux
 source /workspace/scripts/ci/install-pinned-java-runtime.sh
 build_evidence="${ARTIFACT_ROOT}/evidence/evidence.md"
 [[ -s "${build_evidence}" ]]

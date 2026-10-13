@@ -43,6 +43,8 @@ class TrinoLifecycleContractTests(unittest.TestCase):
             "SELECT 1",
             'attempt % 30 == 0',
             'cd "${ARTIFACT_ROOT}" && sha256sum -c evidence/SHA256SUMS',
+            'util-linux',
+            'runuser -u trino -- env JAVA_HOME=',
             "health_check: PASS",
             "query: PASS",
             'str(rows[0][0]) != "1"',
