@@ -56,6 +56,31 @@ class StreamingLakehouseWorkflowTests(unittest.TestCase):
         self.assertIn("test-pinned-java-runtime.sh", ci_pr)
         self.assertIn("test-trino-ci-contract.py", ci_pr)
 
+    def test_iceberg_is_pinned_to_spark_flink_compatibility_and_clean_smoke(self) -> None:
+        iceberg = self.catalog["iceberg"]
+        self.assertEqual(iceberg["version"], "1.12.0")
+        self.assertEqual(iceberg["artifact_type"], "integration-rpm")
+        self.assertEqual(iceberg["runtime_packages"], [
+            "bigdata-iceberg-spark", "bigdata-iceberg-flink"
+        ])
+        self.assertEqual(iceberg["depends_on"], ["spark", "flink"])
+        self.assertEqual(iceberg["compatibility"]["engine_versions"], {
+            "spark": "3.5.8", "flink": "1.20.1", "scala": "2.12"
+        })
+        self.assertEqual(iceberg["source_identity"], "d72a2c06306fac05f6962148834c7d0860ea0fb7")
+        iceberg_job = self.jobs["iceberg"]
+        self.assertEqual(iceberg_job["with"]["component"], "iceberg")
+        self.assertEqual(iceberg_job["with"]["test_profile"], "iceberg-cross-engine-smoke")
+        self.assertIn("spark_gate", iceberg_job["needs"])
+        self.assertIn("flink", iceberg_job["needs"])
+        self.assertIn("iceberg_prerequisite_spark", iceberg_job["needs"])
+        self.assertIn("iceberg_prerequisite_flink", iceberg_job["needs"])
+        self.assertIn("inputs.start_component == 'iceberg'", iceberg_job["if"])
+        self.assertEqual(self.jobs["iceberg_prerequisite_spark"]["with"]["version"], "3.5.8")
+        self.assertEqual(self.jobs["iceberg_prerequisite_flink"]["with"]["version"], "1.20.1")
+        self.assertIn("inputs.start_component == 'iceberg'", self.jobs["iceberg_prerequisite_spark"]["if"])
+        self.assertIn("inputs.start_component == 'iceberg'", self.jobs["iceberg_prerequisite_flink"]["if"])
+
     def test_kafka_kraft_uses_zookeeper_package_prerequisite(self) -> None:
         # KRaft avoids a ZooKeeper quorum at runtime, but the pinned Bigtop RPM
         # still has a hard package Requires edge on ZooKeeper.
