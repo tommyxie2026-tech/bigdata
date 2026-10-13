@@ -41,6 +41,7 @@ class TrinoLifecycleContractTests(unittest.TestCase):
             "/v1/info",
             "/v1/statement",
             "SELECT 1",
+            'attempt % 30 == 0',
             "health_check: PASS",
             "query: PASS",
             'str(rows[0][0]) != "1"',

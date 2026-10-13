@@ -70,6 +70,7 @@ for attempt in $(seq 1 180); do
     if python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get("version")=="483" and not d.get("starting",False) else 1)' "${LOG_DIR}/health.json"; then health_ok=true; break; fi
   fi
   kill -0 "${trino_pid}" || { cat "${LOG_DIR}/launcher.log" >&2; exit 1; }
+  if (( attempt % 30 == 0 )); then echo "Waiting for Trino startup (${attempt}/180 attempts)..."; fi
   sleep 2
 done
 [[ "${health_ok}" == true ]] || { cat "${LOG_DIR}/launcher.log" >&2; exit 1; }
