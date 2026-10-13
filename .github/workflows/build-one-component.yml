@@ -74,6 +74,23 @@ jobs:
             --component "${COMPONENT}" \
             --github-output "${GITHUB_OUTPUT}"
 
+      - name: Resolve component build adapter
+        id: adapter
+        env:
+          COMPONENT: ${{ inputs.component }}
+          BUILD_TASK: ${{ inputs.task }}
+          BUILDER: ${{ inputs.builder }}
+          TEST_PROFILE: ${{ inputs.test_profile }}
+        run: |
+          python3 scripts/ci/resolve-component-adapter.py \
+            --builder "${BUILDER}" \
+            --component "${COMPONENT}" \
+            --operation build \
+            --task "${BUILD_TASK}" \
+            --test-profile "${TEST_PROFILE}" \
+            --scripts-dir scripts/ci \
+            --github-output "${GITHUB_OUTPUT}"
+
       - name: Restore Maven and Gradle downloads
         uses: actions/cache@v4
         with:
@@ -101,6 +118,7 @@ jobs:
             -e COMPONENT_JDK_PACKAGE="${{ inputs.jdk_package }}" \
             -e EXPECTED_SOURCE_IDENTITY="${{ inputs.source_identity }}" \
             -e COMPONENT_RUNTIME_PACKAGES="${{ steps.catalog.outputs.packages }}" \
+            -e COMPONENT_ADAPTER="${{ steps.adapter.outputs.script }}" \
             -e BUILD_RUN_ID="${GITHUB_RUN_ID}" \
             -e WORK_ROOT=/work \
             -v "${GITHUB_WORKSPACE}:/workspace:ro" \
@@ -108,7 +126,7 @@ jobs:
             -v /tmp/bigdata-component-cache/m2:/root/.m2 \
             -v /tmp/bigdata-component-cache/gradle:/root/.gradle \
             "${OPENEULER_IMAGE}" \
-            bash /workspace/scripts/ci/build-bigtop-component.sh
+            bash "/workspace/scripts/ci/${COMPONENT_ADAPTER}"
 
       - name: Publish summary
         if: always()

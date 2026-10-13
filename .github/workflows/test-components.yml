@@ -16,6 +16,10 @@ on:
         required: false
         type: string
         default: legacy-smoke
+      builder:
+        required: false
+        type: string
+        default: bigtop
       artifact_type:
         required: false
         type: string
@@ -60,6 +64,11 @@ on:
         required: false
         default: legacy-smoke
         type: string
+      builder:
+        description: Build adapter selected by the component catalog
+        required: false
+        default: bigtop
+        type: string
       artifact_type:
         description: Artifact contract from the component catalog
         required: false
@@ -100,6 +109,7 @@ jobs:
       EVIDENCE_ROOT: /tmp/bigdata-component-test
       BUILD_RUN_ID: ${{ inputs.build_run_id }}
       TEST_PROFILE: ${{ inputs.test_profile }}
+      BUILDER: ${{ inputs.builder || 'bigtop' }}
       COMPONENT_JDK: ${{ inputs.jdk || '8' }}
       COMPONENT_JDK_PACKAGE: ${{ inputs.jdk_package || 'java-1.8.0-openjdk' }}
       ARTIFACT_TYPE: ${{ inputs.artifact_type || 'service-rpm' }}
@@ -122,6 +132,23 @@ jobs:
           python3 scripts/ci/resolve-component-dependencies.py \
             --config ci/components.yaml \
             --component "${COMPONENT}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Resolve component test adapter
+        id: adapter
+        env:
+          COMPONENT: ${{ inputs.component }}
+          BUILD_TASK: ${{ inputs.component }}-rpm
+          BUILDER: ${{ inputs.builder || 'bigtop' }}
+          TEST_PROFILE: ${{ inputs.test_profile || 'legacy-smoke' }}
+        run: |
+          python3 scripts/ci/resolve-component-adapter.py \
+            --builder "${BUILDER}" \
+            --component "${COMPONENT}" \
+            --operation test \
+            --task "${BUILD_TASK}" \
+            --test-profile "${TEST_PROFILE}" \
+            --scripts-dir scripts/ci \
             --github-output "${GITHUB_OUTPUT}"
 
       - name: Checkout dependency RPM repositories
@@ -152,11 +179,13 @@ jobs:
             -e COMPONENT="${{ inputs.component }}" \
             -e VERSION="${{ inputs.version }}" \
             -e TEST_PROFILE="${{ inputs.test_profile || 'legacy-smoke' }}" \
+            -e BUILDER="${{ inputs.builder || 'bigtop' }}" \
             -e ARTIFACT_TYPE="${{ inputs.artifact_type || 'service-rpm' }}" \
             -e COMPONENT_JDK="${{ inputs.jdk || '8' }}" \
             -e COMPONENT_JDK_PACKAGE="${{ inputs.jdk_package || 'java-1.8.0-openjdk' }}" \
             -e EXPECTED_SOURCE_IDENTITY="${{ inputs.source_identity || '' }}" \
             -e COMPONENT_RUNTIME_PACKAGES="${{ steps.catalog.outputs.packages }}" \
+            -e COMPONENT_ADAPTER="${{ steps.adapter.outputs.script }}" \
             -e BUILD_RUN_ID="${BUILD_RUN_ID}" \
             -e TEST_RUN_ID="${GITHUB_RUN_ID}" \
             -e DEPENDENCY_REPO_PATHS="${{ steps.catalog.outputs.dependency_repos }}" \
@@ -167,7 +196,7 @@ jobs:
             -v "${ARTIFACT_ROOT}:/artifact:ro" \
             -v "${EVIDENCE_ROOT}:/evidence" \
             "${OPENEULER_IMAGE}" \
-            bash /workspace/scripts/ci/test-bigtop-component.sh
+            bash "/workspace/scripts/ci/${COMPONENT_ADAPTER}"
 
       - name: Publish summary
         if: always()

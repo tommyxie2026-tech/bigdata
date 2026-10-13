@@ -21,6 +21,17 @@ TOKEN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 IMMUTABLE_GIT_REF = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 SUPPORTED_JDKS = {"8", "11", "17", "21"}
+SUPPORTED_PROFILES = {
+    "legacy-smoke",
+    "kafka-kraft-smoke",
+    "flink-local-job-smoke",
+    "trino-single-node-smoke",
+    "hue-single-node-smoke",
+    "iceberg-cross-engine-smoke",
+    "hudi-cross-engine-smoke",
+    "paimon-cross-engine-smoke",
+}
+RUNTIME_VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+){0,2}$")
 LEGACY_COMPONENTS = {"zookeeper", "hadoop", "tez", "hive", "spark", "hbase"}
 
 
@@ -67,8 +78,8 @@ def validate_component(name: str, entry: Any) -> list[str]:
 
     if not legacy:
         profile = entry.get("test_profile")
-        require(isinstance(profile, str) and bool(TOKEN.fullmatch(profile)),
-                f"component {name}: test_profile is required")
+        require(isinstance(profile, str) and profile in SUPPORTED_PROFILES,
+                f"component {name}: unsupported or missing test_profile {profile!r}")
         jdk = str(entry.get("jdk", ""))
         require(jdk in SUPPORTED_JDKS, f"component {name}: unsupported JDK {jdk!r}")
         require(isinstance(entry.get("jdk_package"), str)
@@ -80,6 +91,14 @@ def validate_component(name: str, entry: Any) -> list[str]:
                     f"component {name}: Bigtop source_identity must be a full immutable commit SHA")
 
     if builder == "custom":
+        runtime = entry.get("runtime")
+        require(isinstance(runtime, dict) and bool(runtime),
+                f"component {name}: custom builder requires runtime metadata")
+        require(set(runtime).issubset({"java", "python"}) and bool(runtime),
+                f"component {name}: runtime may declare java and/or python versions")
+        require(all(isinstance(version, str) and bool(RUNTIME_VERSION.fullmatch(version))
+                    for version in runtime.values()),
+                f"component {name}: runtime versions must be exact numeric versions")
         source = entry.get("source")
         require(isinstance(source, dict), f"component {name}: custom builder requires source metadata")
         source_type = source.get("type")
@@ -137,12 +156,23 @@ def validate(path: Path) -> list[str]:
             "components must be a non-empty mapping")
 
     graph: dict[str, list[str]] = {}
+    compatibility_engines: dict[str, list[str]] = {}
     for name, entry in components.items():
         graph[name] = validate_component(name, entry)
+        compatibility = entry.get("compatibility")
+        if isinstance(compatibility, dict):
+            engines = compatibility.get("engines", [])
+            require(isinstance(engines, list),
+                    f"component {name}: compatibility.engines must be a list")
+            compatibility_engines[name] = engines
     for name, dependencies in graph.items():
         for dependency in dependencies:
             require(dependency in graph,
                     f"component {name}: unknown dependency {dependency!r}")
+    for name, engines in compatibility_engines.items():
+        for engine in engines:
+            require(engine in graph,
+                    f"component {name}: unknown compatibility engine {engine!r}")
 
     visiting: set[str] = set()
     visited: set[str] = set()

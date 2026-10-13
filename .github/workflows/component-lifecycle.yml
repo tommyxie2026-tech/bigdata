@@ -111,6 +111,7 @@ jobs:
       version: ${{ inputs.version }}
       build_run_id: ${{ format('{0}', github.run_id) }}
       test_profile: ${{ inputs.test_profile }}
+      builder: ${{ inputs.builder }}
       artifact_type: ${{ inputs.artifact_type }}
       jdk: ${{ inputs.jdk }}
       jdk_package: ${{ inputs.jdk_package }}

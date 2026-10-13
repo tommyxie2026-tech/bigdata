@@ -44,13 +44,14 @@ components:
     test_profile: iceberg-cross-engine-smoke
     jdk: '17'
     jdk_package: java-17-openjdk
+    runtime: {java: '17'}
     source:
       type: archive
       url: https://example.invalid/iceberg-1.0.0.tar.gz
       sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     source_identity: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     compatibility:
-      engines: [flink, spark, trino]
+      engines: [flink]
       catalog: hive-metastore
 """
 
@@ -121,6 +122,25 @@ class ComponentConfigTests(unittest.TestCase):
             with self.subTest(config=config):
                 self.assertEqual(self.validate(config).returncode, 1)
 
+    def test_rejects_unknown_test_profile(self) -> None:
+        config = SERVICE.replace("kafka-kraft-smoke", "unregistered-smoke")
+        self.assertEqual(self.validate(config).returncode, 1)
+
+    def test_rejects_unknown_compatibility_engine(self) -> None:
+        config = CONNECTOR.replace("[flink]", "[flink, missing-engine]")
+        config += "\n  flink:\n    builder: bigtop\n    artifact_type: service-rpm\n    version: 1.20.1\n    source_identity: 19670ce6a3cc68833b7dd47697cd6272b66bb372\n    runtime_packages: [flink]\n    depends_on: []\n    build_task: flink-rpm\n    test_profile: flink-local-job-smoke\n    jdk: '11'\n    jdk_package: java-11-openjdk\n"
+        self.assertEqual(self.validate(config).returncode, 1)
+
+    def test_custom_builder_requires_explicit_runtime_metadata(self) -> None:
+        config = CONNECTOR.replace("    runtime: {java: '17'}\n", "    runtime: {}\n")
+        config += "\n  flink:\n    builder: bigtop\n    artifact_type: service-rpm\n    version: 1.20.1\n    source_identity: 19670ce6a3cc68833b7dd47697cd6272b66bb372\n    runtime_packages: [flink]\n    depends_on: []\n    build_task: flink-rpm\n    test_profile: flink-local-job-smoke\n    jdk: '11'\n    jdk_package: java-11-openjdk\n"
+        self.assertEqual(self.validate(config).returncode, 1)
+
+    def test_custom_builder_rejects_unsupported_runtime_version(self) -> None:
+        config = CONNECTOR.replace("runtime: {java: '17'}", "runtime: {python: latest}")
+        config += "\n  flink:\n    builder: bigtop\n    artifact_type: service-rpm\n    version: 1.20.1\n    source_identity: 19670ce6a3cc68833b7dd47697cd6272b66bb372\n    runtime_packages: [flink]\n    depends_on: []\n    build_task: flink-rpm\n    test_profile: flink-local-job-smoke\n    jdk: '11'\n    jdk_package: java-11-openjdk\n"
+        self.assertEqual(self.validate(config).returncode, 1)
+
     def test_bigtop_service_requires_immutable_source_identity(self) -> None:
         for config in (
             SERVICE.replace("    source_identity: 19670ce6a3cc68833b7dd47697cd6272b66bb372\n", ""),
@@ -131,7 +151,7 @@ class ComponentConfigTests(unittest.TestCase):
 
     def test_integration_rpm_requires_source_identity_and_compatibility_tuple(self) -> None:
         missing_tuple = CONNECTOR.replace(
-            "    compatibility:\n      engines: [flink, spark, trino]\n      catalog: hive-metastore\n", ""
+            "    compatibility:\n      engines: [flink]\n      catalog: hive-metastore\n", ""
         )
         mismatched_identity = CONNECTOR.replace("source_identity: " + "a" * 64, "source_identity: " + "b" * 64)
         for config in (missing_tuple, mismatched_identity):
