@@ -75,7 +75,9 @@ EOF
   dependency_index=$((dependency_index + 1))
 done
 dnf clean all
-dnf -y --enablerepo=iceberg-ci install ${COMPONENT_RUNTIME_PACKAGES}
+read -r -a runtime_packages <<< "${COMPONENT_RUNTIME_PACKAGES}"
+[[ "${#runtime_packages[@]}" -eq 2 ]]
+dnf -y --enablerepo=iceberg-ci install "${runtime_packages[@]}"
 rpm -q bigdata-iceberg-spark bigdata-iceberg-flink spark flink
 rpm -ql bigdata-iceberg-spark | grep -Fx '/usr/lib/spark/jars/iceberg-spark-runtime-3.5_2.12-1.12.0.jar'
 rpm -ql bigdata-iceberg-flink | grep -Fx '/usr/lib/flink/lib/iceberg-flink-runtime-1.20-1.12.0.jar'
