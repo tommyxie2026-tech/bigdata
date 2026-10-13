@@ -157,3 +157,30 @@ components:
       url: https://github.com/trinodb/trino-packages.git
       ref: 5533573115277b8c452348f28dcf011aea14dd71
     depends_on: []
+  iceberg:
+    builder: custom
+    artifact_type: integration-rpm
+    version: 1.12.0
+    source_identity: d72a2c06306fac05f6962148834c7d0860ea0fb7
+    runtime_packages:
+      - bigdata-iceberg-spark
+      - bigdata-iceberg-flink
+    build_task: iceberg-rpm
+    wave: 8
+    test_profile: iceberg-cross-engine-smoke
+    jdk: '17'
+    jdk_package: java-17-openjdk-devel
+    runtime:
+      java: '17'
+    source:
+      type: git
+      url: https://github.com/apache/iceberg.git
+      ref: d72a2c06306fac05f6962148834c7d0860ea0fb7
+    compatibility:
+      engines:
+        - spark
+        - flink
+      catalog: hive-metastore
+    depends_on:
+      - spark
+      - flink
