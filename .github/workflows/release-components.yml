@@ -189,7 +189,9 @@ jobs:
             require_evidence_field artifact_type "${evidence_artifact_type}"
             require_evidence_field test_profile "${evidence_test_profile}"
             require_evidence_field toolchain_jdk "${evidence_jdk}"
-            require_evidence_field jdk_package "${evidence_jdk_package}"
+            if [[ -n "${evidence_jdk_package}" ]]; then
+              require_evidence_field jdk_package "${evidence_jdk_package}"
+            fi
             require_evidence_field test_run_id "${TEST_RUN_ID}"
             for required_key in artifact_type test_profile toolchain_jdk; do
               required_value="$(awk -F ': ' -v key="${required_key}" '$1 == key { print $2; exit }' "${test_evidence}")"

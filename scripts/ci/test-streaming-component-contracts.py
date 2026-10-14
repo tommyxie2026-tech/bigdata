@@ -137,6 +137,15 @@ class StreamingComponentContracts(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, workflow)
 
+    def test_release_allows_archive_based_jdk_evidence_without_package_field(self) -> None:
+        workflow = (ROOT / ".github/workflows/release-components.yml").read_text(encoding="utf-8")
+        self.assertIn(
+            'if [[ -n "${evidence_jdk_package}" ]]; then',
+            workflow,
+        )
+        self.assertIn('evidence_jdk_archive_sha="$(awk', workflow)
+        self.assertIn('"${evidence_jdk_archive_sha}" != "${expected_jdk_archive_sha}"', workflow)
+
     def test_iceberg_lifecycle_pin_matches_catalog_commit(self) -> None:
         workflow = (ROOT / ".github/workflows/build-components.yml").read_text(encoding="utf-8")
         iceberg = CATALOG["components"]["iceberg"]
