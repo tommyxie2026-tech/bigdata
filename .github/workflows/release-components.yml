@@ -172,7 +172,7 @@ jobs:
           evidence_compatibility_identity="$(awk -F ': ' '$1 == "compatibility_identity" { print $2 }' "${test_evidence}")"
           expected_compatibility_identity="${{ steps.catalog.outputs.compatibility_identity }}"
           if [[ "${evidence_compatibility_identity}" != "${expected_compatibility_identity}" ]]; then
-            printf 'Test evidence compatibility identity mismatch: evidence=%s expected=%s\\n' \
+            printf 'Test evidence compatibility identity mismatch: evidence=%s expected=%s\n' \
               "${evidence_compatibility_identity:-<missing>}" "${expected_compatibility_identity}" >&2
             exit 1
           fi
