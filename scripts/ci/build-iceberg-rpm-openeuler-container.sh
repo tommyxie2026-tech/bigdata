@@ -31,7 +31,7 @@ actual_source_identity="$(git -C "${SOURCE_DIR}" rev-parse HEAD)"
 [[ "${actual_source_identity}" == "${EXPECTED_SOURCE_IDENTITY}" ]]
 # Iceberg derives its project version from Git tags when version.txt is absent.
 # This shallow commit checkout may not contain those tags, so pin the declared release version.
-printf '%s\\n' "${VERSION}" > "${SOURCE_DIR}/version.txt"
+printf '%s\n' "${VERSION}" > "${SOURCE_DIR}/version.txt"
 cd "${SOURCE_DIR}"
 bash /workspace/scripts/ci/retry-maven-downloads.sh "${ARTIFACTS}/logs/iceberg-gradle-build.log" \
   ./gradlew --no-daemon --stacktrace \
