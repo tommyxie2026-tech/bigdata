@@ -118,6 +118,9 @@ class StreamingComponentContracts(unittest.TestCase):
             "org.apache.iceberg.flink.FlinkCatalogFactory",
             "spark_iceberg_table_roundtrip: PASS",
             "flink_iceberg_catalog_factory: PASS",
+            ': "${COMPONENT_COMPATIBILITY_IDENTITY:?COMPONENT_COMPATIBILITY_IDENTITY is required}"',
+            '"${compatibility_identity}" != "${COMPONENT_COMPATIBILITY_IDENTITY}"',
+            "Iceberg RPM compatibility identity mismatch: artifact=%s expected=%s",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, test)
