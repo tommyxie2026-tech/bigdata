@@ -111,6 +111,7 @@ class StreamingComponentContracts(unittest.TestCase):
         test = (ROOT / "scripts/ci/test-iceberg-rpm-openeuler-container.sh").read_text(encoding="utf-8")
         for token in (
             "spark-sql",
+            "spark.sql.catalogImplementation=in-memory",
             "IcebergSparkSessionExtensions",
             "CREATE TABLE local.ci.events",
             "INSERT INTO local.ci.events",
