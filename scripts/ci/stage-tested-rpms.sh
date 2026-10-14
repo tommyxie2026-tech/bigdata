@@ -179,6 +179,17 @@ rpm_count: ${common_count}
 test_status: PASS
 repository_layout: split-runtime/v2
 EOF
+# Optional provenance fields must be omitted when absent, rather than rendered
+# as empty YAML scalars with trailing whitespace (which git diff --check rejects).
+if [[ -n "${JDK_RUNTIME_ARCHIVE_SHA256}" ]]; then
+  printf 'jdk_runtime_archive_sha256: %s\\n' "${JDK_RUNTIME_ARCHIVE_SHA256}" >> "${target}/manifest.yaml"
+fi
+if [[ -n "${SOURCE_IDENTITY}" ]]; then
+  printf 'source_identity: %s\\n' "${SOURCE_IDENTITY}" >> "${target}/manifest.yaml"
+fi
+if [[ -n "${COMPATIBILITY_IDENTITY}" ]]; then
+  printf 'compatibility_identity: %s\\n' "${COMPATIBILITY_IDENTITY}" >> "${target}/manifest.yaml"
+fi
 fi
 
 manifest_schema=bigdata.rpm-repo/v1
@@ -192,9 +203,6 @@ artifact_type: ${ARTIFACT_TYPE}
 test_profile: ${TEST_PROFILE}
 jdk: ${COMPONENT_JDK}
 jdk_package: "${COMPONENT_JDK_PACKAGE}"
-jdk_runtime_archive_sha256: ${JDK_RUNTIME_ARCHIVE_SHA256}
-source_identity: ${SOURCE_IDENTITY}
-compatibility_identity: ${COMPATIBILITY_IDENTITY}
 build_run_id: ${BUILD_RUN_ID:-${TEST_RUN_ID}}
 test_run_id: ${TEST_RUN_ID}
 os: openEuler 22.03 LTS SP4
