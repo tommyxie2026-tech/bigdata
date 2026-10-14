@@ -159,7 +159,7 @@ jobs:
             local key="$1" expected="$2" actual
             if ! grep -Fqx -- "${key}: ${expected}" "${test_evidence}"; then
               actual="$(awk -F ': ' -v key="${key}" '$1 == key { value = substr($0, index($0, ": ") + 2); sub(/\\r$/, "", value); print value; exit }' "${test_evidence}")"
-              printf 'Test evidence field mismatch: field=%s expected=%q actual=%q\\n' \
+              printf 'Test evidence field mismatch: field=%s expected=%q actual=%q\n' \
                 "${key}" "${expected}" "${actual:-<missing>}" >&2
               return 1
             fi
@@ -172,7 +172,7 @@ jobs:
           evidence_jdk="$(awk -F ': ' '$1 == "toolchain_jdk" { print $2 }' "${test_evidence}")"
           evidence_jdk_package="$(awk -F ': ' '$1 == "jdk_package" { print $2 }' "${test_evidence}")"
           if [[ -n "${TEST_PROFILE}" && "${TEST_PROFILE}" != "${evidence_test_profile}" ]]; then
-            printf 'Requested test profile mismatch: requested=%q evidence=%q\\n' "${TEST_PROFILE}" "${evidence_test_profile:-<missing>}" >&2
+            printf 'Requested test profile mismatch: requested=%q evidence=%q\n' "${TEST_PROFILE}" "${evidence_test_profile:-<missing>}" >&2
             exit 1
           fi
           evidence_build_run_id="$(awk -F ': ' '$1 == "build_run_id" { print $2 }' "${test_evidence}")"
@@ -194,7 +194,7 @@ jobs:
             for required_key in artifact_type test_profile toolchain_jdk; do
               required_value="$(awk -F ': ' -v key="${required_key}" '$1 == key { print $2; exit }' "${test_evidence}")"
               if [[ -z "${required_value}" ]]; then
-                printf 'Test evidence field is required but empty: field=%s\\n' "${required_key}" >&2
+                printf 'Test evidence field is required but empty: field=%s\n' "${required_key}" >&2
                 exit 1
               fi
             done
@@ -202,24 +202,24 @@ jobs:
               expected_jdk_archive_sha="${{ steps.catalog.outputs.jdk_runtime_archive_sha256 }}"
               evidence_jdk_archive_sha="$(awk -F ': ' '$1 == "jdk_runtime_archive_sha256" { print $2 }' "${test_evidence}")"
               if [[ -z "${expected_jdk_archive_sha}" || "${evidence_jdk_archive_sha}" != "${expected_jdk_archive_sha}" ]]; then
-                printf 'JDK archive checksum mismatch: evidence=%q expected=%q\\n' "${evidence_jdk_archive_sha:-<missing>}" "${expected_jdk_archive_sha:-<missing>}" >&2
+                printf 'JDK archive checksum mismatch: evidence=%q expected=%q\n' "${evidence_jdk_archive_sha:-<missing>}" "${expected_jdk_archive_sha:-<missing>}" >&2
                 exit 1
               fi
             fi
             if [[ "${evidence_test_run_id}" != "${TEST_RUN_ID}" ]]; then
-              printf 'Test evidence run ID mismatch: evidence=%q expected=%q\\n' "${evidence_test_run_id:-<missing>}" "${TEST_RUN_ID}" >&2
+              printf 'Test evidence run ID mismatch: evidence=%q expected=%q\n' "${evidence_test_run_id:-<missing>}" "${TEST_RUN_ID}" >&2
               exit 1
             fi
             if [[ ! "${evidence_build_run_id}" =~ ^[0-9]+$ ]]; then
-              printf 'Test evidence build run ID is invalid: actual=%q\\n' "${evidence_build_run_id:-<missing>}" >&2
+              printf 'Test evidence build run ID is invalid: actual=%q\n' "${evidence_build_run_id:-<missing>}" >&2
               exit 1
             fi
             if [[ -n "${ARTIFACT_TYPE}" && "${ARTIFACT_TYPE}" != "${evidence_artifact_type}" ]]; then
-              printf 'Requested artifact type mismatch: requested=%q evidence=%q\\n' "${ARTIFACT_TYPE}" "${evidence_artifact_type:-<missing>}" >&2
+              printf 'Requested artifact type mismatch: requested=%q evidence=%q\n' "${ARTIFACT_TYPE}" "${evidence_artifact_type:-<missing>}" >&2
               exit 1
             fi
             if [[ -n "${EXPECTED_SOURCE_IDENTITY}" && "${EXPECTED_SOURCE_IDENTITY}" != "${evidence_source_identity}" ]]; then
-              printf 'Requested source identity mismatch: requested=%q evidence=%q\\n' "${EXPECTED_SOURCE_IDENTITY}" "${evidence_source_identity:-<missing>}" >&2
+              printf 'Requested source identity mismatch: requested=%q evidence=%q\n' "${EXPECTED_SOURCE_IDENTITY}" "${evidence_source_identity:-<missing>}" >&2
               exit 1
             fi
           fi
@@ -234,15 +234,15 @@ jobs:
             COMPONENT_JDK_PACKAGE="${evidence_jdk_package:-${COMPONENT_JDK_PACKAGE:-java-1.8.0-openjdk}}"
           fi
           if [[ -n "${EXPECTED_SOURCE_IDENTITY}" && "${source_identity}" != "${EXPECTED_SOURCE_IDENTITY}" ]]; then
-            printf 'Test evidence source identity mismatch: evidence=%q expected=%q\\n' "${source_identity:-<missing>}" "${EXPECTED_SOURCE_IDENTITY}" >&2
+            printf 'Test evidence source identity mismatch: evidence=%q expected=%q\n' "${source_identity:-<missing>}" "${EXPECTED_SOURCE_IDENTITY}" >&2
             exit 1
           fi
           if [[ ! "${build_run_id}" =~ ^[0-9]+$ ]]; then
-            printf 'Test evidence build run ID is invalid: actual=%q\\n' "${build_run_id:-<missing>}" >&2
+            printf 'Test evidence build run ID is invalid: actual=%q\n' "${build_run_id:-<missing>}" >&2
             exit 1
           fi
           if [[ ! "${TEST_RUN_ID}" =~ ^[0-9]+$ ]]; then
-            printf 'Requested test run ID is invalid: actual=%q\\n' "${TEST_RUN_ID}" >&2
+            printf 'Requested test run ID is invalid: actual=%q\n' "${TEST_RUN_ID}" >&2
             exit 1
           fi
 
