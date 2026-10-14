@@ -175,12 +175,14 @@ class ComponentRepoFastPathTests(unittest.TestCase):
                 "schema: bigdata.rpm-repo/v1",
                 "schema: bigdata.rpm-repo/v2",
             )
-            text += (
-                "artifact_type: integration-rpm\\n"
-                "test_profile: iceberg-cross-engine-smoke\\n"
-                "jdk: 17\\n"
-                'jdk_package: "java-17-openjdk-devel"\\n'
-            )
+            text += "\\n".join(
+                (
+                    "artifact_type: integration-rpm",
+                    "test_profile: iceberg-cross-engine-smoke",
+                    "jdk: 17",
+                    'jdk_package: "java-17-openjdk-devel"',
+                )
+            ) + "\\n"
             manifest.write_text(text)
             result = subprocess.run(
                 [
