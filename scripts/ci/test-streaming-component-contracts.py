@@ -128,6 +128,13 @@ class StreamingComponentContracts(unittest.TestCase):
         self.assertIn(f"source_identity: {iceberg['source_identity']}", workflow)
         self.assertNotIn("d72a2c06306fac05f6962148834c7d0860ea0fb7", workflow)
 
+    def test_iceberg_build_pins_release_version_for_shallow_checkout(self) -> None:
+        build = (ROOT / "scripts/ci/build-iceberg-rpm-openeuler-container.sh").read_text(encoding="utf-8")
+        self.assertIn('> "${SOURCE_DIR}/version.txt"', build)
+        self.assertLess(build.index('> "${SOURCE_DIR}/version.txt"'), build.index("./gradlew"))
+        self.assertIn('SPARK_JAR="iceberg-spark-runtime-3.5_2.12-${VERSION}.jar"', build)
+        self.assertIn('FLINK_JAR="iceberg-flink-runtime-1.20-${VERSION}.jar"', build)
+
     def test_dispatcher_fails_on_profile_component_mismatch(self) -> None:
         result = subprocess.run(
             ["bash", "-c", "COMPONENT=kafka VERSION=3.4.1 TEST_PROFILE=wrong BUILD_RUN_ID=1 TEST_RUN_ID=2 bash scripts/ci/test-bigtop-component.sh"],
