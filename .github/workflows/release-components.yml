@@ -189,8 +189,22 @@ jobs:
             require_evidence_field artifact_type "${evidence_artifact_type}"
             require_evidence_field test_profile "${evidence_test_profile}"
             require_evidence_field toolchain_jdk "${evidence_jdk}"
-            if [[ -n "${evidence_jdk_package}" ]]; then
+            if [[ -n "${COMPONENT_JDK_PACKAGE}" ]]; then
+              if [[ "${evidence_jdk_package}" != "${COMPONENT_JDK_PACKAGE}" ]]; then
+                printf 'Test evidence JDK package mismatch: evidence=%q expected=%q\\n' \
+                  "${evidence_jdk_package:-<missing>}" "${COMPONENT_JDK_PACKAGE}" >&2
+                exit 1
+              fi
+              require_evidence_field jdk_package "${COMPONENT_JDK_PACKAGE}"
+            elif [[ -n "${evidence_jdk_package}" ]]; then
               require_evidence_field jdk_package "${evidence_jdk_package}"
+            else
+              expected_jdk_archive_sha="${{ steps.catalog.outputs.jdk_runtime_archive_sha256 }}"
+              evidence_jdk_archive_sha="$(awk -F ': ' '$1 == "jdk_runtime_archive_sha256" { print $2 }' "${test_evidence}")"
+              if [[ -z "${expected_jdk_archive_sha}" || "${evidence_jdk_archive_sha}" != "${expected_jdk_archive_sha}" ]]; then
+                printf 'JDK archive checksum mismatch: evidence=%q expected=%q\\n' "${evidence_jdk_archive_sha:-<missing>}" "${expected_jdk_archive_sha:-<missing>}" >&2
+                exit 1
+              fi
             fi
             require_evidence_field test_run_id "${TEST_RUN_ID}"
             for required_key in artifact_type test_profile toolchain_jdk; do
