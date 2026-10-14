@@ -167,6 +167,40 @@ class ComponentRepoFastPathTests(unittest.TestCase):
             result = self.run_check(repo, source_identity="a" * 40, compatibility_identity="d" * 64)
         self.assertEqual(result.returncode, 1)
 
+    def test_quoted_manifest_jdk_package_hits_fast_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = write_fixture(Path(directory))
+            manifest = next(repo.rglob("manifest.yaml"))
+            text = manifest.read_text().replace(
+                "schema: bigdata.rpm-repo/v1",
+                "schema: bigdata.rpm-repo/v2",
+            )
+            text += (
+                "artifact_type: integration-rpm\\n"
+                "test_profile: iceberg-cross-engine-smoke\\n"
+                "jdk: 17\\n"
+                'jdk_package: "java-17-openjdk-devel"\\n'
+            )
+            manifest.write_text(text)
+            result = subprocess.run(
+                [
+                    "python3", str(CHECKER),
+                    "--component", COMPONENT,
+                    "--version", VERSION,
+                    "--repo-checkout", str(repo),
+                    "--components-file", str(COMPONENTS),
+                    "--source-identity", "a" * 40,
+                    "--artifact-type", "integration-rpm",
+                    "--test-profile", "iceberg-cross-engine-smoke",
+                    "--jdk", "17",
+                    "--jdk-package", "java-17-openjdk-devel",
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+
     def test_clean_dnf_install_failure_never_accepts_fast_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "github-output"
