@@ -88,6 +88,54 @@ class StreamingComponentContracts(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, script)
 
+    def test_iceberg_build_and_test_contracts_pin_both_engine_jars(self) -> None:
+        iceberg = CATALOG["components"]["iceberg"]
+        self.assertEqual(iceberg["version"], "1.12.0")
+        self.assertEqual(iceberg["runtime_packages"], [
+            "bigdata-iceberg-spark", "bigdata-iceberg-flink"
+        ])
+        self.assertEqual(iceberg["compatibility"]["engine_versions"], {
+            "spark": "3.5.8", "flink": "1.20.1", "scala": "2.12"
+        })
+        build = (ROOT / "scripts/ci/build-iceberg-rpm-openeuler-container.sh").read_text(encoding="utf-8")
+        for token in (
+            ":iceberg-spark:iceberg-spark-runtime-3.5_2.12:shadowJar",
+            ":iceberg-flink:iceberg-flink-runtime-1.20:shadowJar",
+            "bigdata-iceberg-spark",
+            "bigdata-iceberg-flink",
+            "rpm_count: 2",
+            "rpmbuild",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, build)
+        test = (ROOT / "scripts/ci/test-iceberg-rpm-openeuler-container.sh").read_text(encoding="utf-8")
+        for token in (
+            "spark-sql",
+            "spark.sql.catalogImplementation=in-memory",
+            "IcebergSparkSessionExtensions",
+            "CREATE TABLE local.ci.events",
+            "INSERT INTO local.ci.events",
+            "org.apache.iceberg.flink.FlinkCatalogFactory",
+            "spark_iceberg_table_roundtrip: PASS",
+            "flink_iceberg_catalog_factory: PASS",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, test)
+
+    def test_iceberg_lifecycle_pin_matches_catalog_commit(self) -> None:
+        workflow = (ROOT / ".github/workflows/build-components.yml").read_text(encoding="utf-8")
+        iceberg = CATALOG["components"]["iceberg"]
+        self.assertEqual(iceberg["source_identity"], iceberg["source"]["ref"])
+        self.assertIn(f"source_identity: {iceberg['source_identity']}", workflow)
+        self.assertNotIn("d72a2c06306fac05f6962148834c7d0860ea0fb7", workflow)
+
+    def test_iceberg_build_pins_release_version_for_shallow_checkout(self) -> None:
+        build = (ROOT / "scripts/ci/build-iceberg-rpm-openeuler-container.sh").read_text(encoding="utf-8")
+        self.assertIn('> "${SOURCE_DIR}/version.txt"', build)
+        self.assertLess(build.index('> "${SOURCE_DIR}/version.txt"'), build.index("./gradlew"))
+        self.assertIn('SPARK_JAR="iceberg-spark-runtime-3.5_2.12-${VERSION}.jar"', build)
+        self.assertIn('FLINK_JAR="iceberg-flink-runtime-1.20-${VERSION}.jar"', build)
+
     def test_dispatcher_fails_on_profile_component_mismatch(self) -> None:
         result = subprocess.run(
             ["bash", "-c", "COMPONENT=kafka VERSION=3.4.1 TEST_PROFILE=wrong BUILD_RUN_ID=1 TEST_RUN_ID=2 bash scripts/ci/test-bigtop-component.sh"],

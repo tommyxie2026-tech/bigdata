@@ -48,6 +48,7 @@ on:
           - kafka
           - flink
           - trino
+          - iceberg
       version:
         description: Component version
         required: true

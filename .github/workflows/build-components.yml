@@ -18,6 +18,7 @@ on:
           - kafka
           - flink
           - trino
+          - iceberg
           - all
           - repo_maintenance
       promote_test_run_id:
@@ -772,3 +773,71 @@ jobs:
       jdk: '25'
       jdk_package: ''
       source_identity: 5533573115277b8c452348f28dcf011aea14dd71
+  iceberg_prerequisite_spark:
+    name: Verify Spark RPM prerequisite for Iceberg
+    if: github.event_name == 'workflow_dispatch' && inputs.start_component == 'iceberg'
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/component-lifecycle.yml
+    with:
+      component: spark
+      version: '3.5.8'
+      builder: bigtop
+      artifact_type: service-rpm
+      build_task: spark-rpm
+      test_profile: legacy-smoke
+      jdk: '8'
+      jdk_package: java-1.8.0-openjdk-devel
+      source_identity: ''
+
+  iceberg_prerequisite_flink:
+    name: Verify Flink RPM prerequisite for Iceberg
+    if: github.event_name == 'workflow_dispatch' && inputs.start_component == 'iceberg'
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/component-lifecycle.yml
+    with:
+      component: flink
+      version: '1.20.1'
+      builder: bigtop
+      artifact_type: service-rpm
+      build_task: flink-rpm
+      test_profile: flink-local-job-smoke
+      jdk: '11'
+      jdk_package: java-11-openjdk-devel
+      source_identity: 19670ce6a3cc68833b7dd47697cd6272b66bb372
+
+  iceberg:
+    name: Iceberg 1.12.0 Build Test Release
+    needs: [spark_gate, flink, iceberg_prerequisite_spark, iceberg_prerequisite_flink]
+    if: >-
+      always() &&
+      ((github.event_name == 'workflow_dispatch' && inputs.start_component == 'iceberg' &&
+        needs.iceberg_prerequisite_spark.result == 'success' &&
+        needs.iceberg_prerequisite_spark.outputs.stage_passed == 'true' &&
+        needs.iceberg_prerequisite_flink.result == 'success' &&
+        needs.iceberg_prerequisite_flink.outputs.stage_passed == 'true') ||
+       ((github.event_name != 'workflow_dispatch' || inputs.start_component == 'all') &&
+        needs.spark_gate.result == 'success' &&
+        needs.spark_gate.outputs.continue_chain == 'true' &&
+        needs.flink.result == 'success' &&
+        needs.flink.outputs.stage_passed == 'true'))
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/component-lifecycle.yml
+    with:
+      component: iceberg
+      version: '1.12.0'
+      builder: custom
+      artifact_type: integration-rpm
+      build_task: iceberg-rpm
+      test_profile: iceberg-cross-engine-smoke
+      jdk: '17'
+      jdk_package: java-17-openjdk-devel
+      source_identity: 212aa894e919ff9fdf89160da4aadcbe6858ac01
