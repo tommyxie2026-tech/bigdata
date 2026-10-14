@@ -144,7 +144,7 @@ class StreamingComponentContracts(unittest.TestCase):
             workflow,
         )
         self.assertIn('evidence_jdk_archive_sha="$(awk', workflow)
-        self.assertIn('"${evidence_jdk_archive_sha}" == "${expected_jdk_archive_sha}"', workflow)
+        self.assertIn('"${evidence_jdk_archive_sha}" != "${expected_jdk_archive_sha}"', workflow)
 
     def test_iceberg_lifecycle_pin_matches_catalog_commit(self) -> None:
         workflow = (ROOT / ".github/workflows/build-components.yml").read_text(encoding="utf-8")
