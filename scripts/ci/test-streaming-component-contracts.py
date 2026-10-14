@@ -125,6 +125,18 @@ class StreamingComponentContracts(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, test)
 
+    def test_release_evidence_failures_report_field_and_values(self) -> None:
+        workflow = (ROOT / ".github/workflows/release-components.yml").read_text(encoding="utf-8")
+        for token in (
+            "require_evidence_field()",
+            "Test evidence field mismatch: field=%s expected=%q actual=%q",
+            "Test evidence run ID mismatch: evidence=%q expected=%q",
+            "Requested artifact type mismatch: requested=%q evidence=%q",
+            "Requested source identity mismatch: requested=%q evidence=%q",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, workflow)
+
     def test_iceberg_lifecycle_pin_matches_catalog_commit(self) -> None:
         workflow = (ROOT / ".github/workflows/build-components.yml").read_text(encoding="utf-8")
         iceberg = CATALOG["components"]["iceberg"]
