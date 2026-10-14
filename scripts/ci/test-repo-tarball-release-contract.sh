@@ -24,12 +24,10 @@ grep -Fq -- '-cf - repo | gzip -n' "$workflow" || fail "release archive must con
 
 stage_script=scripts/ci/stage-tested-rpms.sh
 test -f "$stage_script" || fail "RPM repository staging script is missing"
-for empty_manifest_field in \
-  'jdk_runtime_archive_sha256: ${JDK_RUNTIME_ARCHIVE_SHA256}' \
-  'source_identity: ${SOURCE_IDENTITY}' \
-  'compatibility_identity: ${COMPATIBILITY_IDENTITY}'; do
-  if grep -Fq "$empty_manifest_field" "$stage_script"; then
-    fail "optional manifest field must not be rendered unconditionally: $empty_manifest_field"
+for empty_manifest_key in \
+  jdk_runtime_archive_sha256 source_identity compatibility_identity; do
+  if grep -Eq "^[[:space:]]*${empty_manifest_key}:" "$stage_script"; then
+    fail "optional manifest key must not be written unconditionally: $empty_manifest_key"
   fi
 done
 grep -Fq 'if [[ -n "${JDK_RUNTIME_ARCHIVE_SHA256}" ]]; then' "$stage_script" \
