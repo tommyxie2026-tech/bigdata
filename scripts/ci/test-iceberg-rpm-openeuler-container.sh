@@ -83,6 +83,7 @@ command -v spark-sql >/dev/null
 command -v flink >/dev/null
 warehouse=file:///tmp/iceberg-spark-ci-warehouse
 spark-sql --master 'local[2]' \
+  --conf spark.sql.catalogImplementation=in-memory \
   --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
   --conf spark.sql.catalog.local=org.apache.iceberg.spark.SparkCatalog \
   --conf spark.sql.catalog.local.type=hadoop \
