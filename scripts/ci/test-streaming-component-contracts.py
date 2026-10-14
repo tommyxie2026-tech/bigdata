@@ -121,6 +121,13 @@ class StreamingComponentContracts(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, test)
 
+    def test_iceberg_lifecycle_pin_matches_catalog_commit(self) -> None:
+        workflow = (ROOT / ".github/workflows/build-components.yml").read_text(encoding="utf-8")
+        iceberg = CATALOG["components"]["iceberg"]
+        self.assertEqual(iceberg["source_identity"], iceberg["source"]["ref"])
+        self.assertIn(f"source_identity: {iceberg['source_identity']}", workflow)
+        self.assertNotIn("d72a2c06306fac05f6962148834c7d0860ea0fb7", workflow)
+
     def test_dispatcher_fails_on_profile_component_mismatch(self) -> None:
         result = subprocess.run(
             ["bash", "-c", "COMPONENT=kafka VERSION=3.4.1 TEST_PROFILE=wrong BUILD_RUN_ID=1 TEST_RUN_ID=2 bash scripts/ci/test-bigtop-component.sh"],
