@@ -6,6 +6,7 @@ set -euo pipefail
 : "${TEST_RUN_ID:?TEST_RUN_ID is required}"
 : "${ARTIFACT_ROOT:?ARTIFACT_ROOT is required}"
 : "${EVIDENCE_ROOT:?EVIDENCE_ROOT is required}"
+: "${COMPONENT_COMPATIBILITY_IDENTITY:?COMPONENT_COMPATIBILITY_IDENTITY is required}"
 : "${COMPONENT_RUNTIME_PACKAGES:?COMPONENT_RUNTIME_PACKAGES is required}"
 REPO_DIR=/tmp/bigdata-iceberg-rpm-repo
 LOG_DIR="${EVIDENCE_ROOT}/logs"
@@ -27,6 +28,11 @@ source_identity="$(awk -F ': ' '$1 == "source_identity" {print $2}' "${build_evi
 compatibility_identity="$(awk -F ': ' '$1 == "compatibility_identity" {print $2}' "${build_evidence}")"
 [[ "${source_identity}" == "${EXPECTED_SOURCE_IDENTITY}" ]]
 [[ "${compatibility_identity}" =~ ^[0-9a-f]{64}$ ]]
+if [[ "${compatibility_identity}" != "${COMPONENT_COMPATIBILITY_IDENTITY}" ]]; then
+  printf 'Iceberg RPM compatibility identity mismatch: artifact=%s expected=%s\\n' \
+    "${compatibility_identity}" "${COMPONENT_COMPATIBILITY_IDENTITY}" >&2
+  exit 1
+fi
 rpm_files=("${ARTIFACT_ROOT}"/rpms/*.rpm)
 [[ "${#rpm_files[@]}" -eq 2 ]]
 rpm_names=()
