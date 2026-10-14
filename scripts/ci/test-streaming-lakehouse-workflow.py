@@ -67,7 +67,8 @@ class StreamingLakehouseWorkflowTests(unittest.TestCase):
         self.assertEqual(iceberg["compatibility"]["engine_versions"], {
             "spark": "3.5.8", "flink": "1.20.1", "scala": "2.12"
         })
-        self.assertEqual(iceberg["source_identity"], "d72a2c06306fac05f6962148834c7d0860ea0fb7")
+        self.assertEqual(iceberg["source_identity"], "212aa894e919ff9fdf89160da4aadcbe6858ac01")
+        self.assertEqual(iceberg["source"]["ref"], iceberg["source_identity"])
         iceberg_job = self.jobs["iceberg"]
         self.assertEqual(iceberg_job["with"]["component"], "iceberg")
         self.assertEqual(iceberg_job["with"]["test_profile"], "iceberg-cross-engine-smoke")
