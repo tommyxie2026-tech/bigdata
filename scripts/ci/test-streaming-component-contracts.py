@@ -119,6 +119,10 @@ class StreamingComponentContracts(unittest.TestCase):
             "spark_iceberg_table_roundtrip: PASS",
             "flink_iceberg_catalog_factory: PASS",
             ': "${COMPONENT_COMPATIBILITY_IDENTITY:?COMPONENT_COMPATIBILITY_IDENTITY is required}"',
+            ': "${COMPONENT_JDK_PACKAGE:?COMPONENT_JDK_PACKAGE is required}"',
+            'dnf -y install ca-certificates coreutils createrepo_c dnf-utils findutils "${COMPONENT_JDK_PACKAGE}" procps-ng python3 rpm',
+            'rpm -q "${COMPONENT_JDK_PACKAGE}"',
+            "jdk_package: ${COMPONENT_JDK_PACKAGE}",
             '"${compatibility_identity}" != "${COMPONENT_COMPATIBILITY_IDENTITY}"',
             "Iceberg RPM compatibility identity mismatch: artifact=%s expected=%s",
         ):
@@ -145,6 +149,12 @@ class StreamingComponentContracts(unittest.TestCase):
         )
         self.assertIn('evidence_jdk_archive_sha="$(awk', workflow)
         self.assertIn('"${evidence_jdk_archive_sha}" != "${expected_jdk_archive_sha}"', workflow)
+
+    def test_release_checks_configured_jdk_package_against_test_evidence(self) -> None:
+        workflow = (ROOT / ".github/workflows/release-components.yml").read_text(encoding="utf-8")
+        self.assertIn('if [[ -n "${COMPONENT_JDK_PACKAGE}" ]]; then', workflow)
+        self.assertIn('"${evidence_jdk_package}" != "${COMPONENT_JDK_PACKAGE}"', workflow)
+        self.assertIn("Test evidence JDK package mismatch: evidence=%q expected=%q", workflow)
 
     def test_iceberg_lifecycle_pin_matches_catalog_commit(self) -> None:
         workflow = (ROOT / ".github/workflows/build-components.yml").read_text(encoding="utf-8")
