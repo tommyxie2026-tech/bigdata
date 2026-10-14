@@ -29,7 +29,7 @@ compatibility_identity="$(awk -F ': ' '$1 == "compatibility_identity" {print $2}
 [[ "${source_identity}" == "${EXPECTED_SOURCE_IDENTITY}" ]]
 [[ "${compatibility_identity}" =~ ^[0-9a-f]{64}$ ]]
 if [[ "${compatibility_identity}" != "${COMPONENT_COMPATIBILITY_IDENTITY}" ]]; then
-  printf 'Iceberg RPM compatibility identity mismatch: artifact=%s expected=%s\\n' \
+  printf 'Iceberg RPM compatibility identity mismatch: artifact=%s expected=%s\n' \
     "${compatibility_identity}" "${COMPONENT_COMPATIBILITY_IDENTITY}" >&2
   exit 1
 fi
