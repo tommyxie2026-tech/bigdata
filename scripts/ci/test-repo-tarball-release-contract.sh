@@ -22,4 +22,20 @@ grep -Fq 'gh release create' "$workflow" || fail "GitHub Release creation is mis
 grep -Fq -- '--prerelease' "$workflow" || fail "RC1 must be marked as a prerelease"
 grep -Fq -- '-cf - repo | gzip -n' "$workflow" || fail "release archive must contain only repo/"
 
+stage_script=scripts/ci/stage-tested-rpms.sh
+test -f "$stage_script" || fail "RPM repository staging script is missing"
+for optional_key in jdk_runtime_archive_sha256 source_identity compatibility_identity; do
+  if grep -Eq "^\\${optional_key}: \\\\${" "$stage_script"; then
+    fail "optional manifest field $optional_key must not be rendered unconditionally"
+  fi
+done
+grep -Fq 'if [[ -n "${JDK_RUNTIME_ARCHIVE_SHA256}" ]]; then' "$stage_script" \
+  || fail "JDK archive checksum must be emitted only when configured"
+grep -Fq 'if [[ -n "${SOURCE_IDENTITY}" ]]; then' "$stage_script" \
+  || fail "source identity must be emitted only when available"
+grep -Fq 'if [[ -n "${COMPATIBILITY_IDENTITY}" ]]; then' "$stage_script" \
+  || fail "compatibility identity must be emitted only when available"
+grep -Fq "printf 'jdk_runtime_archive_sha256: %s\\\\n'" "$stage_script" \
+  || fail "JDK archive checksum must be appended without empty trailing fields"
+
 echo "Repository tarball release contract passed."
