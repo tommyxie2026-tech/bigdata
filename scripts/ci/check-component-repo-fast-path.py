@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
+import json
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -45,8 +46,21 @@ def fields(path: Path) -> dict[str, str]:
         for line in path.read_text(encoding="utf-8").splitlines():
             if not line or line[0].isspace() or ":" not in line:
                 continue
-            key, value = line.split(":", 1)
-            result[key.strip()] = value.strip()
+            key, raw_value = line.split(":", 1)
+            key = key.strip()
+            value = raw_value.strip()
+            if value.startswith('"'):
+                try:
+                    value = json.loads(value)
+                except json.JSONDecodeError as error:
+                    raise RepoMismatch(f"invalid quoted manifest value for {key}: {value!r}") from error
+                if not isinstance(value, str):
+                    raise RepoMismatch(f"manifest value for {key} must be a string")
+            elif value.startswith("'"):
+                if len(value) < 2 or not value.endswith("'"):
+                    raise RepoMismatch(f"invalid quoted manifest value for {key}: {value!r}")
+                value = value[1:-1].replace("''", "'")
+            result[key] = value
     except OSError as error:
         raise RepoMismatch(f"cannot read {path}: {error}") from error
     return result
