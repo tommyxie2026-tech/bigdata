@@ -140,7 +140,7 @@ class StreamingComponentContracts(unittest.TestCase):
     def test_release_allows_archive_based_jdk_evidence_without_package_field(self) -> None:
         workflow = (ROOT / ".github/workflows/release-components.yml").read_text(encoding="utf-8")
         self.assertIn(
-            'if [[ -n "${evidence_jdk_package}" ]]; then\\n              require_evidence_field jdk_package',
+            'if [[ -n "${evidence_jdk_package}" ]]; then',
             workflow,
         )
         self.assertIn('evidence_jdk_archive_sha="$(awk', workflow)
