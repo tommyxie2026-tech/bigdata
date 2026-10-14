@@ -1,0 +1,18 @@
+schema: bigdata.rpm-repo/v2
+component: iceberg
+version: 1.12.0
+bigtop_version: 3.6.0
+artifact_type: integration-rpm
+test_profile: iceberg-cross-engine-smoke
+jdk: 17
+jdk_package: "java-17-openjdk-devel"
+build_run_id: 38623122804
+test_run_id: 38623122804
+os: openEuler 22.03 LTS SP4
+promotion_workflow_commit: e21d222771a2e049f1efd739f98abda07f7ab39f
+tested_artifact_run_id: 38623122804
+rpm_count: 2
+test_status: PASS
+repository_layout: split-runtime/v2
+source_identity: 212aa894e919ff9fdf89160da4aadcbe6858ac01
+compatibility_identity: 1afa381f72a739ec42aacc9d0edc6b7e19da6f561dded92ea7b6b7b889077045
