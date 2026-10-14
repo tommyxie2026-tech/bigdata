@@ -8,6 +8,7 @@ set -euo pipefail
 : "${EVIDENCE_ROOT:?EVIDENCE_ROOT is required}"
 : "${COMPONENT_COMPATIBILITY_IDENTITY:?COMPONENT_COMPATIBILITY_IDENTITY is required}"
 : "${COMPONENT_RUNTIME_PACKAGES:?COMPONENT_RUNTIME_PACKAGES is required}"
+: "${COMPONENT_JDK_PACKAGE:?COMPONENT_JDK_PACKAGE is required}"
 REPO_DIR=/tmp/bigdata-iceberg-rpm-repo
 LOG_DIR="${EVIDENCE_ROOT}/logs"
 [[ "${COMPONENT}" == iceberg && "${VERSION}" == 1.12.0 ]]
@@ -16,7 +17,8 @@ LOG_DIR="${EVIDENCE_ROOT}/logs"
 [[ "${COMPONENT_RUNTIME_PACKAGES}" == "bigdata-iceberg-spark bigdata-iceberg-flink" ]]
 grep -qi openEuler /etc/os-release
 mkdir -p "${EVIDENCE_ROOT}" "${LOG_DIR}" "${REPO_DIR}"
-dnf -y install ca-certificates coreutils createrepo_c dnf-utils findutils java-17-openjdk-devel procps-ng python3 rpm
+dnf -y install ca-certificates coreutils createrepo_c dnf-utils findutils "${COMPONENT_JDK_PACKAGE}" procps-ng python3 rpm
+rpm -q "${COMPONENT_JDK_PACKAGE}"
 build_evidence="${ARTIFACT_ROOT}/evidence/evidence.md"
 [[ -s "${build_evidence}" ]]
 grep -qx "component: ${COMPONENT}" "${build_evidence}"
@@ -122,6 +124,7 @@ environment: openEuler-22.03-LTS-SP4-clean-container
 repository: local-createrepo-c
 package_manager: dnf
 toolchain_jdk: 17
+jdk_package: ${COMPONENT_JDK_PACKAGE}
 dnf_install: PASS
 spark_iceberg_table_roundtrip: PASS
 flink_iceberg_catalog_factory: PASS
