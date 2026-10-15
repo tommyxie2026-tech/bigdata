@@ -68,7 +68,7 @@ echo "No Hue source build or RPM build was performed."
 [[ "$(uname -m)" == x86_64 ]]
 node_archive="/tmp/node-v22.23.0-linux-x64.tar.xz"
 node_sha256=14d7de44f235534799f8b171a4050d9a6a4bc99c87e053a25d3d54afa580aa20
-curl --fail --location --retry 3 --output "${node_archive}" \
+curl --fail --location --retry 5 --retry-all-errors --retry-delay 2 --retry-max-time 300 --output "${node_archive}" \
   https://nodejs.org/dist/v22.23.0/node-v22.23.0-linux-x64.tar.xz
 printf '%s  %s\n' "${node_sha256}" "${node_archive}" | sha256sum --check --status
 node_root="$(mktemp -d /tmp/hue-node.XXXXXX)"
