@@ -22,6 +22,7 @@ packages=(
   python3
   python3-devel
   python3-pip
+  rsync
   sqlite-devel
   cyrus-sasl-devel
   tar
@@ -48,7 +49,7 @@ if sys.version_info[:2] != (3, 9):
 print(f"python_build_runtime: {sys.version.split()[0]}")
 PY
 
-for tool in gcc g++ git make; do
+for tool in gcc g++ git make rsync; do
   command -v "$tool"
 done
 
