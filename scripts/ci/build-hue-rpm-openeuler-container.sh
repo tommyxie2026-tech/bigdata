@@ -65,8 +65,10 @@ grep -Eq '^apps: desktop$' "${SOURCE_DIR}/Makefile"
 BOOTSTRAP_PYTHON="${WORK_ROOT}/bootstrap-python"
 rm -rf "${BOOTSTRAP_PYTHON}"
 python3 -m venv "${BOOTSTRAP_PYTHON}"
-SYS_PYTHON="${BOOTSTRAP_PYTHON}/bin/python"
-SYS_PIP="${BOOTSTRAP_PYTHON}/bin/pip"
+export PATH="${BOOTSTRAP_PYTHON}/bin:${PATH}"
+SYS_PYTHON="${BOOTSTRAP_PYTHON}/bin/python3.9"
+SYS_PIP="${BOOTSTRAP_PYTHON}/bin/pip3.9"
+[[ "$(command -v python3.9)" == "${SYS_PYTHON}" ]]
 "${SYS_PYTHON}" -m pip --version
 
 # Follow the upstream container build contract: compile apps and install the
@@ -74,7 +76,6 @@ SYS_PIP="${BOOTSTRAP_PYTHON}/bin/pip"
 cd "${SOURCE_DIR}"
 PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python \
   PREFIX=/usr/share INSTALL_DIR="${INSTALL_DIR}" PYTHON_VER=python3.9 \
-  SYS_PYTHON="${SYS_PYTHON}" SYS_PIP="${SYS_PIP}" \
   make apps install 2>&1 | tee "${ARTIFACTS}/logs/hue-build.log"
 
 HUE_PYTHON="${INSTALL_DIR}/build/venvs/python3.9/bin/python"
