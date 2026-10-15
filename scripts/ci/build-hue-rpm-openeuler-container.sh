@@ -37,7 +37,7 @@ if sys.version_info[:2] != (3, 9):
 PY
 python3 -m pip --version
 
-curl --fail --location --retry 3 --output "${NODE_ARCHIVE}" \
+curl --fail --location --retry 5 --retry-all-errors --retry-delay 2 --retry-max-time 300 --output "${NODE_ARCHIVE}" \
   https://nodejs.org/dist/v22.23.0/node-v22.23.0-linux-x64.tar.xz
 printf '%s  %s\n' "${NODE_SHA256}" "${NODE_ARCHIVE}" | sha256sum --check
 NODE_ROOT=/opt/node-v22.23.0
