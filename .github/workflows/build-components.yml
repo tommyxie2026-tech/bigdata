@@ -19,6 +19,7 @@ on:
           - flink
           - trino
           - iceberg
+          - hue
           - all
           - repo_maintenance
       promote_test_run_id:
