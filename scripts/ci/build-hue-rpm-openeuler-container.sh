@@ -28,7 +28,7 @@ dnf -y install \
   ca-certificates curl gcc gcc-c++ git gmp-devel krb5-devel libffi-devel \
   libxml2-devel libxslt-devel make openldap-devel openssl-devel python3 \
   python3-devel sqlite-devel cyrus-sasl-devel tar xz rpm-build rpmdevtools \
-  shadow-utils openEuler-rpm-config
+  shadow-utils openEuler-rpm-config systemd-rpm-macros
 python3 --version
 python3 - <<'PY'
 import sys
