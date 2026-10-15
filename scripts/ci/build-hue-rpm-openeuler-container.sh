@@ -119,8 +119,8 @@ PrivateTmp=true
 WantedBy=multi-user.target
 EOF
 
-tar -C / -czf "${RPM_TOP}/hue-runtime.tar.gz" usr/share/hue
 mkdir -p "${RPM_TOP}"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+tar -C / -czf "${RPM_TOP}/hue-runtime.tar.gz" usr/share/hue
 install -m 0644 "${RPM_TOP}/hue-runtime.tar.gz" "${RPM_TOP}/SOURCES/hue-runtime.tar.gz"
 install -m 0644 "${WORK_ROOT}/hue-LICENSE.txt" "${RPM_TOP}/SOURCES/LICENSE"
 install -m 0644 "${WORK_ROOT}/hue-NOTICE.txt" "${RPM_TOP}/SOURCES/NOTICE"
