@@ -21,6 +21,7 @@ packages=(
   openssl-devel
   python3
   python3-devel
+  python3-pip
   sqlite-devel
   cyrus-sasl-devel
   tar
@@ -30,6 +31,7 @@ packages=(
 dnf -y install "${packages[@]}"
 
 python3 --version
+python3 -m pip --version
 python3 - <<'PY'
 import sys
 
