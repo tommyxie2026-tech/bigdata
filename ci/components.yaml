@@ -188,3 +188,24 @@ components:
     depends_on:
       - spark
       - flink
+
+  hue:
+    builder: custom
+    artifact_type: service-rpm
+    version: 4.11.0
+    source_identity: 65d9e489f400ac151029b33c5a2bd9df31e167da
+    runtime_packages:
+      - bigdata-hue-server
+    build_task: hue-rpm
+    wave: 9
+    test_profile: hue-single-node-smoke
+    jdk: '17'
+    jdk_package: java-17-openjdk-devel
+    runtime:
+      python: '3.9'
+    source:
+      type: git
+      url: https://github.com/cloudera/hue.git
+      ref: 65d9e489f400ac151029b33c5a2bd9df31e167da
+    depends_on:
+      - trino

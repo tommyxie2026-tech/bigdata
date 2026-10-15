@@ -81,7 +81,63 @@ components:
 """
 
 
+HUE = """\\
+schema: bigdata.ci.components/v1
+components:
+  hue:
+    builder: custom
+    artifact_type: service-rpm
+    version: 4.11.0
+    source_identity: 65d9e489f400ac151029b33c5a2bd9df31e167da
+    runtime_packages: [bigdata-hue-server]
+    depends_on: [trino]
+    build_task: hue-rpm
+    test_profile: hue-single-node-smoke
+    jdk: '17'
+    jdk_package: java-17-openjdk-devel
+    runtime: {python: '3.9'}
+    source:
+      type: git
+      url: https://github.com/cloudera/hue.git
+      ref: 65d9e489f400ac151029b33c5a2bd9df31e167da
+  trino:
+    builder: custom
+    artifact_type: service-rpm
+    version: '483'
+    source_identity: 5533573115277b8c452348f28dcf011aea14dd71
+    runtime_packages: [trino-server-rpm]
+    depends_on: []
+    build_task: trino-rpm
+    test_profile: trino-single-node-smoke
+    jdk: '25'
+    jdk_package: ''
+    jdk_runtime_archive:
+      url: https://api.adoptium.net/v3/binary/version/jdk-25.0.4%2B7/linux/x64/jdk/hotspot/normal/eclipse
+      sha256: e58fcdcd637b25c03ca84cbbcefc70d11efb8f4b4cbd05decc9f661769d77f94
+    runtime: {java: '25'}
+    source:
+      type: git
+      url: https://github.com/trinodb/trino-packages.git
+      ref: 5533573115277b8c452348f28dcf011aea14dd71
+"""
+
+
 class ComponentConfigTests(unittest.TestCase):
+    def test_accepts_hue_service_with_pinned_source_and_python_runtime(self) -> None:
+        result = self.validate(HUE)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_rejects_hue_floating_source_or_runtime(self) -> None:
+        cases = (
+            HUE.replace("ref: 65d9e489f400ac151029b33c5a2bd9df31e167da", "ref: main"),
+            HUE.replace("runtime: {python: '3.9'}", "runtime: {python: '3.x'}"),
+            HUE.replace("runtime_packages: [bigdata-hue-server]", "runtime_packages: []"),
+            HUE.replace("test_profile: hue-single-node-smoke", "test_profile: legacy-smoke"),
+        )
+        for config in cases:
+            with self.subTest(config=config):
+                self.assertEqual(self.validate(config).returncode, 1)
+
     def validate(self, text: str) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / "components.yaml"
