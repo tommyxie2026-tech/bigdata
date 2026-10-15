@@ -59,12 +59,22 @@ hue_source_version="$(sed -n 's/^VERSION="\([^"]*\)"$/\1/p' "${SOURCE_DIR}/VERSI
 [[ "${hue_source_version}" == "${VERSION}" ]]
 grep -Eq '^apps: desktop$' "${SOURCE_DIR}/Makefile"
 
+# Bootstrap Hue's pinned build tooling in an isolated Python environment.
+# The target image's RPM-owned pip has no RECORD file, so upgrading it directly
+# from upstream's Makefile fails. A venv-local pip can be upgraded safely.
+BOOTSTRAP_PYTHON="${WORK_ROOT}/bootstrap-python"
+rm -rf "${BOOTSTRAP_PYTHON}"
+python3 -m venv "${BOOTSTRAP_PYTHON}"
+SYS_PYTHON="${BOOTSTRAP_PYTHON}/bin/python"
+SYS_PIP="${BOOTSTRAP_PYTHON}/bin/pip"
+"${SYS_PYTHON}" -m pip --version
+
 # Follow the upstream container build contract: compile apps and install the
 # relocatable runtime at its final path so virtualenv shebangs remain valid.
 cd "${SOURCE_DIR}"
 PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python \
   PREFIX=/usr/share INSTALL_DIR="${INSTALL_DIR}" PYTHON_VER=python3.9 \
-  SYS_PYTHON=/usr/bin/python3 SYS_PIP=/usr/bin/pip3 \
+  SYS_PYTHON="${SYS_PYTHON}" SYS_PIP="${SYS_PIP}" \
   make apps install 2>&1 | tee "${ARTIFACTS}/logs/hue-build.log"
 
 HUE_PYTHON="${INSTALL_DIR}/build/venvs/python3.9/bin/python"
