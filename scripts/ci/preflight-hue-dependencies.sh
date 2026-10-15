@@ -34,7 +34,9 @@ python3 --version
 python3 -m pip --version
 bootstrap_python="$(mktemp -d /tmp/hue-bootstrap.XXXXXX)"
 python3 -m venv "${bootstrap_python}"
-"${bootstrap_python}/bin/python" -m pip --version
+[[ -x "${bootstrap_python}/bin/python3.9" && -x "${bootstrap_python}/bin/pip3.9" ]]
+[[ "$(PATH="${bootstrap_python}/bin:${PATH}" command -v python3.9)" == "${bootstrap_python}/bin/python3.9" ]]
+"${bootstrap_python}/bin/python3.9" -m pip --version
 rm -rf "${bootstrap_python}"
 python3 - <<'PY'
 import sys
