@@ -23,6 +23,8 @@ packages=(
   python3-devel
   sqlite-devel
   cyrus-sasl-devel
+  tar
+  xz
 )
 
 dnf -y install "${packages[@]}"
