@@ -199,10 +199,14 @@ components:
     build_task: hue-rpm
     wave: 9
     test_profile: hue-single-node-smoke
-    jdk: '17'
-    jdk_package: java-17-openjdk-devel
+    jdk: '25'
+    jdk_package: ''
+    jdk_runtime_archive:
+      url: https://api.adoptium.net/v3/binary/version/jdk-25.0.4%2B7/linux/x64/jdk/hotspot/normal/eclipse
+      sha256: e58fcdcd637b25c03ca84cbbcefc70d11efb8f4b4cbd05decc9f661769d77f94
     runtime:
       python: '3.9'
+      java: '25'
     source:
       type: git
       url: https://github.com/cloudera/hue.git
