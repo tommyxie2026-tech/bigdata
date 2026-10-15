@@ -124,6 +124,9 @@ tar -C / -czf "${RPM_TOP}/hue-runtime.tar.gz" usr/share/hue
 install -m 0644 "${RPM_TOP}/hue-runtime.tar.gz" "${RPM_TOP}/SOURCES/hue-runtime.tar.gz"
 install -m 0644 "${WORK_ROOT}/hue-LICENSE.txt" "${RPM_TOP}/SOURCES/LICENSE"
 install -m 0644 "${WORK_ROOT}/hue-NOTICE.txt" "${RPM_TOP}/SOURCES/NOTICE"
+install -m 0644 /etc/hue/hue.ini "${RPM_TOP}/SOURCES/hue.ini"
+install -m 0755 /usr/libexec/hue/hue-server "${RPM_TOP}/SOURCES/hue-server"
+install -m 0644 /usr/lib/systemd/system/hue.service "${RPM_TOP}/SOURCES/hue.service"
 cat > "${RPM_TOP}/SPECS/bigdata-hue-server.spec" <<'EOF'
 Name:           bigdata-hue-server
 Version:        4.11.0
@@ -137,6 +140,9 @@ Requires:       systemd
 Source0:        hue-runtime.tar.gz
 Source1:        LICENSE
 Source2:        NOTICE
+Source3:        hue.ini
+Source4:        hue-server
+Source5:        hue.service
 
 %description
 Hue web service and SQL editor built from the pinned upstream source.
@@ -148,6 +154,9 @@ Hue web service and SQL editor built from the pinned upstream source.
 %install
 mkdir -p %{buildroot}/usr/share %{buildroot}/etc/hue %{buildroot}/usr/lib/systemd/system %{buildroot}/usr/libexec/hue %{buildroot}/var/lib/hue %{buildroot}/var/log/hue %{buildroot}%{_licensedir}/bigdata-hue
 tar -xzf %{SOURCE0} -C %{buildroot}
+install -m 0644 %{SOURCE3} %{buildroot}/etc/hue/hue.ini
+install -m 0755 %{SOURCE4} %{buildroot}/usr/libexec/hue/hue-server
+install -m 0644 %{SOURCE5} %{buildroot}/usr/lib/systemd/system/hue.service
 install -m 0644 %{SOURCE1} %{buildroot}%{_licensedir}/bigdata-hue/LICENSE
 install -m 0644 %{SOURCE2} %{buildroot}%{_licensedir}/bigdata-hue/NOTICE
 
@@ -184,7 +193,7 @@ fi
 /usr/share/hue
 
 %changelog
-* Wed Oct 15 2026 BIGDATA CI <ci@example.invalid> - 4.11.0-1.oe2203sp4
+* Thu Oct 15 2026 BIGDATA CI <ci@example.invalid> - 4.11.0-1.oe2203sp4
 - Build the pinned Hue service for openEuler 22.03 SP4
 EOF
 rpmbuild --define "_topdir ${RPM_TOP}" -bb "${RPM_TOP}/SPECS/bigdata-hue-server.spec"
