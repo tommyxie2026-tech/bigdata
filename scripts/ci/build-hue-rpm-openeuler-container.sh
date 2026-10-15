@@ -28,7 +28,7 @@ dnf -y install \
   ca-certificates curl gcc gcc-c++ git gmp-devel krb5-devel libffi-devel \
   libxml2-devel libxslt-devel make openldap-devel openssl-devel python3 \
   python3-devel sqlite-devel cyrus-sasl-devel tar xz rpm-build rpmdevtools \
-  shadow-utils openEuler-rpm-config systemd-rpm-macros
+  shadow-utils openEuler-rpm-config
 python3 --version
 python3 - <<'PY'
 import sys
@@ -145,13 +145,21 @@ install -m 0644 %{SOURCE2} %{buildroot}%{_licensedir}/bigdata-hue/NOTICE
 getent group hue >/dev/null || groupadd --system hue
 getent passwd hue >/dev/null || useradd --system --gid hue --home-dir /var/lib/hue --shell /sbin/nologin hue
 chown -R hue:hue /var/lib/hue /var/log/hue /etc/hue
-%systemd_post hue.service
+/usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
+if [ "$1" -eq 1 ]; then
+  /usr/bin/systemctl preset hue.service >/dev/null 2>&1 || :
+fi
 
 %preun
-%systemd_preun hue.service
+if [ "$1" -eq 0 ]; then
+  /usr/bin/systemctl disable --now hue.service >/dev/null 2>&1 || :
+fi
 
 %postun
-%systemd_postun_with_restart hue.service
+/usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
+if [ "$1" -ge 1 ]; then
+  /usr/bin/systemctl try-restart hue.service >/dev/null 2>&1 || :
+fi
 
 %files
 %license %{_licensedir}/bigdata-hue/LICENSE
