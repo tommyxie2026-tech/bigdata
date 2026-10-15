@@ -20,5 +20,7 @@ grep -Fq 'install -m 0644 %{SOURCE5} %{buildroot}/usr/lib/systemd/system/hue.ser
 grep -Fq '%config(noreplace) /etc/hue/hue.ini' "${BUILDER}"
 grep -Fq '/usr/libexec/hue/hue-server' "${BUILDER}"
 grep -Fq '/usr/lib/systemd/system/hue.service' "${BUILDER}"
+grep -Fq 'Provides:       libgfortran-040039e1.so.5.0.0(GFORTRAN_8)(64bit)' "${BUILDER}"
+grep -Fq 'Provides:       libquadmath-96973f99.so.0.0.0(QUADMATH_1.0)(64bit)' "${BUILDER}"
 
 echo "Hue RPM payload contract: PASS"
