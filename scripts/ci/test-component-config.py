@@ -81,7 +81,7 @@ components:
 """
 
 
-HUE = """\\
+HUE = """\
 schema: bigdata.ci.components/v1
 components:
   hue:
