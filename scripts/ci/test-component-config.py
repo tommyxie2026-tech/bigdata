@@ -132,7 +132,7 @@ class ComponentConfigTests(unittest.TestCase):
             HUE.replace("ref: 65d9e489f400ac151029b33c5a2bd9df31e167da", "ref: main"),
             HUE.replace("runtime: {python: '3.9'}", "runtime: {python: '3.x'}"),
             HUE.replace("runtime_packages: [bigdata-hue-server]", "runtime_packages: []"),
-            HUE.replace("test_profile: hue-single-node-smoke", "test_profile: legacy-smoke"),
+            HUE.replace("test_profile: hue-single-node-smoke", "test_profile: unregistered-smoke"),
         )
         for config in cases:
             with self.subTest(config=config):
