@@ -28,6 +28,8 @@ class ComponentAdapterTests(unittest.TestCase):
             "test-trino-rpm-openeuler-container.sh",
             "build-iceberg-rpm-openeuler-container.sh",
             "test-iceberg-rpm-openeuler-container.sh",
+            "build-hue-rpm-openeuler-container.sh",
+            "test-hue-rpm-openeuler-container.sh",
         ):
             (self.scripts / filename).write_text("#!/bin/bash\n", encoding="utf-8")
 
@@ -61,6 +63,26 @@ class ComponentAdapterTests(unittest.TestCase):
         )
         self.assertEqual(build, (self.scripts / "build-iceberg-rpm-openeuler-container.sh").resolve())
         self.assertEqual(test, (self.scripts / "test-iceberg-rpm-openeuler-container.sh").resolve())
+
+    def test_hue_custom_adapter_resolves_pinned_rpm_scripts(self) -> None:
+        build = ADAPTER.resolve_adapter(
+            "custom", "hue", "build", "hue-rpm", "hue-single-node-smoke", self.scripts
+        )
+        test = ADAPTER.resolve_adapter(
+            "custom", "hue", "test", "hue-rpm", "hue-single-node-smoke", self.scripts
+        )
+        self.assertEqual(build, (self.scripts / "build-hue-rpm-openeuler-container.sh").resolve())
+        self.assertEqual(test, (self.scripts / "test-hue-rpm-openeuler-container.sh").resolve())
+
+    def test_hue_custom_adapter_rejects_wrong_build_task_and_test_profile(self) -> None:
+        with self.assertRaises(ValueError):
+            ADAPTER.resolve_adapter(
+                "custom", "hue", "build", "trino-rpm", "hue-single-node-smoke", self.scripts
+            )
+        with self.assertRaises(ValueError):
+            ADAPTER.resolve_adapter(
+                "custom", "hue", "test", "hue-rpm", "trino-single-node-smoke", self.scripts
+            )
 
     def test_custom_task_mismatch_fails_closed(self) -> None:
         with self.assertRaises(ValueError):
