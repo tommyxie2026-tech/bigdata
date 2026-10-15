@@ -207,6 +207,9 @@ component: ${COMPONENT}
 version: ${VERSION}
 artifact_type: service-rpm
 test_profile: ${TEST_PROFILE}
+toolchain_jdk: ${COMPONENT_JDK}
+jdk_package: ${COMPONENT_JDK_PACKAGE:-}
+jdk_runtime_archive_sha256: ${JDK_RUNTIME_ARCHIVE_SHA256}
 source_identity: ${source_identity}
 compatibility_identity: ${compatibility_identity}
 build_run_id: ${BUILD_RUN_ID}
