@@ -152,6 +152,7 @@ for attempt in $(seq 1 120); do
     break
   fi
   kill -0 "${hue_pid}" || { cat "${LOG_DIR}/hue-server.log" >&2; exit 1; }
+  if (( attempt % 30 == 0 )); then echo "Waiting for Hue startup (${attempt}/120 attempts)..."; fi
   sleep 2
 done
 [[ "${hue_ready}" == true ]] || { cat "${LOG_DIR}/hue-server.log" >&2; exit 1; }
