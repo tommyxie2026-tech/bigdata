@@ -67,7 +67,6 @@ rm -rf "${BOOTSTRAP_PYTHON}"
 python3 -m venv "${BOOTSTRAP_PYTHON}"
 export PATH="${BOOTSTRAP_PYTHON}/bin:${PATH}"
 SYS_PYTHON="${BOOTSTRAP_PYTHON}/bin/python3.9"
-SYS_PIP="${BOOTSTRAP_PYTHON}/bin/pip3.9"
 [[ "$(command -v python3.9)" == "${SYS_PYTHON}" ]]
 "${SYS_PYTHON}" -m pip --version
 
