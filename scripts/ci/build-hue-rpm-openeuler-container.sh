@@ -27,7 +27,7 @@ grep -qi openEuler /etc/os-release
 dnf -y install \
   ca-certificates curl gcc gcc-c++ git gmp-devel krb5-devel libffi-devel \
   libxml2-devel libxslt-devel make openldap-devel openssl-devel python3 \
-  python3-devel python3-pip sqlite-devel cyrus-sasl-devel tar xz rpm-build rpmdevtools \
+  python3-devel python3-pip rsync sqlite-devel cyrus-sasl-devel tar xz rpm-build rpmdevtools \
   shadow-utils openEuler-rpm-config
 python3 --version
 python3 - <<'PY'
