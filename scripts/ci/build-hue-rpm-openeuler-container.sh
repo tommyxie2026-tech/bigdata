@@ -137,6 +137,9 @@ URL:            https://github.com/cloudera/hue
 BuildArch:      x86_64
 Requires:       python3
 Requires:       systemd
+# These versioned private SONAMEs are bundled inside Hue's Python wheels.
+Provides:       libgfortran-040039e1.so.5.0.0(GFORTRAN_8)(64bit)
+Provides:       libquadmath-96973f99.so.0.0.0(QUADMATH_1.0)(64bit)
 Source0:        hue-runtime.tar.gz
 Source1:        LICENSE
 Source2:        NOTICE
