@@ -71,11 +71,43 @@ old = "_fileobject_uses_str_type = isinstance(socket._fileobject(None)._rbuf, ba
 new = """try:
     _fileobject_uses_str_type = isinstance(socket._fileobject(None)._rbuf, basestring)
 except AttributeError:
-    # socket._fileobject was removed in Python 3; use the bytes-buffer path.
+    # Python 3 removed the socket._fileobject base used by this pinned server.
+    import io
+    class _SocketFileObject:
+        default_bufsize = 8192
+        def __init__(self, sock, mode="rb", bufsize=-1, close=False):
+            self._sock = sock
+            self._rbufsize = bufsize if bufsize > 0 else self.default_bufsize
+            self._wbufsize = bufsize if bufsize > 0 else self.default_bufsize
+            self._rbuf = io.BytesIO()
+            self._wbuf = []
+            self._close = close
+        def write(self, data):
+            self._wbuf.append(data)
+            if sum(map(len, self._wbuf)) >= self._wbufsize:
+                self.flush()
+        def close(self):
+            self.flush()
+            if self._close:
+                self._sock.close()
+    socket._fileobject = _SocketFileObject
     _fileobject_uses_str_type = False"""
 if source.count(old) != 1:
     raise SystemExit("Pinned Hue wsgiserver compatibility anchor changed")
-path.write_text(source.replace(old, new))
+source = source.replace(old, new)
+replacements = (
+    ("from io import StringIO as string_io", "from io import BytesIO as string_io"),
+    ('buffer = "".join(self._wbuf)', 'buffer = b"".join(self._wbuf)'),
+    ("bline.endswith('\\n')", "bline.endswith(b'\\n')"),
+    ("data.find('\\n', 0, left)", "data.find(b'\\n', 0, left)"),
+    ("data.find('\\n')", "data.find(b'\\n')"),
+    ('data != "\\n"', 'data != b"\\n"'),
+)
+for before, after in replacements:
+    if before not in source:
+        raise SystemExit(f"Missing Python 3 socket buffer compatibility anchor: {before}")
+    source = source.replace(before, after)
+path.write_text(source)
 PY
 
 # Bootstrap Hue's pinned build tooling in an isolated Python environment.
