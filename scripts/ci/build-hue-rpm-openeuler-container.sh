@@ -249,7 +249,6 @@ trino_python_client: 0.329.0
 rpm_count: 1
 status: PASS
 EOF
- "${SOURCE_DIR}/Makefile"
 
 # The pinned upstream CherryPy server probes socket._fileobject, which Python 3.9 removed.
 # Hue only uses this flag to select its Python 2 string-buffer branch; on Python 3,
