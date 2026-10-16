@@ -101,7 +101,7 @@ http-server.http.port=8080
 discovery.uri=http://127.0.0.1:8080
 EOF
 cat > /etc/trino/node.properties <<'EOF'
-node.environment=bigdata-ci
+node.environment=bigdata_ci
 node.id=bigdata-ci-trino
 node.data-dir=/var/lib/trino/data
 EOF
