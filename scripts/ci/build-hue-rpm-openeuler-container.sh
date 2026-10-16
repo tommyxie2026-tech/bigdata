@@ -57,7 +57,28 @@ actual_source_identity="$(git -C "${SOURCE_DIR}" rev-parse HEAD)"
 [[ "${actual_source_identity}" == "${EXPECTED_SOURCE_IDENTITY}" ]]
 hue_source_version="$(sed -n 's/^VERSION="\([^"]*\)"$/\1/p' "${SOURCE_DIR}/VERSION" | head -n1)"
 [[ "${hue_source_version}" == "${VERSION}" ]]
-grep -Eq '^apps: desktop
+grep -Eq '^apps: desktop$' "${SOURCE_DIR}/Makefile"
+
+# The pinned upstream CherryPy server probes socket._fileobject, removed in Python 3.9.
+# Its flag only chooses the Python 2 string-buffer path; Python 3 must use the bytes-buffer path.
+python3 - "${SOURCE_DIR}/desktop/core/src/desktop/lib/wsgiserver.py" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+source = path.read_text()
+old = "_fileobject_uses_str_type = isinstance(socket._fileobject(None)._rbuf, basestring)"
+new = """try:
+    _fileobject_uses_str_type = isinstance(socket._fileobject(None)._rbuf, basestring)
+except AttributeError:
+    # socket._fileobject was removed in Python 3; use the bytes-buffer path.
+    _fileobject_uses_str_type = False"""
+if source.count(old) != 1:
+    raise SystemExit("Pinned Hue wsgiserver compatibility anchor changed")
+path.write_text(source.replace(old, new))
+PY
+
+# Bootstrap Hue's pinned build tooling in an isolated Python environment.
 # The target image's RPM-owned pip has no RECORD file, so upgrading it directly
 # from upstream's Makefile fails. A venv-local pip can be upgraded safely.
 BOOTSTRAP_PYTHON="${WORK_ROOT}/bootstrap-python"
