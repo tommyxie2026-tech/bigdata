@@ -90,6 +90,7 @@ cat > /usr/libexec/hue/hue-server <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 export HUE_CONF_DIR=/etc/hue
+export DESKTOP_LOG_DIR=/var/log/hue
 export HOME=/var/lib/hue
 cd /usr/share/hue
 exec /usr/share/hue/build/venvs/python3.9/bin/hue runcherrypyserver --server-name=0.0.0.0 --port=8888
