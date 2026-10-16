@@ -30,6 +30,10 @@ on:
       source_identity:
         required: true
         type: string
+      require_pr_build_test:
+        required: false
+        type: boolean
+        default: false
     outputs:
       stage_passed:
         description: True only for a verified fast path or completed lifecycle
@@ -87,7 +91,8 @@ jobs:
     if: >-
       always() &&
       needs.repo_check.result == 'success' &&
-      needs.repo_check.outputs.already_current != 'true' &&
+      (needs.repo_check.outputs.already_current != 'true' ||
+       (inputs.require_pr_build_test && github.event_name == 'pull_request')) &&
       needs.pr_test_reuse.outputs.test_run_id == ''
     uses: ./.github/workflows/build-one-component.yml
     with:
@@ -158,10 +163,12 @@ jobs:
           RELEASE_RESULT: ${{ needs.release.result }}
           EVENT_NAME: ${{ github.event_name }}
           IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          REQUIRE_PR_BUILD_TEST: ${{ inputs.require_pr_build_test }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ "${CHECK_RESULT}" == success && "${ALREADY_CURRENT}" == true && \
+                "${REQUIRE_PR_BUILD_TEST}" != true && \
                 "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && \
                 "${RELEASE_RESULT}" == skipped ]]; then
             echo 'stage_passed=true' >> "${GITHUB_OUTPUT}"
