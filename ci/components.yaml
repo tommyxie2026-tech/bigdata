@@ -188,3 +188,34 @@ components:
     depends_on:
       - spark
       - flink
+  paimon:
+    builder: custom
+    artifact_type: integration-rpm
+    version: 2.1.0
+    source_identity: 3a5ffe7870697e2c2605e63413fb5ac5800aae7e
+    runtime_packages:
+      - bigdata-paimon-spark
+      - bigdata-paimon-flink
+    build_task: paimon-rpm
+    wave: 9
+    test_profile: paimon-cross-engine-smoke
+    jdk: '11'
+    jdk_package: java-11-openjdk-devel
+    runtime:
+      java: '11'
+    source:
+      type: git
+      url: https://github.com/apache/paimon.git
+      ref: 3a5ffe7870697e2c2605e63413fb5ac5800aae7e
+    compatibility:
+      engines:
+        - spark
+        - flink
+      engine_versions:
+        spark: 3.5.8
+        scala: '2.12'
+        flink: 1.20.1
+      catalog: paimon
+    depends_on:
+      - spark
+      - flink
