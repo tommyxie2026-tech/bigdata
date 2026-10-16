@@ -90,7 +90,7 @@ sed -i \
   -e 's|^## name=desktop/desktop.db$|name=/var/lib/hue/hue.db|' \
   /etc/hue/hue.ini
 install -d -o hue -g hue -m 0750 /var/lib/hue /var/log/hue
-runuser -u hue -- env HUE_CONF_DIR=/etc/hue HOME=/var/lib/hue \
+runuser -u hue -- env HUE_CONF_DIR=/etc/hue DESKTOP_LOG_DIR=/var/log/hue HOME=/var/lib/hue \
   /usr/share/hue/build/venvs/python3.9/bin/hue migrate \
   2>&1 | tee "${LOG_DIR}/hue-migrate.log"
 
@@ -140,7 +140,7 @@ for attempt in $(seq 1 180); do
 done
 [[ "${trino_ready}" == true ]] || { cat "${LOG_DIR}/trino.log" >&2; exit 1; }
 
-runuser -u hue -- env HUE_CONF_DIR=/etc/hue HOME=/var/lib/hue \
+runuser -u hue -- env HUE_CONF_DIR=/etc/hue DESKTOP_LOG_DIR=/var/log/hue HOME=/var/lib/hue \
   /usr/libexec/hue/hue-server >"${LOG_DIR}/hue-server.log" 2>&1 &
 hue_pid=$!
 hue_ready=false
@@ -161,7 +161,7 @@ echo 'health_check: PASS' > "${EVIDENCE_ROOT}/health-check.txt"
 # Exercise Hue's own Trino connector against the real single-node Trino service;
 # a direct HTTP check alone is not considered a backend smoke test.
 cd /usr/share/hue
-runuser -u hue -- env HUE_CONF_DIR=/etc/hue HOME=/var/lib/hue \
+runuser -u hue -- env HUE_CONF_DIR=/etc/hue DESKTOP_LOG_DIR=/var/log/hue HOME=/var/lib/hue \
   /usr/share/hue/build/venvs/python3.9/bin/hue shell \
   >"${LOG_DIR}/hue-trino-query.log" 2>&1 <<'PY'
 import os
