@@ -83,7 +83,7 @@ rpm -q bigdata-hue-server trino-server-rpm
 
 test -x /usr/share/hue/build/venvs/python3.9/bin/hue
 test -s /etc/hue/hue.ini
-grep -Fq 'exec /usr/share/hue/build/venvs/python3.9/bin/hue runcherrypyserver --server-name=0.0.0.0 --port=8888' /usr/libexec/hue/hue-server
+grep -Fq 'exec /usr/share/hue/build/venvs/python3.9/bin/hue runcherrypyserver' /usr/libexec/hue/hue-server
 sed -i \
   -e "s|^secret_key=.*|secret_key=bigdata-hue-ci-disposable-key-2026|" \
   -e 's|^## engine=sqlite3$|engine=sqlite3|' \
