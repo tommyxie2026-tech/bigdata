@@ -24,8 +24,10 @@ mkdir -p "${REPO_DIR}" "${EVIDENCE_ROOT}" "${LOG_DIR}"
 dnf -y install ca-certificates createrepo_c curl dnf-utils findutils java-11-openjdk-devel procps-ng rpm shadow-utils
 javac_path="$(rpm -ql java-11-openjdk-devel | awk '/\/bin\/javac$/ { print; exit }')"
 [[ -n "${javac_path}" && -x "${javac_path}" ]] || { echo "JDK 11 javac not found in java-11-openjdk-devel." >&2; exit 1; }
-export JAVA_HOME="$(dirname "$(dirname "${javac_path}")")"
-export PATH="${JAVA_HOME}/bin:${PATH}"
+JAVA_HOME="$(dirname "$(dirname "${javac_path}")")"
+export JAVA_HOME
+PATH="${JAVA_HOME}/bin:${PATH}"
+export PATH
 java -version 2>&1 | grep -Eq 'version "11([.]|")'
 
 build_evidence="${ARTIFACT_ROOT}/evidence/evidence.md"
