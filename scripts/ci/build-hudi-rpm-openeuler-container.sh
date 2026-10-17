@@ -23,8 +23,12 @@ mkdir -p "${ARTIFACTS}/rpms" "${ARTIFACTS}/logs" "${ARTIFACTS}/evidence"
 grep -qi openEuler /etc/os-release
 
 dnf -y install ca-certificates curl git java-11-openjdk-devel maven rpm-build tar
-java -version
-javac -version
+javac_path="$(rpm -ql java-11-openjdk-devel | awk '/\/bin\/javac$/ { print; exit }')"
+[[ -n "${javac_path}" && -x "${javac_path}" ]] || { echo "JDK 11 javac not found in java-11-openjdk-devel." >&2; exit 1; }
+export JAVA_HOME="$(dirname "$(dirname "${javac_path}")")"
+export PATH="${JAVA_HOME}/bin:${PATH}"
+java -version 2>&1 | grep -Eq 'version "11([.]|")'
+javac -version 2>&1 | grep -Eq '^javac 11([.]|$)'
 
 rm -rf "${SOURCE_DIR}"
 git init "${SOURCE_DIR}"
