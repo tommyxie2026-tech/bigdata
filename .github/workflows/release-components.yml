@@ -49,6 +49,7 @@ on:
           - flink
           - trino
           - iceberg
+          - hue
       version:
         description: Component version
         required: true

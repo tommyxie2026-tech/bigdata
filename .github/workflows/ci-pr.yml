@@ -58,6 +58,9 @@ jobs:
       - name: Component RPM repository fast-path contracts
         run: python3 scripts/ci/test-component-repo-fast-path.py
 
+      - name: Hue RPM package payload contract
+        run: bash scripts/ci/test-hue-rpm-package-contract.sh
+
       - name: Component catalog contracts
         run: |
           python3 scripts/ci/test-component-config.py
