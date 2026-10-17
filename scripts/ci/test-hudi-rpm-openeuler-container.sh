@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+trap 'rc=$?; printf "Smoke test command failed at line %s (exit %s): %s\\n" "$LINENO" "$rc" "$BASH_COMMAND" >&2; exit "$rc"' ERR
 
 : "${COMPONENT:?COMPONENT is required}"
 : "${VERSION:?VERSION is required}"
