@@ -61,3 +61,5 @@ jobs:
       jdk_package: java-11-openjdk-devel
       source_identity: a9185b7c4e83422132c25f2efdf282c5bc6af2c7
       require_pr_build_test: true
+      # Re-test the previously built RPMs; source and checksum are checked by the test.
+      rpm_build_run_id: '39032012294'

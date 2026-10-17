@@ -18,6 +18,21 @@ report_smoke_failure() {
 }
 trap report_smoke_failure ERR
 
+assert_result_row() {
+  local log_file="$1" expected="$2"
+  awk -F '|' -v expected="${expected}" '
+    /^\\|/ {
+      row = ""
+      for (i = 2; i < NF; i++) {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", $i)
+        row = row (i == 2 ? "" : ":") $i
+      }
+      if (row == expected) found = 1
+    }
+    END { exit !found }
+  ' "${log_file}"
+}
+
 : "${COMPONENT:?COMPONENT is required}"
 : "${VERSION:?VERSION is required}"
 : "${BUILD_RUN_ID:?BUILD_RUN_ID is required}"
@@ -161,7 +176,7 @@ runuser -u spark -- env HOME=/var/lib/spark SPARK_LOCAL_IP=127.0.0.1 HADOOP_CONF
   --conf spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension \
   --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog \
   -f /tmp/hudi-spark-write.sql > "${LOG_DIR}/spark-write.log" 2>&1
-grep -q '1:1' "${LOG_DIR}/spark-write.log"
+grep -qx '1:1' "${LOG_DIR}/spark-write.log"
 echo 'spark_hudi_upsert: PASS' > "${EVIDENCE_ROOT}/spark-write.txt"
 
 cat > /tmp/hudi-flink-write.sql <<'SQL'
@@ -182,19 +197,25 @@ CREATE TABLE hudi_flink_ci (
   'compaction.async.enabled' = 'false',
   'clean.async.enabled' = 'false'
 );
-INSERT INTO hudi_flink_ci VALUES ('42', 'flink-before', 1), ('42', 'flink-after', 2);
+INSERT INTO hudi_flink_ci VALUES ('42', 'flink-before', 1);
 SQL
 chown flink:flink /tmp/hudi-flink-write.sql
 hadoop_classpath=''
 if command -v hadoop >/dev/null 2>&1; then
   hadoop_classpath="$(hadoop classpath)"
 fi
+# Separate local sessions wait for each committed write before the next update.
+for phase in before after; do
+  if [[ "${phase}" == after ]]; then
+    sed -i "s/'flink-before', 1/'flink-after', 2/" /tmp/hudi-flink-write.sql
+  fi
 runuser -u flink -- env HOME=/var/lib/flink JAVA_TOOL_OPTIONS=-Duser.home=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf \
   HADOOP_CONF_DIR=/etc/hadoop/conf HADOOP_CLASSPATH="${hadoop_classpath}" \
-  "${flink_sql}" embedded -j "${flink_bundle}" -f /tmp/hudi-flink-write.sql \
-  > "${LOG_DIR}/flink-write.log" 2>&1
+  "${flink_sql}" embedded -f /tmp/hudi-flink-write.sql \
+  >> "${LOG_DIR}/flink-write.log" 2>&1
+done
+! grep -Eq '\[ERROR\]|Exception in thread' "${LOG_DIR}/flink-write.log"
 [[ -s /tmp/hudi-flink-table/.hoodie/hoodie.properties ]]
-echo 'flink_hudi_upsert: PASS' > "${EVIDENCE_ROOT}/flink-write.txt"
 
 cat > /tmp/hudi-spark-cross-read.sql <<'SQL'
 CREATE TABLE hudi_flink_output (
@@ -214,6 +235,7 @@ runuser -u spark -- env HOME=/var/lib/spark SPARK_LOCAL_IP=127.0.0.1 HADOOP_CONF
   --conf spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension \
   --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog \
   -f /tmp/hudi-spark-cross-read.sql > "${LOG_DIR}/spark-cross-read.log" 2>&1
+echo 'flink_hudi_upsert: PASS' > "${EVIDENCE_ROOT}/flink-write.txt"
 echo 'spark_reads_flink_hudi_commit: PASS' > "${EVIDENCE_ROOT}/spark-cross-read.txt"
 
 cat > /tmp/hudi-flink-cross-read.sql <<'SQL'
@@ -231,14 +253,14 @@ CREATE TABLE hudi_spark_output (
   'metadata.enabled' = 'false',
   'hoodie.filesystem.view.type' = 'MEMORY'
 );
-SELECT id, name, ts FROM hudi_spark_output;
+SELECT COUNT(*), MAX(name), MAX(ts) FROM hudi_spark_output;
 SQL
 chown flink:flink /tmp/hudi-flink-cross-read.sql
 runuser -u flink -- env HOME=/var/lib/flink JAVA_TOOL_OPTIONS=-Duser.home=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf \
   HADOOP_CONF_DIR=/etc/hadoop/conf HADOOP_CLASSPATH="${hadoop_classpath}" \
-  "${flink_sql}" embedded -j "${flink_bundle}" -f /tmp/hudi-flink-cross-read.sql \
+  "${flink_sql}" embedded -f /tmp/hudi-flink-cross-read.sql \
   > "${LOG_DIR}/flink-cross-read.log" 2>&1
-grep -q 'spark-after' "${LOG_DIR}/flink-cross-read.log"
+assert_result_row "${LOG_DIR}/flink-cross-read.log" '1:spark-after:2'
 echo 'flink_reads_spark_hudi_commit: PASS' > "${EVIDENCE_ROOT}/flink-cross-read.txt"
 
 cat > "${EVIDENCE_ROOT}/evidence.md" <<EOF
