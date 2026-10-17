@@ -61,6 +61,9 @@ jobs:
       - name: Hue RPM package payload contract
         run: bash scripts/ci/test-hue-rpm-package-contract.sh
 
+      - name: Paimon SQL result parser regression
+        run: python3 scripts/ci/test-paimon-result-parser.py
+
       - name: Component catalog contracts
         run: |
           python3 scripts/ci/test-component-config.py
