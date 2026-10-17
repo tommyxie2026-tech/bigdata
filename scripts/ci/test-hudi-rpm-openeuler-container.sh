@@ -119,6 +119,17 @@ id spark
 id flink
 install -d -o spark -g spark -m 0750 /tmp/hudi-spark-table
 install -d -o flink -g flink -m 0750 /tmp/hudi-flink-table /var/log/flink
+install -d -o flink -g flink -m 0750 /usr/lib/flink/log
+flink_conf=/etc/flink/conf/flink-conf.yaml
+[[ -f "${flink_conf}" ]]
+cat >> "${flink_conf}" <<'EOF'
+jobmanager.bind-host: 127.0.0.1
+jobmanager.rpc.address: 127.0.0.1
+rest.bind-address: 127.0.0.1
+rest.address: 127.0.0.1
+taskmanager.bind-host: 127.0.0.1
+taskmanager.host: 127.0.0.1
+EOF
 
 cat > /tmp/hudi-spark-write.sql <<'SQL'
 CREATE TABLE hudi_spark_ci (
