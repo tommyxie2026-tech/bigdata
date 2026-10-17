@@ -119,6 +119,8 @@ id spark
 id flink
 install -d -o spark -g spark -m 0750 /tmp/hudi-spark-table
 install -d -o flink -g flink -m 0750 /tmp/hudi-flink-table /var/log/flink /var/lib/flink
+# Spark and Flink both write Hudi metadata under the shared cross-engine table path.
+chmod 0777 /tmp/hudi-flink-table
 install -d -o flink -g flink -m 0750 /usr/lib/flink/log /etc/flink/conf
 flink_conf=/etc/flink/conf/flink-conf.yaml
 touch "${flink_conf}"
