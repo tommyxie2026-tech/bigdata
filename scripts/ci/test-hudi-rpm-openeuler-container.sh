@@ -218,6 +218,7 @@ echo 'spark_reads_flink_hudi_commit: PASS' > "${EVIDENCE_ROOT}/spark-cross-read.
 
 cat > /tmp/hudi-flink-cross-read.sql <<'SQL'
 SET 'execution.runtime-mode' = 'batch';
+SET 'execution.target' = 'local';
 SET 'sql-client.execution.result-mode' = 'tableau';
 CREATE TABLE hudi_spark_output (
   id STRING PRIMARY KEY NOT ENFORCED,
