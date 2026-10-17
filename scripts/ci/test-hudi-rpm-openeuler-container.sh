@@ -129,7 +129,11 @@ CREATE TABLE hudi_spark_ci (
 TBLPROPERTIES (type='cow', primaryKey='id', preCombineField='ts')
 LOCATION 'file:///tmp/hudi-spark-table';
 INSERT INTO hudi_spark_ci VALUES ('42', 'spark-before', 1);
-INSERT INTO hudi_spark_ci VALUES ('42', 'spark-after', 2);
+MERGE INTO hudi_spark_ci AS target
+USING (SELECT '42' AS id, 'spark-after' AS name, CAST(2 AS BIGINT) AS ts) AS source
+ON target.id = source.id
+WHEN MATCHED THEN UPDATE SET target.name = source.name, target.ts = source.ts
+WHEN NOT MATCHED THEN INSERT (id, name, ts) VALUES (source.id, source.name, source.ts);
 SELECT concat(CAST(COUNT(*) AS STRING), ':', CAST(SUM(CASE WHEN name = 'spark-after' THEN 1 ELSE 0 END) AS STRING)) FROM hudi_spark_ci;
 SQL
 chown spark:spark /tmp/hudi-spark-write.sql
