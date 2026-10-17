@@ -182,8 +182,7 @@ CREATE TABLE hudi_flink_ci (
   'compaction.async.enabled' = 'false',
   'clean.async.enabled' = 'false'
 );
-INSERT INTO hudi_flink_ci VALUES ('42', 'flink-before', 1);
-INSERT INTO hudi_flink_ci VALUES ('42', 'flink-after', 2);
+INSERT INTO hudi_flink_ci VALUES ('42', 'flink-before', 1), ('42', 'flink-after', 2);
 SQL
 chown flink:flink /tmp/hudi-flink-write.sql
 hadoop_classpath=''
