@@ -47,24 +47,6 @@ export JAVA_HOME
 PATH="${JAVA_HOME}/bin:${PATH}"
 export PATH
 java -version 2>&1 | grep -Eq 'version "11([.]|")'
-hadoop_classpath=''
-if command -v hadoop >/dev/null 2>&1; then
-  hadoop_classpath="$(hadoop classpath)"
-fi
-[[ -n "${hadoop_classpath}" ]] || { echo "Hadoop runtime classpath is empty." >&2; exit 1; }
-mapfile -t hadoop_jars < <(find /usr/lib/hadoop /usr/lib/hadoop-* -type f -name '*.jar' -print 2>/dev/null | LC_ALL=C sort -u)
-[[ "${#hadoop_jars[@]}" -gt 0 ]] || { echo "Hadoop runtime JARs are missing." >&2; exit 1; }
-found_hadoop_common=false
-for hadoop_jar in "${hadoop_jars[@]}"; do
-  if [[ "${hadoop_jar}" == */hadoop-common-*.jar ]]; then
-    found_hadoop_common=true
-  fi
-done
-[[ "${found_hadoop_common}" == true ]] || { echo "hadoop-common JAR is missing." >&2; exit 1; }
-for index in "${!hadoop_jars[@]}"; do
-  hadoop_jar="${hadoop_jars[index]}"
-  ln -sf "${hadoop_jar}" "/usr/lib/flink/lib/bigdata-hadoop-${index}-${hadoop_jar##*/}"
-done
 
 build_evidence="${ARTIFACT_ROOT}/evidence/evidence.md"
 [[ -s "${build_evidence}" ]]
@@ -130,6 +112,24 @@ EOF
 dnf clean all
 dnf -y --enablerepo=paimon-ci install bigdata-paimon-spark bigdata-paimon-flink spark flink hadoop-client hadoop-conf-pseudo
 rpm -q bigdata-paimon-spark bigdata-paimon-flink spark flink
+hadoop_classpath=''
+if command -v hadoop >/dev/null 2>&1; then
+  hadoop_classpath="$(hadoop classpath)"
+fi
+[[ -n "${hadoop_classpath}" ]] || { echo "Hadoop runtime classpath is empty." >&2; exit 1; }
+mapfile -t hadoop_jars < <(find /usr/lib/hadoop /usr/lib/hadoop-* -type f -name '*.jar' -print 2>/dev/null | LC_ALL=C sort -u)
+[[ "${#hadoop_jars[@]}" -gt 0 ]] || { echo "Hadoop runtime JARs are missing." >&2; exit 1; }
+found_hadoop_common=false
+for hadoop_jar in "${hadoop_jars[@]}"; do
+  if [[ "${hadoop_jar}" == */hadoop-common-*.jar ]]; then
+    found_hadoop_common=true
+  fi
+done
+[[ "${found_hadoop_common}" == true ]] || { echo "hadoop-common JAR is missing." >&2; exit 1; }
+for index in "${!hadoop_jars[@]}"; do
+  hadoop_jar="${hadoop_jars[index]}"
+  ln -sf "${hadoop_jar}" "/usr/lib/flink/lib/bigdata-hadoop-${index}-${hadoop_jar##*/}"
+done
 
 spark_bundle="/usr/lib/spark/jars/${SPARK_JAR}"
 flink_bundle="/usr/lib/flink/lib/${FLINK_JAR}"
