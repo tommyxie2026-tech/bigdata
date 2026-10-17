@@ -18,6 +18,21 @@ report_smoke_failure() {
 }
 trap report_smoke_failure ERR
 
+assert_result_row() {
+  local log_file="$1" expected="$2"
+  awk -F '|' -v expected="${expected}" '
+    /^\\|/ {
+      row = ""
+      for (i = 2; i < NF; i++) {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", $i)
+        row = row (i == 2 ? "" : ":") $i
+      }
+      if (row == expected) found = 1
+    }
+    END { exit !found }
+  ' "${log_file}"
+}
+
 : "${COMPONENT:?COMPONENT is required}"
 : "${VERSION:?VERSION is required}"
 : "${BUILD_RUN_ID:?BUILD_RUN_ID is required}"
@@ -39,7 +54,7 @@ SPARK_JAR=paimon-spark-3.5_2.12-${VERSION}.jar
 FLINK_JAR=paimon-flink-1.20-${VERSION}.jar
 mkdir -p "${REPO_DIR}" "${EVIDENCE_ROOT}" "${LOG_DIR}"
 chmod 0777 "${LOG_DIR}" # Spark and Flink service users write their test logs here.
-dnf -y install ca-certificates createrepo_c findutils java-11-openjdk-devel procps-ng rpm shadow-utils util-linux
+dnf -y install ca-certificates createrepo_c findutils hostname java-11-openjdk-devel procps-ng rpm shadow-utils util-linux
 javac_path="$(rpm -ql java-11-openjdk-devel | awk '/\/bin\/javac$/ && !found { print; found=1 } END { if (!found) exit 1 }')"
 [[ -n "${javac_path}" && -x "${javac_path}" ]] || { echo "JDK 11 javac not found in java-11-openjdk-devel." >&2; exit 1; }
 JAVA_HOME="$(dirname "$(dirname "${javac_path}")")"
@@ -117,20 +132,6 @@ if command -v hadoop >/dev/null 2>&1; then
   hadoop_classpath="$(hadoop classpath)"
 fi
 [[ -n "${hadoop_classpath}" ]] || { echo "Hadoop runtime classpath is empty." >&2; exit 1; }
-mapfile -t hadoop_jars < <(find /usr/lib/hadoop /usr/lib/hadoop-* -type f -name '*.jar' -print 2>/dev/null | LC_ALL=C sort -u)
-[[ "${#hadoop_jars[@]}" -gt 0 ]] || { echo "Hadoop runtime JARs are missing." >&2; exit 1; }
-found_hadoop_common=false
-for hadoop_jar in "${hadoop_jars[@]}"; do
-  if [[ "${hadoop_jar}" == */hadoop-common-*.jar ]]; then
-    found_hadoop_common=true
-  fi
-done
-[[ "${found_hadoop_common}" == true ]] || { echo "hadoop-common JAR is missing." >&2; exit 1; }
-for index in "${!hadoop_jars[@]}"; do
-  hadoop_jar="${hadoop_jars[index]}"
-  ln -sf "${hadoop_jar}" "/usr/lib/flink/lib/bigdata-hadoop-${index}-${hadoop_jar##*/}"
-done
-
 spark_bundle="/usr/lib/spark/jars/${SPARK_JAR}"
 flink_bundle="/usr/lib/flink/lib/${FLINK_JAR}"
 [[ -s "${spark_bundle}" && -s "${flink_bundle}" ]]
@@ -173,38 +174,43 @@ SELECT concat(CAST(COUNT(*) AS STRING), ':', CAST(SUM(CASE WHEN name = 'spark-af
 SQL
 chown spark:spark /tmp/paimon-spark.sql
 runuser -u spark -- bash -c 'umask 000; exec env HOME=/var/lib/spark SPARK_LOCAL_IP=127.0.0.1 HADOOP_CONF_DIR=/etc/hadoop/conf "$1" --master "local[2]" --conf spark.sql.catalogImplementation=in-memory --conf spark.sql.catalog.paimon=org.apache.paimon.spark.SparkCatalog --conf spark.sql.catalog.paimon.warehouse=file:/tmp/paimon-spark-table --conf spark.sql.extensions=org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions -f /tmp/paimon-spark.sql' _ "${spark_sql}" > "${LOG_DIR}/spark-write.log" 2>&1
-grep -q '1:1' "${LOG_DIR}/spark-write.log"
+grep -qx '1:1' "${LOG_DIR}/spark-write.log"
 chmod -R a+rwX /tmp/paimon-spark-table
 echo 'spark_paimon_upsert: PASS' > "${EVIDENCE_ROOT}/spark-write.txt"
 
 cat > /tmp/paimon-flink.sql <<'SQL'
 SET 'execution.runtime-mode' = 'batch';
+SET 'execution.target' = 'local';
+SET 'table.dml-sync' = 'true';
 SET 'sql-client.execution.result-mode' = 'tableau';
 CREATE CATALOG paimon_catalog WITH (
   'type' = 'paimon',
   'warehouse' = 'file:/tmp/paimon-flink-table'
 );
 USE CATALOG paimon_catalog;
-CREATE TABLE paimon_flink_ci (
+CREATE TABLE IF NOT EXISTS paimon_flink_ci (
   id BIGINT,
   name STRING,
   PRIMARY KEY (id) NOT ENFORCED
-) WITH ('bucket' = '1');
+) WITH ('bucket' = '1', 'merge-engine' = 'deduplicate');
 INSERT INTO paimon_flink_ci VALUES (42, 'flink-before');
-INSERT INTO paimon_flink_ci VALUES (42, 'flink-after');
-SELECT * FROM paimon_flink_ci;
 SQL
 chown flink:flink /tmp/paimon-flink.sql
-runuser -u flink -- bash -c 'umask 000; exec env HOME=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf HADOOP_CONF_DIR=/etc/hadoop/conf HADOOP_CLASSPATH="$3" "$1" embedded -j "$2" -f /tmp/paimon-flink.sql' _ "${flink_sql}" "${flink_bundle}" "${hadoop_classpath}" > "${LOG_DIR}/flink-write.log" 2>&1
-grep -q 'flink-after' "${LOG_DIR}/flink-write.log"
+for phase in before after; do
+  if [[ "${phase}" == after ]]; then
+    sed -i 's/flink-before/flink-after/' /tmp/paimon-flink.sql
+  fi
+  runuser -u flink -- bash -c 'umask 000; exec env HOME=/var/lib/flink JAVA_TOOL_OPTIONS=-Duser.home=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf HADOOP_CONF_DIR=/etc/hadoop/conf HADOOP_CLASSPATH="$3" "$1" embedded -f /tmp/paimon-flink.sql' _ "${flink_sql}" "${flink_bundle}" "${hadoop_classpath}" >> "${LOG_DIR}/flink-write.log" 2>&1
+done
+! grep -Eq '\[ERROR\]|Exception in thread' "${LOG_DIR}/flink-write.log"
 chmod -R a+rwX /tmp/paimon-flink-table
-echo 'flink_paimon_upsert: PASS' > "${EVIDENCE_ROOT}/flink-write.txt"
 
 cat > /tmp/paimon-spark-cross-read.sql <<'SQL'
 SELECT assert_true(COUNT(*) = 1 AND MAX(name) = 'flink-after') FROM paimon.default.paimon_flink_ci;
 SQL
 chown spark:spark /tmp/paimon-spark-cross-read.sql
 runuser -u spark -- env HOME=/var/lib/spark SPARK_LOCAL_IP=127.0.0.1 HADOOP_CONF_DIR=/etc/hadoop/conf   "${spark_sql}" --master 'local[2]'   --conf spark.sql.catalogImplementation=in-memory   --conf spark.sql.catalog.paimon=org.apache.paimon.spark.SparkCatalog   --conf spark.sql.catalog.paimon.warehouse=file:/tmp/paimon-flink-table   --conf spark.sql.extensions=org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions   -f /tmp/paimon-spark-cross-read.sql > "${LOG_DIR}/spark-cross-read.log" 2>&1
+echo 'flink_paimon_upsert: PASS' > "${EVIDENCE_ROOT}/flink-write.txt"
 echo 'spark_reads_flink_paimon_table: PASS' > "${EVIDENCE_ROOT}/spark-cross-read.txt"
 
 cat > /tmp/paimon-flink-cross-read.sql <<'SQL'
@@ -215,11 +221,11 @@ CREATE CATALOG paimon_catalog WITH (
   'warehouse' = 'file:/tmp/paimon-spark-table'
 );
 USE CATALOG paimon_catalog;
-SELECT * FROM paimon_spark_ci;
+SELECT COUNT(*), MAX(name) FROM paimon_spark_ci;
 SQL
 chown flink:flink /tmp/paimon-flink-cross-read.sql
-runuser -u flink -- env HOME=/var/lib/flink JAVA_TOOL_OPTIONS=-Duser.home=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf HADOOP_CONF_DIR=/etc/hadoop/conf HADOOP_CLASSPATH="${hadoop_classpath}"   "${flink_sql}" embedded -j "${flink_bundle}" -f /tmp/paimon-flink-cross-read.sql > "${LOG_DIR}/flink-cross-read.log" 2>&1
-grep -q 'spark-after' "${LOG_DIR}/flink-cross-read.log"
+runuser -u flink -- env HOME=/var/lib/flink JAVA_TOOL_OPTIONS=-Duser.home=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf HADOOP_CONF_DIR=/etc/hadoop/conf HADOOP_CLASSPATH="${hadoop_classpath}"   "${flink_sql}" embedded -f /tmp/paimon-flink-cross-read.sql > "${LOG_DIR}/flink-cross-read.log" 2>&1
+assert_result_row "${LOG_DIR}/flink-cross-read.log" '1:spark-after'
 echo 'flink_reads_spark_paimon_table: PASS' > "${EVIDENCE_ROOT}/flink-cross-read.txt"
 
 cat > "${EVIDENCE_ROOT}/evidence.md" <<EOF

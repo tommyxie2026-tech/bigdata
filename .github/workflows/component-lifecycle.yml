@@ -34,6 +34,11 @@ on:
         required: false
         type: boolean
         default: false
+      rpm_build_run_id:
+        description: Existing successful RPM build to test without recompiling
+        required: false
+        type: string
+        default: ''
     outputs:
       stage_passed:
         description: True only for a verified fast path or completed lifecycle
@@ -93,7 +98,8 @@ jobs:
       needs.repo_check.result == 'success' &&
       (needs.repo_check.outputs.already_current != 'true' ||
        (inputs.require_pr_build_test && github.event_name == 'pull_request')) &&
-      needs.pr_test_reuse.outputs.test_run_id == ''
+      needs.pr_test_reuse.outputs.test_run_id == '' &&
+      inputs.rpm_build_run_id == ''
     uses: ./.github/workflows/build-one-component.yml
     with:
       component: ${{ inputs.component }}
@@ -108,13 +114,13 @@ jobs:
 
   test:
     name: Test ${{ inputs.component }} ${{ inputs.version }}
-    needs: [build, pr_test_reuse]
-    if: ${{ always() && needs.build.result == 'success' }}
+    needs: [repo_check, build, pr_test_reuse]
+    if: ${{ always() && needs.repo_check.result == 'success' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.rpm_build_run_id != '')) }}
     uses: ./.github/workflows/test-components.yml
     with:
       component: ${{ inputs.component }}
       version: ${{ inputs.version }}
-      build_run_id: ${{ format('{0}', github.run_id) }}
+      build_run_id: ${{ inputs.rpm_build_run_id || format('{0}', github.run_id) }}
       test_profile: ${{ inputs.test_profile }}
       builder: ${{ inputs.builder }}
       artifact_type: ${{ inputs.artifact_type }}
@@ -158,6 +164,7 @@ jobs:
           CHECK_RESULT: ${{ needs.repo_check.result }}
           ALREADY_CURRENT: ${{ needs.repo_check.outputs.already_current }}
           PR_TEST_RUN_ID: ${{ needs.pr_test_reuse.outputs.test_run_id }}
+          RPM_BUILD_RUN_ID: ${{ inputs.rpm_build_run_id }}
           BUILD_RESULT: ${{ needs.build.result }}
           TEST_RESULT: ${{ needs.test.result }}
           RELEASE_RESULT: ${{ needs.release.result }}
@@ -177,7 +184,8 @@ jobs:
                   "${PR_TEST_RUN_ID}" =~ ^[0-9]+$ ]]; then
             echo 'stage_passed=true' >> "${GITHUB_OUTPUT}"
             echo "Promoted verified PR test artifacts from run ${PR_TEST_RUN_ID}." >> "${GITHUB_STEP_SUMMARY}"
-          elif [[ "${CHECK_RESULT}" == success && "${BUILD_RESULT}" == success && \
+          elif [[ "${CHECK_RESULT}" == success && ( "${BUILD_RESULT}" == success || \
+                    ( "${BUILD_RESULT}" == skipped && "${RPM_BUILD_RUN_ID}" =~ ^[0-9]+$ ) ) && \
                   "${TEST_RESULT}" == success && \
                   ( "${RELEASE_RESULT}" == success || \
                     ( "${EVENT_NAME}" == pull_request && "${RELEASE_RESULT}" == skipped ) ) ]]; then
