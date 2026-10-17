@@ -220,6 +220,7 @@ echo 'spark_reads_flink_paimon_table: PASS' > "${EVIDENCE_ROOT}/spark-cross-read
 
 cat > /tmp/paimon-flink-cross-read.sql <<'SQL'
 SET 'execution.runtime-mode' = 'batch';
+SET 'execution.target' = 'local';
 SET 'sql-client.execution.result-mode' = 'tableau';
 CREATE CATALOG paimon_catalog WITH (
   'type' = 'paimon',
