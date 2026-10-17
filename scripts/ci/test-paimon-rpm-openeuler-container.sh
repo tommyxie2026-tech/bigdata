@@ -174,7 +174,7 @@ SELECT concat(CAST(COUNT(*) AS STRING), ':', CAST(SUM(CASE WHEN name = 'spark-af
 SQL
 chown spark:spark /tmp/paimon-spark.sql
 runuser -u spark -- bash -c 'umask 000; exec env HOME=/var/lib/spark SPARK_LOCAL_IP=127.0.0.1 HADOOP_CONF_DIR=/etc/hadoop/conf "$1" --master "local[2]" --conf spark.sql.catalogImplementation=in-memory --conf spark.sql.catalog.paimon=org.apache.paimon.spark.SparkCatalog --conf spark.sql.catalog.paimon.warehouse=file:/tmp/paimon-spark-table --conf spark.sql.extensions=org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions -f /tmp/paimon-spark.sql' _ "${spark_sql}" > "${LOG_DIR}/spark-write.log" 2>&1
-grep -qx '1:1' "${LOG_DIR}/spark-write.log"
+assert_result_row "${LOG_DIR}/spark-write.log" '1:1'
 chmod -R a+rwX /tmp/paimon-spark-table
 echo 'spark_paimon_upsert: PASS' > "${EVIDENCE_ROOT}/spark-write.txt"
 
