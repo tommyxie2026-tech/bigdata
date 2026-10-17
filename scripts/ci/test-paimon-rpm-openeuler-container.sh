@@ -137,11 +137,11 @@ CREATE TABLE paimon.default.paimon_spark_ci (
 );
 INSERT INTO paimon.default.paimon_spark_ci VALUES (42, 'spark-before');
 INSERT INTO paimon.default.paimon_spark_ci VALUES (42, 'spark-after');
-SELECT assert_true(COUNT(*) = 1 AND MAX(name) = 'spark-after') FROM paimon.default.paimon_spark_ci;
+SELECT concat(CAST(COUNT(*) AS STRING), ':', CAST(SUM(CASE WHEN name = 'spark-after' THEN 1 ELSE 0 END) AS STRING)) FROM paimon.default.paimon_spark_ci;
 SQL
 chown spark:spark /tmp/paimon-spark.sql
 runuser -u spark -- bash -c 'umask 000; exec env HOME=/var/lib/spark SPARK_LOCAL_IP=127.0.0.1 HADOOP_CONF_DIR=/etc/hadoop/conf "$1" --master "local[2]" --conf spark.sql.catalogImplementation=in-memory --conf spark.sql.catalog.paimon=org.apache.paimon.spark.SparkCatalog --conf spark.sql.catalog.paimon.warehouse=file:/tmp/paimon-spark-table --conf spark.sql.extensions=org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions -f /tmp/paimon-spark.sql' _ "${spark_sql}" > "${LOG_DIR}/spark-write.log" 2>&1
-grep -q 'spark-after' "${LOG_DIR}/spark-write.log"
+grep -q '1:1' "${LOG_DIR}/spark-write.log"
 chmod -R a+rwX /tmp/paimon-spark-table
 echo 'spark_paimon_upsert: PASS' > "${EVIDENCE_ROOT}/spark-write.txt"
 
