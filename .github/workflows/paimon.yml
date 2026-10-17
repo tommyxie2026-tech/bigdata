@@ -1,0 +1,65 @@
+name: Paimon 2.1.0 Build and Test
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/paimon.yml"
+      - ".github/workflows/component-lifecycle.yml"
+      - ".github/workflows/build-one-component.yml"
+      - ".github/workflows/test-components.yml"
+      - ".github/workflows/release-components.yml"
+      - "ci/components.yaml"
+      - "scripts/ci/build-paimon-rpm-openeuler-container.sh"
+      - "scripts/ci/test-paimon-rpm-openeuler-container.sh"
+      - "scripts/ci/resolve-component-adapter.py"
+      - "scripts/ci/resolve-component-dependencies.py"
+      - "scripts/ci/validate-components.py"
+      - "scripts/ci/retry-maven-downloads.sh"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/paimon.yml"
+      - ".github/workflows/component-lifecycle.yml"
+      - ".github/workflows/build-one-component.yml"
+      - ".github/workflows/test-components.yml"
+      - ".github/workflows/release-components.yml"
+      - "ci/components.yaml"
+      - "scripts/ci/build-paimon-rpm-openeuler-container.sh"
+      - "scripts/ci/test-paimon-rpm-openeuler-container.sh"
+      - "scripts/ci/resolve-component-adapter.py"
+      - "scripts/ci/resolve-component-dependencies.py"
+      - "scripts/ci/validate-components.py"
+      - "scripts/ci/retry-maven-downloads.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: paimon-2.1.0-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paimon:
+    name: Paimon 2.1.0 Build RPM and Spark/Flink integration test
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/component-lifecycle.yml
+    with:
+      component: paimon
+      version: '2.1.0'
+      builder: custom
+      artifact_type: integration-rpm
+      build_task: paimon-rpm
+      test_profile: paimon-cross-engine-smoke
+      jdk: '11'
+      jdk_package: java-11-openjdk-devel
+      source_identity: 3a5ffe7870697e2c2605e63413fb5ac5800aae7e
+      require_pr_build_test: true
+      # Re-test the previously built RPMs; source and checksum are checked by the test.
+      rpm_build_run_id: '39013588597'

@@ -30,6 +30,10 @@ class ComponentAdapterTests(unittest.TestCase):
             "test-iceberg-rpm-openeuler-container.sh",
             "build-hue-rpm-openeuler-container.sh",
             "test-hue-rpm-openeuler-container.sh",
+            "build-hudi-rpm-openeuler-container.sh",
+            "test-hudi-rpm-openeuler-container.sh",
+            "build-paimon-rpm-openeuler-container.sh",
+            "test-paimon-rpm-openeuler-container.sh",
         ):
             (self.scripts / filename).write_text("#!/bin/bash\n", encoding="utf-8")
 
@@ -63,6 +67,26 @@ class ComponentAdapterTests(unittest.TestCase):
         )
         self.assertEqual(build, (self.scripts / "build-iceberg-rpm-openeuler-container.sh").resolve())
         self.assertEqual(test, (self.scripts / "test-iceberg-rpm-openeuler-container.sh").resolve())
+
+    def test_hudi_custom_adapter_resolves_pinned_rpm_scripts(self) -> None:
+        build = ADAPTER.resolve_adapter(
+            "custom", "hudi", "build", "hudi-rpm", "hudi-cross-engine-smoke", self.scripts
+        )
+        test = ADAPTER.resolve_adapter(
+            "custom", "hudi", "test", "hudi-rpm", "hudi-cross-engine-smoke", self.scripts
+        )
+        self.assertEqual(build, (self.scripts / "build-hudi-rpm-openeuler-container.sh").resolve())
+        self.assertEqual(test, (self.scripts / "test-hudi-rpm-openeuler-container.sh").resolve())
+
+    def test_paimon_custom_adapter_resolves_pinned_rpm_scripts(self) -> None:
+        build = ADAPTER.resolve_adapter(
+            "custom", "paimon", "build", "paimon-rpm", "paimon-cross-engine-smoke", self.scripts
+        )
+        test = ADAPTER.resolve_adapter(
+            "custom", "paimon", "test", "paimon-rpm", "paimon-cross-engine-smoke", self.scripts
+        )
+        self.assertEqual(build, (self.scripts / "build-paimon-rpm-openeuler-container.sh").resolve())
+        self.assertEqual(test, (self.scripts / "test-paimon-rpm-openeuler-container.sh").resolve())
 
     def test_hue_custom_adapter_resolves_pinned_rpm_scripts(self) -> None:
         build = ADAPTER.resolve_adapter(
