@@ -135,6 +135,7 @@ SQL
 chown spark:spark /tmp/hudi-spark-write.sql
 runuser -u spark -- env HOME=/var/lib/spark SPARK_LOCAL_IP=127.0.0.1 HADOOP_CONF_DIR=/etc/hadoop/conf \
   "${spark_sql}" --master 'local[2]' \
+  --conf spark.sql.catalogImplementation=in-memory \
   --conf spark.serializer=org.apache.spark.serializer.KryoSerializer \
   --conf spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension \
   --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog \
@@ -186,6 +187,7 @@ SQL
 chown spark:spark /tmp/hudi-spark-cross-read.sql
 runuser -u spark -- env HOME=/var/lib/spark SPARK_LOCAL_IP=127.0.0.1 HADOOP_CONF_DIR=/etc/hadoop/conf \
   "${spark_sql}" --master 'local[2]' \
+  --conf spark.sql.catalogImplementation=in-memory \
   --conf spark.serializer=org.apache.spark.serializer.KryoSerializer \
   --conf spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension \
   --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog \
