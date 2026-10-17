@@ -2,6 +2,36 @@
 
 > 2026-10-11 基线说明：本文保留历史设计讨论。当前 openEuler/RPM 版本、七节点配置、Runbook 与验收入口以 [Phase 1 交付设计](phase1-delivery-design.md) 为准；旧 Ubuntu/DEB 和候选版本指令不可用于当前 RC1 部署。
 
+## 当前交付与回归矩阵（2026-10-18）
+
+> 这张表记录仓库当前实际锁定和发布状态，不代表完整集群验收。版本取自主线 `ci/components.yaml`、RPM 仓库 manifest 和最新主线 push CI；“已发布”表示仓库中存在对应 manifest/checksum，不等于 Ambari 七节点部署验收通过。主线 SHA：`52b306b68b407422e1caadb7b00f4481da1cab85`。
+
+| 层级 | 组件 | 当前版本 | 运行时 / OS | 状态与证据 |
+|---|---|---:|---|---|
+| 管理面 | Apache Ambari | 3.0.0 | JDK 17；openEuler 22.03 LTS SP4 | RPM 仓库已发布，3 个 RPM，manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/ambari/3.0.0/manifest.yaml) |
+| 构建基线 | Apache Bigtop | 3.6.0 | `branch-3.6` | 主线构建基线；不是单独的运行时 RPM 发布项 |
+| 公共依赖 | Bigtop common | 3.6.0 | openEuler 22.03 LTS SP4 | RPM 仓库已发布，manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/common/3.6.0/manifest.yaml) |
+| 协调 | ZooKeeper | 3.8.4 | Bigtop 3.6.0 | RPM 仓库已发布，4 个 RPM，manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/zookeeper/3.8.4/manifest.yaml) |
+| 存储与资源 | Hadoop / HDFS / YARN | 3.4.3 | Bigtop 3.6.0 | RPM 仓库已发布，23 个 RPM，manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/hadoop/3.4.3/manifest.yaml) |
+| SQL 执行 | Hive | 4.0.1 | Bigtop 3.6.0 | RPM 仓库已发布，9 个 RPM，manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/hive/4.0.1/manifest.yaml) |
+| 执行引擎 | Tez | 0.10.5 | Bigtop 3.6.0 | RPM 仓库已发布，1 个 RPM，manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/tez/0.10.5/manifest.yaml) |
+| 批处理 | Spark | 3.5.8 | Bigtop 3.6.0 | RPM 仓库已发布，11 个 RPM，manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/spark/3.5.8/manifest.yaml) |
+| 宽表 | HBase | 2.6.5 | Bigtop 3.6.0 | RPM 仓库已发布，6 个 RPM，manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/hbase/2.6.5/manifest.yaml) |
+| 消息队列 | Kafka | 3.4.1 | JDK 8；openEuler 22.03 LTS SP4 | RPM 仓库已发布，KRaft smoke manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/kafka/3.4.1/manifest.yaml) |
+| 流计算 | Flink | 1.20.1 | JDK 11；openEuler 22.03 LTS SP4 | RPM 仓库已发布，local-job smoke manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink/1.20.1/manifest.yaml) |
+| 查询引擎 | Trino | 483 | JDK 25；openEuler 22.03 LTS SP4 | RPM 仓库已发布，single-node smoke manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/trino/483/manifest.yaml) |
+| 湖仓格式 | Iceberg | 1.12.0 | JDK 17；Spark 3.5.8 / Flink 1.20.1 | 两个 integration RPM 已发布，manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/iceberg/1.12.0/manifest.yaml) |
+| 湖仓格式 | Hudi | 1.2.1 | JDK 11；Spark 3.5.8 / Flink 1.20.1 | 两个 integration RPM 已发布；最新主线回归 run `39043226367` 真实通过；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/hudi/1.2.1/manifest.yaml) |
+| 湖仓格式 | Paimon | 2.1.0 | JDK 11；Spark 3.5.8 / Flink 1.20.1 | 复用已验证 RPM（build run `39013588597`）；PR #91 已合并。主线 clean-install / cross-engine 回归 run `39046885689` 正在运行；Build 步骤因复用而 skipped，不算新构建通过，尚无发布 manifest |
+| 查询 UI | Hue | 4.11.0 | Python 3.9、JDK 25、Trino 483；openEuler 22.03 LTS SP4 | PR #85 已合并；当前主线尚无 Hue clean-install / 专项查询成功证据，也没有 RPM 仓库发布 manifest，不能标记为已发布 |
+
+### 当前状态口径
+
+- 已发布组件以对应目录下的 manifest、`SHA256SUMS` 和 RPM 文件为准；CI 的 fast-path 校验是复用既有包，不是新构建。
+- Hudi 最新通过状态来自主线 run `39043226367`；Paimon 以当前 main SHA 的 run `39046885689` 为准，完成前不进入 Release Candidate 或仓库晋级。
+- Hue 的合并只代表代码进入主线；要标记已验证/已发布，仍需 Hue 专项实际 Build/Test 和 RPM 发布记录。
+- JDK 版本是组件构建/运行时边界，不能据此推断同一进程共享一个 JDK，也不替代集群级兼容性验收。
+
 ## 1. 文档目标
 
 本文档定义 Bigdata Platform 第一阶段的基础版本矩阵、兼容性评估维度和后续版本确认流程。
