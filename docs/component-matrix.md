@@ -63,6 +63,26 @@ SQL 层：Hive / Trino / Spark SQL
 | Kubernetes | 运行平台 | 不要求 | 规划 | 必选 | K8s | P1 |
 | Prometheus | 观测 | 可选 | 推荐 | 必选 | K8s/独立 | P2 |
 
+### 4.1 Phase 3 实时数据湖组件交付状态
+
+状态口径：**已发布/冒烟通过**只表示对应 RPM 与所列 smoke 证据存在；**回归失败/进行中**表示当前主线的实际专项测试状态；**未接入/待选型**表示尚无可验证的版本化交付。RPM fast path 或 skipped job 不视为新构建或测试通过。
+
+| 组件 | Phase 3 角色 | 当前版本 / 方案 | 交付与验证状态 | 后续动作 |
+|---|---|---:|---|---|
+| Kafka | 消息接入 | 3.4.1 | RPM 已发布；KRaft smoke PASS | 补齐与 CDC/Flink 的端到端链路验证 |
+| Flink | 流计算 | 1.20.1 | RPM 已发布；local-job smoke PASS | 补齐 Kafka/CDC 与湖仓表格式端到端验证 |
+| CDC Connector | 数据接入 | 未定 | 未接入构建/发布矩阵；未选定连接器及版本 | 明确数据源与 CDC 技术选型，再补构建、部署和一致性测试 |
+| Iceberg | 主线湖仓表格式 | 1.12.0 | integration RPM 已发布，仓库 manifest PASS | 补齐和 Kafka/Flink、对象存储的组合验收 |
+| Hudi | 可选湖仓 Profile | 1.2.1 | integration RPM 已发布；主线回归 PASS | 保持可选 Profile，补充 CDC upsert 场景验收 |
+| Paimon | 候选湖仓表格式（当前路线图未列入） | 2.1.0 | 已有 RPM 可复用；最新主线跨引擎测试失败，Spark 读回结果为 NULL；尚未晋级仓库 | 修复并重跑 Spark/Flink 写入与交叉读取测试，通过后再发布 |
+| Hive Metastore | 湖仓元数据 | 随 Hive 4.0.1 | Hive RPM 已发布；Phase 3 多引擎元数据协同未单独验收 | 验证 Trino、Spark、Flink 对同一 catalog 的读写与 schema 一致性 |
+| Trino | 交互式查询 | 483 | RPM 已发布；single-node smoke PASS | 补齐 Iceberg/Hudi/Paimon catalog 端到端查询验证 |
+| S3 兼容对象存储 | 湖仓存储 | 未选型 | 无目标实现/版本及仓库 RPM；未进入构建测试 | 选定 MinIO、OBS 或其他实现，并定义身份认证、TLS、bucket policy 与兼容性验收 |
+| HDFS | 兼容存储后端 | 3.4.3 | RPM 已发布；Phase 1 包装证据 PASS | 作为对象存储未就绪时的替代后端，补齐湖仓格式读写验证 |
+| Delta Lake | 可选湖仓格式 | 未定 | 路线图仅列为可选；未纳入当前交付矩阵 | 仅在有明确场景需求后选型和立项 |
+
+Hue 是查询 UI，不属于当前路线图定义的 Phase 3 核心组件；它已合并主线，但目前没有实际安装/启动与 Hue 专项查询 PASS 证据，暂列为**待专项回归**，不计作已发布完成项。
+
 ## 5. 第一阶段核心组合
 
 第一阶段聚焦传统数仓物理机底座，并要求支持 HA 生产拓扑设计。
