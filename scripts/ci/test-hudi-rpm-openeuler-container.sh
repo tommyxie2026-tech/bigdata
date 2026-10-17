@@ -118,6 +118,8 @@ flink_sql=/usr/lib/flink/bin/sql-client.sh
 id spark
 id flink
 install -d -o spark -g spark -m 0750 /tmp/hudi-spark-table
+# Flink must traverse the Spark-created table for the cross-engine read.
+chmod 0777 /tmp/hudi-spark-table
 install -d -o flink -g flink -m 0750 /tmp/hudi-flink-table /var/log/flink /var/lib/flink
 # Spark and Flink both write Hudi metadata under the shared cross-engine table path.
 chmod 0777 /tmp/hudi-flink-table
