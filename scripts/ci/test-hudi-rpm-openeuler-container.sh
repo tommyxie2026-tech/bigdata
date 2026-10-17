@@ -39,7 +39,7 @@ SPARK_JAR=hudi-spark3.5-bundle_2.12-${VERSION}.jar
 FLINK_JAR=hudi-flink1.20-bundle-${VERSION}.jar
 mkdir -p "${REPO_DIR}" "${EVIDENCE_ROOT}" "${LOG_DIR}"
 chmod 0777 "${LOG_DIR}" # Spark and Flink service users write their test logs here.
-dnf -y install ca-certificates createrepo_c curl dnf-utils findutils java-11-openjdk-devel procps-ng rpm shadow-utils
+dnf -y install ca-certificates createrepo_c curl dnf-utils findutils hostname java-11-openjdk-devel procps-ng rpm shadow-utils
 javac_path="$(rpm -ql java-11-openjdk-devel | awk '/\/bin\/javac$/ && !found { print; found=1 } END { if (!found) exit 1 }')"
 [[ -n "${javac_path}" && -x "${javac_path}" ]] || { echo "JDK 11 javac not found in java-11-openjdk-devel." >&2; exit 1; }
 JAVA_HOME="$(dirname "$(dirname "${javac_path}")")"
@@ -118,7 +118,7 @@ flink_sql=/usr/lib/flink/bin/sql-client.sh
 id spark
 id flink
 install -d -o spark -g spark -m 0750 /tmp/hudi-spark-table
-install -d -o flink -g flink -m 0750 /tmp/hudi-flink-table /var/log/flink
+install -d -o flink -g flink -m 0750 /tmp/hudi-flink-table /var/log/flink /var/lib/flink
 install -d -o flink -g flink -m 0750 /usr/lib/flink/log /etc/flink/conf
 flink_conf=/etc/flink/conf/flink-conf.yaml
 touch "${flink_conf}"
