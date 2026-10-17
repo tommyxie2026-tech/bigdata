@@ -140,7 +140,6 @@ SQL
 chown flink:flink /tmp/paimon-flink.sql
 runuser -u flink -- bash -c 'umask 000; exec env HOME=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf HADOOP_CONF_DIR=/etc/hadoop/conf "$1" embedded -j "$2" -f /tmp/paimon-flink.sql' _ "${flink_sql}" "${flink_bundle}" > "${LOG_DIR}/flink-write.log" 2>&1
 grep -q 'flink-after' "${LOG_DIR}/flink-write.log"
-[[ -s /tmp/paimon-flink-table/default.db/paimon_flink_ci/manifest/latest" ]] || true
 chmod -R a+rwX /tmp/paimon-flink-table
 echo 'flink_paimon_upsert: PASS' > "${EVIDENCE_ROOT}/flink-write.txt"
 
