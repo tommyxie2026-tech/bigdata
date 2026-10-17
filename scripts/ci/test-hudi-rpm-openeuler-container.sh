@@ -126,11 +126,11 @@ chmod 0640 "${flink_conf}"
 chown flink:flink "${flink_conf}"
 cat >> "${flink_conf}" <<'EOF'
 jobmanager.bind-host: 0.0.0.0
-jobmanager.rpc.address: localhost
+jobmanager.rpc.address: 127.0.0.1
 rest.bind-address: 0.0.0.0
-rest.address: localhost
+rest.address: 127.0.0.1
 taskmanager.bind-host: 0.0.0.0
-taskmanager.host: localhost
+taskmanager.host: 127.0.0.1
 EOF
 
 cat > /tmp/hudi-spark-write.sql <<'SQL'
@@ -184,7 +184,7 @@ hadoop_classpath=''
 if command -v hadoop >/dev/null 2>&1; then
   hadoop_classpath="$(hadoop classpath)"
 fi
-runuser -u flink -- env HOME=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf \
+runuser -u flink -- env HOME=/var/lib/flink JAVA_TOOL_OPTIONS=-Duser.home=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf \
   HADOOP_CONF_DIR=/etc/hadoop/conf HADOOP_CLASSPATH="${hadoop_classpath}" \
   "${flink_sql}" embedded -j "${flink_bundle}" -f /tmp/hudi-flink-write.sql \
   > "${LOG_DIR}/flink-write.log" 2>&1
@@ -226,7 +226,7 @@ CREATE TABLE hudi_spark_output (
 SELECT id, name, ts FROM hudi_spark_output;
 SQL
 chown flink:flink /tmp/hudi-flink-cross-read.sql
-runuser -u flink -- env HOME=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf \
+runuser -u flink -- env HOME=/var/lib/flink JAVA_TOOL_OPTIONS=-Duser.home=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf \
   HADOOP_CONF_DIR=/etc/hadoop/conf HADOOP_CLASSPATH="${hadoop_classpath}" \
   "${flink_sql}" embedded -j "${flink_bundle}" -f /tmp/hudi-flink-cross-read.sql \
   > "${LOG_DIR}/flink-cross-read.log" 2>&1
