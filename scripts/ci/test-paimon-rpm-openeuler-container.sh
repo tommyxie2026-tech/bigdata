@@ -47,6 +47,10 @@ export JAVA_HOME
 PATH="${JAVA_HOME}/bin:${PATH}"
 export PATH
 java -version 2>&1 | grep -Eq 'version "11([.]|")'
+hadoop_classpath=''
+if command -v hadoop >/dev/null 2>&1; then
+  hadoop_classpath="$(hadoop classpath)"
+fi
 
 build_evidence="${ARTIFACT_ROOT}/evidence/evidence.md"
 [[ -s "${build_evidence}" ]]
@@ -163,7 +167,7 @@ INSERT INTO paimon_flink_ci VALUES (42, 'flink-after');
 SELECT * FROM paimon_flink_ci;
 SQL
 chown flink:flink /tmp/paimon-flink.sql
-runuser -u flink -- bash -c 'umask 000; exec env HOME=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf HADOOP_CONF_DIR=/etc/hadoop/conf "$1" embedded -j "$2" -f /tmp/paimon-flink.sql' _ "${flink_sql}" "${flink_bundle}" > "${LOG_DIR}/flink-write.log" 2>&1
+runuser -u flink -- bash -c 'umask 000; exec env HOME=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf HADOOP_CONF_DIR=/etc/hadoop/conf HADOOP_CLASSPATH="$3" "$1" embedded -j "$2" -f /tmp/paimon-flink.sql' _ "${flink_sql}" "${flink_bundle}" "${hadoop_classpath}" > "${LOG_DIR}/flink-write.log" 2>&1
 grep -q 'flink-after' "${LOG_DIR}/flink-write.log"
 chmod -R a+rwX /tmp/paimon-flink-table
 echo 'flink_paimon_upsert: PASS' > "${EVIDENCE_ROOT}/flink-write.txt"
@@ -186,7 +190,7 @@ USE CATALOG paimon_catalog;
 SELECT * FROM paimon_spark_ci;
 SQL
 chown flink:flink /tmp/paimon-flink-cross-read.sql
-runuser -u flink -- env HOME=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf HADOOP_CONF_DIR=/etc/hadoop/conf   "${flink_sql}" embedded -j "${flink_bundle}" -f /tmp/paimon-flink-cross-read.sql > "${LOG_DIR}/flink-cross-read.log" 2>&1
+runuser -u flink -- env HOME=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf HADOOP_CONF_DIR=/etc/hadoop/conf HADOOP_CLASSPATH="${hadoop_classpath}"   "${flink_sql}" embedded -j "${flink_bundle}" -f /tmp/paimon-flink-cross-read.sql > "${LOG_DIR}/flink-cross-read.log" 2>&1
 grep -q 'spark-after' "${LOG_DIR}/flink-cross-read.log"
 echo 'flink_reads_spark_paimon_table: PASS' > "${EVIDENCE_ROOT}/flink-cross-read.txt"
 
