@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 report_smoke_failure() {
   local rc=$?
   local failed_line=${BASH_LINENO[0]}
@@ -21,13 +21,18 @@ trap report_smoke_failure ERR
 assert_result_row() {
   local log_file="$1" expected="$2"
   awk -F '|' -v expected="${expected}" '
-    /^\\|/ {
-      row = ""
-      for (i = 2; i < NF; i++) {
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "", $i)
-        row = row (i == 2 ? "" : ":") $i
+    {
+      line = $0
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+      if (line == expected) found = 1
+      if (substr(line, 1, 1) == "|") {
+        row = ""
+        for (i = 2; i < NF; i++) {
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", $i)
+          row = row (i == 2 ? "" : ":") $i
+        }
+        if (row == expected) found = 1
       }
-      if (row == expected) found = 1
     }
     END { exit !found }
   ' "${log_file}"
