@@ -227,6 +227,7 @@ CREATE TABLE hudi_spark_output (
   'connector' = 'hudi',
   'path' = 'file:///tmp/hudi-spark-table',
   'table.type' = 'COPY_ON_WRITE',
+  'metadata.enabled' = 'false',
   'hoodie.filesystem.view.type' = 'MEMORY'
 );
 SELECT id, name, ts FROM hudi_spark_output;
