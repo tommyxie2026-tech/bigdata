@@ -150,13 +150,14 @@ chmod 0640 "${flink_conf}"
 chown flink:flink "${flink_conf}"
 cat >> "${flink_conf}" <<'EOF'
 jobmanager.bind-host: 0.0.0.0
-jobmanager.rpc.address: localhost
+jobmanager.rpc.address: 127.0.0.1
 rest.bind-address: 0.0.0.0
-rest.address: localhost
+rest.address: 127.0.0.1
 taskmanager.bind-host: 0.0.0.0
-taskmanager.host: localhost
+taskmanager.host: 127.0.0.1
 EOF
-install -o flink -g flink -m 0660 /dev/null /usr/lib/flink/.flink-sql-history
+install -d -o flink -g flink -m 0750 /var/lib/flink
+install -o flink -g flink -m 0660 /dev/null /var/lib/flink/.flink-sql-history
 
 cat > /tmp/paimon-spark.sql <<'SQL'
 CREATE TABLE paimon.default.paimon_spark_ci (
@@ -217,7 +218,7 @@ USE CATALOG paimon_catalog;
 SELECT * FROM paimon_spark_ci;
 SQL
 chown flink:flink /tmp/paimon-flink-cross-read.sql
-runuser -u flink -- env HOME=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf HADOOP_CONF_DIR=/etc/hadoop/conf HADOOP_CLASSPATH="${hadoop_classpath}"   "${flink_sql}" embedded -j "${flink_bundle}" -f /tmp/paimon-flink-cross-read.sql > "${LOG_DIR}/flink-cross-read.log" 2>&1
+runuser -u flink -- env HOME=/var/lib/flink JAVA_TOOL_OPTIONS=-Duser.home=/var/lib/flink FLINK_HOME=/usr/lib/flink FLINK_CONF_DIR=/etc/flink/conf HADOOP_CONF_DIR=/etc/hadoop/conf HADOOP_CLASSPATH="${hadoop_classpath}"   "${flink_sql}" embedded -j "${flink_bundle}" -f /tmp/paimon-flink-cross-read.sql > "${LOG_DIR}/flink-cross-read.log" 2>&1
 grep -q 'spark-after' "${LOG_DIR}/flink-cross-read.log"
 echo 'flink_reads_spark_paimon_table: PASS' > "${EVIDENCE_ROOT}/flink-cross-read.txt"
 
