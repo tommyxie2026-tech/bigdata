@@ -143,7 +143,20 @@ id flink
 rm -rf /tmp/paimon-spark-table /tmp/paimon-flink-table
 install -d -m 0777 /tmp/paimon-spark-table /tmp/paimon-flink-table
 install -d -o spark -g spark -m 0750 /var/log/spark
-install -d -o flink -g flink -m 0750 /var/log/flink /usr/lib/flink/log
+install -d -o flink -g flink -m 0750 /var/log/flink /usr/lib/flink/log /etc/flink/conf
+flink_conf=/etc/flink/conf/flink-conf.yaml
+touch "${flink_conf}"
+chmod 0640 "${flink_conf}"
+chown flink:flink "${flink_conf}"
+cat >> "${flink_conf}" <<'EOF'
+jobmanager.bind-host: 0.0.0.0
+jobmanager.rpc.address: localhost
+rest.bind-address: 0.0.0.0
+rest.address: localhost
+taskmanager.bind-host: 0.0.0.0
+taskmanager.host: localhost
+EOF
+install -o flink -g flink -m 0660 /dev/null /usr/lib/flink/.flink-sql-history
 
 cat > /tmp/paimon-spark.sql <<'SQL'
 CREATE TABLE paimon.default.paimon_spark_ci (
