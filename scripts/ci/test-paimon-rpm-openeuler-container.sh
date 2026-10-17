@@ -51,6 +51,20 @@ hadoop_classpath=''
 if command -v hadoop >/dev/null 2>&1; then
   hadoop_classpath="$(hadoop classpath)"
 fi
+[[ -n "${hadoop_classpath}" ]] || { echo "Hadoop runtime classpath is empty." >&2; exit 1; }
+mapfile -t hadoop_jars < <(find /usr/lib/hadoop /usr/lib/hadoop-* -type f -name '*.jar' -print 2>/dev/null | LC_ALL=C sort -u)
+[[ "${#hadoop_jars[@]}" -gt 0 ]] || { echo "Hadoop runtime JARs are missing." >&2; exit 1; }
+found_hadoop_common=false
+for hadoop_jar in "${hadoop_jars[@]}"; do
+  if [[ "${hadoop_jar}" == */hadoop-common-*.jar ]]; then
+    found_hadoop_common=true
+  fi
+done
+[[ "${found_hadoop_common}" == true ]] || { echo "hadoop-common JAR is missing." >&2; exit 1; }
+for index in "${!hadoop_jars[@]}"; do
+  hadoop_jar="${hadoop_jars[index]}"
+  ln -sf "${hadoop_jar}" "/usr/lib/flink/lib/bigdata-hadoop-${index}-${hadoop_jar##*/}"
+done
 
 build_evidence="${ARTIFACT_ROOT}/evidence/evidence.md"
 [[ -s "${build_evidence}" ]]
@@ -129,7 +143,7 @@ id flink
 rm -rf /tmp/paimon-spark-table /tmp/paimon-flink-table
 install -d -m 0777 /tmp/paimon-spark-table /tmp/paimon-flink-table
 install -d -o spark -g spark -m 0750 /var/log/spark
-install -d -o flink -g flink -m 0750 /var/log/flink
+install -d -o flink -g flink -m 0750 /var/log/flink /usr/lib/flink/log
 
 cat > /tmp/paimon-spark.sql <<'SQL'
 CREATE TABLE paimon.default.paimon_spark_ci (
