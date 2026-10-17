@@ -167,6 +167,7 @@ echo 'spark_hudi_upsert: PASS' > "${EVIDENCE_ROOT}/spark-write.txt"
 cat > /tmp/hudi-flink-write.sql <<'SQL'
 SET 'execution.runtime-mode' = 'batch';
 SET 'execution.target' = 'local';
+SET 'table.dml-sync' = 'true';
 CREATE TABLE hudi_flink_ci (
   id STRING PRIMARY KEY NOT ENFORCED,
   name STRING,
