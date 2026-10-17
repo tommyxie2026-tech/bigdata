@@ -188,3 +188,35 @@ components:
     depends_on:
       - spark
       - flink
+
+  hudi:
+    builder: custom
+    artifact_type: integration-rpm
+    version: 1.2.1
+    source_identity: a9185b7c4e83422132c25f2efdf282c5bc6af2c7
+    runtime_packages:
+      - bigdata-hudi-spark
+      - bigdata-hudi-flink
+    build_task: hudi-rpm
+    wave: 9
+    test_profile: hudi-cross-engine-smoke
+    jdk: '11'
+    jdk_package: java-11-openjdk-devel
+    runtime:
+      java: '11'
+    source:
+      type: git
+      url: https://github.com/apache/hudi.git
+      ref: a9185b7c4e83422132c25f2efdf282c5bc6af2c7
+    compatibility:
+      engines:
+        - spark
+        - flink
+      engine_versions:
+        spark: 3.5.8
+        scala: '2.12'
+        flink: 1.20.1
+      catalog: hudi
+    depends_on:
+      - spark
+      - flink
