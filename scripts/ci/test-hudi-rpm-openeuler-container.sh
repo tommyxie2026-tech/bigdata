@@ -130,7 +130,7 @@ TBLPROPERTIES (type='cow', primaryKey='id', preCombineField='ts')
 LOCATION 'file:///tmp/hudi-spark-table';
 INSERT INTO hudi_spark_ci VALUES ('42', 'spark-before', 1);
 INSERT INTO hudi_spark_ci VALUES ('42', 'spark-after', 2);
-SELECT assert_true(COUNT(*) = 1 AND MAX(name) = 'spark-after') FROM hudi_spark_ci;
+SELECT concat(CAST(COUNT(*) AS STRING), ':', MAX(name)) FROM hudi_spark_ci;
 SQL
 chown spark:spark /tmp/hudi-spark-write.sql
 runuser -u spark -- env HOME=/var/lib/spark SPARK_LOCAL_IP=127.0.0.1 HADOOP_CONF_DIR=/etc/hadoop/conf \
@@ -140,7 +140,7 @@ runuser -u spark -- env HOME=/var/lib/spark SPARK_LOCAL_IP=127.0.0.1 HADOOP_CONF
   --conf spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension \
   --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog \
   -f /tmp/hudi-spark-write.sql > "${LOG_DIR}/spark-write.log" 2>&1
-grep -q 'spark-after' "${LOG_DIR}/spark-write.log"
+grep -q '1:spark-after' "${LOG_DIR}/spark-write.log"
 echo 'spark_hudi_upsert: PASS' > "${EVIDENCE_ROOT}/spark-write.txt"
 
 cat > /tmp/hudi-flink-write.sql <<'SQL'
