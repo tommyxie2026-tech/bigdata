@@ -125,12 +125,12 @@ touch "${flink_conf}"
 chmod 0640 "${flink_conf}"
 chown flink:flink "${flink_conf}"
 cat >> "${flink_conf}" <<'EOF'
-jobmanager.bind-host: 127.0.0.1
-jobmanager.rpc.address: 127.0.0.1
-rest.bind-address: 127.0.0.1
-rest.address: 127.0.0.1
-taskmanager.bind-host: 127.0.0.1
-taskmanager.host: 127.0.0.1
+jobmanager.bind-host: 0.0.0.0
+jobmanager.rpc.address: localhost
+rest.bind-address: 0.0.0.0
+rest.address: localhost
+taskmanager.bind-host: 0.0.0.0
+taskmanager.host: localhost
 EOF
 
 cat > /tmp/hudi-spark-write.sql <<'SQL'
