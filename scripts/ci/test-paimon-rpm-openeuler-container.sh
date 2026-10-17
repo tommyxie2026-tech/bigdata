@@ -22,6 +22,11 @@ SPARK_JAR=paimon-spark-3.5_2.12-${VERSION}.jar
 FLINK_JAR=paimon-flink-1.20-${VERSION}.jar
 mkdir -p "${REPO_DIR}" "${EVIDENCE_ROOT}" "${LOG_DIR}"
 dnf -y install ca-certificates createrepo_c findutils java-11-openjdk-devel procps-ng rpm shadow-utils util-linux
+javac_path="$(rpm -ql java-11-openjdk-devel | awk '/\/bin\/javac$/ { print; exit }')"
+[[ -n "${javac_path}" && -x "${javac_path}" ]] || { echo "JDK 11 javac not found in java-11-openjdk-devel." >&2; exit 1; }
+export JAVA_HOME="$(dirname "$(dirname "${javac_path}")")"
+export PATH="${JAVA_HOME}/bin:${PATH}"
+java -version 2>&1 | grep -Eq 'version "11([.]|")'
 
 build_evidence="${ARTIFACT_ROOT}/evidence/evidence.md"
 [[ -s "${build_evidence}" ]]
