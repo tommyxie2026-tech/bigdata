@@ -39,7 +39,7 @@ SPARK_JAR=paimon-spark-3.5_2.12-${VERSION}.jar
 FLINK_JAR=paimon-flink-1.20-${VERSION}.jar
 mkdir -p "${REPO_DIR}" "${EVIDENCE_ROOT}" "${LOG_DIR}"
 chmod 0777 "${LOG_DIR}" # Spark and Flink service users write their test logs here.
-dnf -y install ca-certificates createrepo_c findutils java-11-openjdk-devel procps-ng rpm shadow-utils util-linux
+dnf -y install ca-certificates createrepo_c findutils hadoop-client hadoop-conf-pseudo java-11-openjdk-devel procps-ng rpm shadow-utils util-linux
 javac_path="$(rpm -ql java-11-openjdk-devel | awk '/\/bin\/javac$/ && !found { print; found=1 } END { if (!found) exit 1 }')"
 [[ -n "${javac_path}" && -x "${javac_path}" ]] || { echo "JDK 11 javac not found in java-11-openjdk-devel." >&2; exit 1; }
 JAVA_HOME="$(dirname "$(dirname "${javac_path}")")"
