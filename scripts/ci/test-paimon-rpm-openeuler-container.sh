@@ -4,6 +4,16 @@ report_smoke_failure() {
   local rc=$?
   local failed_line=${BASH_LINENO[0]}
   printf 'Smoke test command failed at line %s (exit %s): %s\\n' "${failed_line}" "${rc}" "${BASH_COMMAND}" >&2
+  if [[ -n "${LOG_DIR:-}" && -d "${LOG_DIR}" ]]; then
+    local log_file
+    for log_file in "${LOG_DIR}"/*.log; do
+      [[ -f "${log_file}" ]] || continue
+      printf '\\n--- Last 200 lines of %s ---\\n' "${log_file}" >&2
+      tail -n 200 "${log_file}" >&2
+    done
+  else
+    echo "Smoke-test log directory is missing: ${LOG_DIR:-unset}" >&2
+  fi
   return "${rc}"
 }
 trap report_smoke_failure ERR
