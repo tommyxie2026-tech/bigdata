@@ -1,0 +1,114 @@
+name: S3 Fixture API Integration
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/s3-fixture.yml'
+      - 'scripts/s3-fixture/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/s3-fixture.yml'
+      - 'scripts/s3-fixture/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: s3-fixture-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: S3 HTTPS, IAM, multipart and restart
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AWS_EC2_METADATA_DISABLED: 'true'
+      AWS_CONFIG_FILE: /dev/null
+      AWS_SHARED_CREDENTIALS_FILE: /dev/null
+      EVIDENCE: ${{ runner.temp }}/s3-evidence
+      FIXTURE: ${{ runner.temp }}/s3-fixture
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: scripts/s3-fixture/requirements.txt
+      - name: Strict result assertion regressions
+        run: python3 scripts/s3-fixture/test_checks.py -v
+      - name: Install pinned S3 client
+        run: python3 -m pip install --disable-pip-version-check --timeout 20 --retries 2 -r scripts/s3-fixture/requirements.txt
+      - name: Prepare ephemeral TLS and authenticated fixture
+        run: |
+          set -euo pipefail
+          mkdir -p "$FIXTURE/config" "$FIXTURE/data" "$EVIDENCE"
+          cp scripts/s3-fixture/identities.json "$FIXTURE/config/s3.json"
+          cp scripts/s3-fixture/filer.toml "$FIXTURE/config/filer.toml"
+          openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
+            -subj '/CN=localhost' \
+            -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' \
+            -addext 'basicConstraints=critical,CA:TRUE' \
+            -addext 'extendedKeyUsage=serverAuth' \
+            -keyout "$FIXTURE/config/server.key" -out "$FIXTURE/config/server.crt"
+          image="$(python3 -c 'import json; print(json.load(open("scripts/s3-fixture/contract.json"))["image"])')"
+          docker run -d --name bigdata-s3 --network host --user 0:0 \
+            -v "$FIXTURE/data:/data" -v "$FIXTURE/config:/etc/seaweedfs:ro" \
+            "$image" server -ip=127.0.0.1 -ip.bind=127.0.0.1 -dir=/data \
+            -master.telemetry=false -volume.max=8 -s3 \
+            -s3.port=8333 -s3.port.https=8334 -s3.port.iceberg=0 -s3.port.lance=0 \
+            -s3.config=/etc/seaweedfs/s3.json \
+            -s3.cert.file=/etc/seaweedfs/server.crt -s3.key.file=/etc/seaweedfs/server.key
+          docker exec bigdata-s3 weed version | tee "$EVIDENCE/version.txt"
+          grep -Eq '4[.]48([ .]|$)' "$EVIDENCE/version.txt"
+          docker inspect --format '{{.Image}}' bigdata-s3 > "$EVIDENCE/container-image-id.txt"
+          cp scripts/s3-fixture/contract.json "$EVIDENCE/contract.json"
+      - name: Verified TLS, exact CRUD, IAM rejection and multipart
+        run: |
+          set -euo pipefail
+          timeout 300 python3 scripts/s3-fixture/probe.py initial \
+            --endpoint https://localhost:8334 --ca "$FIXTURE/config/server.crt" \
+            --evidence "$EVIDENCE" 2>&1 | tee "$EVIDENCE/initial.log"
+      - name: Restart same fixture against persistent data directory
+        run: docker restart --time 10 bigdata-s3
+      - name: Verify persisted object, retained permissions and cleanup
+        run: |
+          set -euo pipefail
+          timeout 300 python3 scripts/s3-fixture/probe.py restored \
+            --endpoint https://localhost:8334 --ca "$FIXTURE/config/server.crt" \
+            --evidence "$EVIDENCE" 2>&1 | tee "$EVIDENCE/restored.log"
+      - name: Require every initial and restart assertion
+        env:
+          PYTHONPATH: scripts/s3-fixture
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from probe import INITIAL,RESTORED
+          from checks import write_report
+          evidence=Path(os.environ["EVIDENCE"])
+          combined={}
+          required=set()
+          for phase,checks in (("initial",INITIAL),("restored",RESTORED)):
+              report=json.loads((evidence/(phase+".json")).read_text())
+              assert report["status"]=="PASS"
+              combined.update({phase+"."+k:v for k,v in report["checks"].items()})
+              required.update(phase+"."+k for k in checks)
+          write_report(evidence/"summary.json",combined,required)
+          PY
+      - name: Preserve fixture logs and remove container
+        if: always()
+        run: |
+          mkdir -p "$EVIDENCE"
+          docker logs --timestamps bigdata-s3 > "$EVIDENCE/server.log" 2>&1 || true
+          docker rm -f bigdata-s3 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s3-fixture-4.48-api-evidence
+          path: ${{ runner.temp }}/s3-evidence
+          if-no-files-found: error
+          retention-days: 30

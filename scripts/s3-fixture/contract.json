@@ -1,0 +1,12 @@
+{
+  "schema": "bigdata.s3-fixture/v1",
+  "implementation": "seaweedfs",
+  "version": "4.48",
+  "source_identity": "530be3e37337488ecc34d58441e0bc476e121c93",
+  "image": "chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+  "license": "Apache-2.0",
+  "test_profile": "https-crud-iam-multipart-restart",
+  "delivery": "ci-fixture-only",
+  "lakehouse_integration": "NOT_RUN",
+  "rpm_build": "NOT_APPLICABLE"
+}

@@ -2,9 +2,9 @@
 
 > 2026-10-11 基线说明：本文保留历史设计讨论。当前 openEuler/RPM 版本、七节点配置、Runbook 与验收入口以 [Phase 1 交付设计](phase1-delivery-design.md) 为准；旧 Ubuntu/DEB 和候选版本指令不可用于当前 RC1 部署。
 
-## 当前交付与回归矩阵（2026-10-18）
+## 当前交付与回归矩阵（2026-10-19）
 
-> 这张表记录仓库当前实际锁定和发布状态，不代表完整集群验收。版本取自主线 `ci/components.yaml`、RPM 仓库 manifest 和最新主线 push CI；“已发布”表示仓库中存在对应 manifest/checksum，不等于 Ambari 七节点部署验收通过。实现基线主线 SHA：`50639533eebf915815292be52f4cbbe98b2c0f43`。独立 CDC 契约见 `scripts/flink-cdc-mysql/contract.json`；其发布状态单独列出，不混入既有 catalog。
+> 这张表记录仓库当前实际锁定和发布状态，不代表完整集群验收。版本取自主线 `ci/components.yaml`、RPM 仓库 manifest 和最新主线 push CI；“已发布”表示仓库中存在对应 manifest/checksum，不等于 Ambari 七节点部署验收通过。实现基线主线 SHA：`5b7be72a2c159799d6fda4c6b3e9c23a6e0abdf4`。独立 CDC 契约分别见 `scripts/flink-cdc-mysql/contract.json` 和 `scripts/flink-cdc-postgres/contract.json`；其发布状态单独列出，不混入既有 catalog。
 
 | 层级 | 组件 | 当前版本 | 运行时 / OS | 状态与证据 |
 |---|---|---:|---|---|
@@ -20,6 +20,7 @@
 | 消息队列 | Kafka | 3.4.1 | JDK 8；openEuler 22.03 LTS SP4 | RPM 仓库已发布，KRaft smoke manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/kafka/3.4.1/manifest.yaml) |
 | 流计算 | Flink | 1.20.1 | JDK 11；openEuler 22.03 LTS SP4 | RPM 仓库已发布，local-job smoke manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink/1.20.1/manifest.yaml) |
 | 数据接入 | Flink CDC MySQL | 3.4.0；RPM Release `1.oe2203sp4` | Flink 1.20.1 / JDK 11；MySQL 8.0.36 与 JDBC 8.0.27 为测试 fixture | [RPM 已发布](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink-cdc-mysql/3.4.0/manifest.yaml)；[#100](https://github.com/tommyxie2026-tech/bigdata/pull/100) 已合并；[主线 Test / RC / 发布作业 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39106575363)；原始 Build `39102586103`，发布清单 Test `39104310948` |
+| 数据接入 | Flink CDC PostgreSQL | 3.4.0；RPM Release `1.oe2203sp4` | Flink 1.20.1 / JDK 11；PostgreSQL 14.15 为测试 fixture，JDBC 包含于 upstream shaded JAR | [RPM 已发布](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink-cdc-postgres/3.4.0/manifest.yaml)，[#102](https://github.com/tommyxie2026-tech/bigdata/pull/102) 已合并；[主线实际 Test / RC / 晋级 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39139306230)；复用 Build `39124662344`，Test `39139306230` |
 | 查询引擎 | Trino | 483 | JDK 25；openEuler 22.03 LTS SP4 | RPM 仓库已发布，single-node smoke manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/trino/483/manifest.yaml) |
 | 湖仓格式 | Iceberg | 1.12.0 | JDK 17；Spark 3.5.8 / Flink 1.20.1 | 两个 integration RPM 已发布，manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/iceberg/1.12.0/manifest.yaml) |
 | 湖仓格式 | Hudi | 1.2.1 | JDK 11；Spark 3.5.8 / Flink 1.20.1 | 两个 integration RPM 已发布；[真实跨引擎回归 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39043226367)。[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/hudi/1.2.1/manifest.yaml) 引用 run `39035814730`：聚合状态 cancelled，但实际 Test/Release 作业 success；见下方分层状态说明 |
@@ -31,7 +32,7 @@
 - “RPM 已发布”以仓库中的 RPM、`SHA256SUMS`、manifest 和 repodata 为准；“功能 PASS”必须有实际专项测试成功证据。复用包、skipped 或 cancelled 不能替代功能测试。
 - Hudi manifest 引用 run `39035814730`；API 的 run 聚合状态为 cancelled，但该 run 最新 attempt 的实际 Test、Release 和 gate 作业均为 success。后续 run `39043226367` 的跨引擎回归也为 success。需按 run/attempt/job 与产物逐层审计，不只看 run 聚合状态或 manifest 的 `test_status: PASS` 字段。
 - [既有 7 个 v2 组件分层审计](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39102320767) 已通过；该审计不包含独立 CDC 契约或 v1 manifests。
-- CDC MySQL 使用测试专用幂等 JDBC sink 核验行集和真实 savepoint 恢复，不表示已完成 Paimon/Hudi/Iceberg 联调或 exactly-once sink 验收。MySQL JDBC 驱动不包含在连接器 RPM 中。
+- CDC MySQL/PostgreSQL 使用测试专用幂等 JDBC sink 核验行集和真实 savepoint 恢复，不表示已完成 Paimon/Hudi/Iceberg 联调或 exactly-once sink 验收。MySQL JDBC 驱动不包含在连接器 RPM 中。
 - Paimon 已完成主线测试和仓库晋级。Hue 通过 PR #95 切换 Gunicorn；`4.11.0-2` 复用旧包内已编译应用，只更新启动器和重打包，未重编前端/Python 依赖。
 - Hue 的 `4.11.0` 是钉住源码提交自报版本，来源是 `65d9e489f400ac151029b33c5a2bd9df31e167da` 的开发快照；不能将其描述为新 upstream 稳定发行。Hue 测试使用临时 SQLite 元数据库，不代表生产 PostgreSQL/MySQL、HA 或 TLS 已验收。
 - JDK 是逐组件边界：Hue 应用为 Python；JDK 25 服务于 Trino 集成测试，不表示 Hue 本身要求 JDK 25。三种湖仓格式的 Spark/Flink 本地互读不代表 HDFS/S3、集群恢复或 Trino catalog 已验收。
