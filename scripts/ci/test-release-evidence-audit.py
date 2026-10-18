@@ -5,7 +5,7 @@ import unittest
 import io
 import zipfile
 from unittest.mock import patch
-from audit_release_evidence import EvidenceError, verify_evidence, parse_fields, read_evidence_zip, pages
+from audit_release_evidence import EvidenceError, verify_evidence, parse_fields, read_evidence_zip, pages, catalog_policy
 
 REPO = "tommyxie2026-tech/bigdata"
 MANIFEST = {
@@ -159,6 +159,29 @@ class TransportTests(unittest.TestCase):
 
 
 class CatalogPolicyTests(unittest.TestCase):
+    def test_real_catalog_blocks_and_runtime_mapping(self):
+        catalog = """components:
+  flink:
+    builder: bigtop
+    jdk_package: java-11-openjdk-devel
+  hue:
+    builder: custom
+    jdk_runtime_archive:
+      sha256: abc
+  hudi:
+    builder: custom
+    compatibility:
+      engines: [flink]
+"""
+        self.assertEqual(catalog_policy(catalog, "flink", "java-11-openjdk-devel"),
+                         (False, "java-11-openjdk"))
+        self.assertEqual(catalog_policy(catalog, "hue", ""), (True, ""))
+        self.assertEqual(catalog_policy(catalog, "hudi", "java-11-openjdk-devel"),
+                         (True, "java-11-openjdk-devel"))
+        with self.assertRaises(EvidenceError):
+            catalog_policy(catalog, "missing", "")
+
+
     def test_no_compatibility_contract_is_not_missing_evidence(self):
         data = fixture()
         del data["manifest"]["compatibility_identity"]

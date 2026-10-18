@@ -125,22 +125,28 @@ def download_evidence(repository, artifact):
         payload = response.read(2 * 1024 * 1024 + 1)
     return read_evidence_zip(payload)
 
+def catalog_policy(catalog_text, component, build_jdk_package):
+    blocks = re.split(r"(?m)^  ([a-z0-9_-]+):[ \\t]*$", catalog_text)
+    entries = dict(zip(blocks[1::2], blocks[2::2]))
+    if component not in entries:
+        raise EvidenceError("component missing from catalog")
+    entry = entries[component]
+    compatibility_required = bool(re.search(
+        r"(?m)^    (compatibility|jdk_runtime_archive):", entry))
+    builder = re.search(r"(?m)^    builder: (\S+)", entry)
+    test_jdk_package = build_jdk_package
+    if (component in {"kafka", "flink"} and builder
+            and builder.group(1) == "bigtop"):
+        test_jdk_package = build_jdk_package.removesuffix("-devel")
+    return compatibility_required, test_jdk_package
+
 def audit_manifest(repository, path, root):
     manifest = parse_fields(path.read_text())
     if manifest.get("schema") != "bigdata.rpm-repo/v2":
         raise EvidenceError("only v2 manifests are covered")
-    catalog_text = (root / "ci/components.yaml").read_text()
-    blocks = re.split(r"(?m)^  ([a-z0-9_-]+):\\s*$", catalog_text)
-    entries = dict(zip(blocks[1::2], blocks[2::2]))
-    entry = entries.get(manifest["component"], "")
-    compatibility_required = bool(re.search(
-        r"(?m)^    (compatibility|jdk_runtime_archive):", entry))
-    builder = re.search(r"(?m)^    builder: (\\S+)", entry)
-    build_jdk_package = manifest.get("jdk_package", "")
-    test_jdk_package = build_jdk_package
-    if (manifest["component"] in {"kafka", "flink"} and builder
-            and builder.group(1) == "bigtop"):
-        test_jdk_package = build_jdk_package.removesuffix("-devel")
+    compatibility_required, test_jdk_package = catalog_policy(
+        (root / "ci/components.yaml").read_text(), manifest["component"],
+        manifest.get("jdk_package", ""))
     required = {"source_identity", "artifact_type",
                 "test_profile", "jdk", "jdk_package", "build_run_id", "test_run_id"}
     if compatibility_required:
