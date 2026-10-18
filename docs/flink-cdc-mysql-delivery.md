@@ -1,32 +1,59 @@
-# Flink CDC MySQL delivery probe
+# Flink CDC MySQL delivery
 
-The first CI run answers whether the upstream MySQL SQL connector can be built
-from the immutable 3.4.0 release commit on openEuler 22.03 LTS SP4 with Java 11.
-It builds only that Maven module and its reactor dependencies. Existing Flink
-1.20.1 and Hadoop RPMs are not rebuilt or downloaded in this phase.
+This dedicated workflow targets Flink 1.20.1 / Java 11 on openEuler 22.03 LTS SP4.
+The connector source is Flink CDC 3.4.0 release commit
+06581fc73b84b1da45fccf93441d96a118d9bfc1. Source compilation run 39097088418
+already succeeded. Its checked JAR is repackaged; Java sources are not rebuilt.
 
-Pinned source: apache/flink-cdc release-3.4.0, commit
-06581fc73b84b1da45fccf93441d96a118d9bfc1 (annotated release tag dereferenced).
+## Package boundary
 
-Upstream compatibility: CDC 3.4 supports Flink 1.19/1.20. The upstream MySQL
-source guide supports MySQL 8.0.x and specifies mysql:mysql-connector-java:8.0.27.
-That driver is excluded from the upstream connector bundle. The probe fails if
-it finds bundled com/mysql classes. The driver will remain a separate test
-fixture dependency, outside the Apache connector RPM.
+The noarch RPM bigdata-flink-cdc-mysql installs the SQL connector JAR into
+/usr/lib/flink/lib and includes upstream LICENSE/NOTICE. The upstream shaded
+JAR retains its third-party notices. MySQL Connector/J 8.0.27 is separately
+downloaded for the CI fixture and is excluded from the RPM.
 
-Sources:
+The existing Flink 1.20.1, Hadoop 3.4.3 and common runtime RPM repositories are
+installed in a fresh openEuler container. Those engine RPMs are not rebuilt.
+A MySQL 8.0.36 container enables ROW/FULL binlogs with an explicit server ID.
+
+## Assertions for review
+
+The test-only synchronous JDBC sink materializes the source changelog into a
+MySQL table with a primary key. It uses idempotent upserts/deletes; this is not
+an exactly-once sink certification.
+
+1. Snapshot: target must equal {1: before, 2: delete-me}.
+2. Change source with update(1), delete(2), insert(3). Target must equal
+   {1: after, 3: inserted}; partial greps or counts do not pass.
+3. Require a completed Flink checkpoint. Stop with a savepoint and require the
+   original job to reach FINISHED before making offline database changes.
+4. While stopped, update(1), delete(3), insert(4). Restore the same job JAR from
+   the recorded savepoint; target must equal {1: offline-update, 4: offline-insert}.
+5. The restored job's REST checkpoint metadata must contain is_savepoint=true
+   and the exact external_path returned by the stop operation. A fresh snapshot
+   that happens to produce the same row set cannot pass as a restore.
+
+REST calls, job submission, assertion polling and cleanup have bounded timeouts.
+Failures preserve Flink/MySQL logs, checkpoint/savepoint JSON and submission logs.
+Protocol regression:
+`python3 scripts/flink-cdc-mysql/test_protocol.py`
+
+## Build reuse and release
+
+The first packaging run creates the connector RPM. Subsequent test-only changes
+reuse that successful Build job through rpm_build_run_id and verify its evidence
+and RPM checksums. Failed or skipped component tests cannot publish artifacts
+named tested-rpms. A skipped Build is only valid when referencing a real,
+previously successful connector RPM Build job.
+
+A main-branch run with a real successful Test creates a Release Candidate.
+Repository publication requires the tested payload, checksums and repodata,
+and a separately reviewed promotion PR; no PR is automatically merged.
+
+The standalone contract is kept with this component while its first delivery
+is under review. It does not change the unified component catalog or trigger
+unrelated component workflows.
+
+Upstream references:
 - https://flink.apache.org/2025/05/16/apache-flink-cdc-3.4.0-release-announcement/
 - https://nightlies.apache.org/flink/flink-cdc-docs-release-3.4/docs/connectors/flink-sources/mysql-cdc/
-
-After the compilation result, extend this dedicated workflow with:
-1. A connector-only RPM containing the compiled JAR and upstream licenses.
-2. Clean openEuler installation using the existing Flink RPM repository.
-3. MySQL 8.0 fixture: assert the exact snapshot row set, then insert/update/delete.
-4. Stop with a savepoint, mutate MySQL while stopped, restore, assert exact final
-   rows and confirm the restore path through Flink REST checkpoint metadata.
-   A fresh successful snapshot cannot substitute for an actual restore.
-5. Release candidate and repository promotion PR only after all real tests pass;
-   no automatic merges. Test-only changes reuse the connector RPM by source and
-   payload digest instead of recompiling it.
-
-The initial feasibility artifact is deliberately not a tested RPM or a release.

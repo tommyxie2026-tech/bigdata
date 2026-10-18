@@ -16,6 +16,10 @@ on:
         description: Existing successful connector RPM build to retest without repackaging
         type: string
         default: ''
+      repackage_rpm:
+        description: Explicitly repackage the pinned compiled JAR instead of reusing the existing RPM
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -37,9 +41,11 @@ jobs:
     steps:
       - id: select
         env:
-          REUSE_RUN: ${{ inputs.rpm_build_run_id || '' }}
+          REUSE_RUN: ${{ inputs.rpm_build_run_id || '39102586103' }}
+          REPACKAGE: ${{ inputs.repackage_rpm || false }}
         run: |
           set -euo pipefail
+          if [[ "$REPACKAGE" == true ]]; then REUSE_RUN=""; fi
           if [[ -n "$REUSE_RUN" ]]; then
             [[ "$REUSE_RUN" =~ ^[0-9]+$ ]]
             echo "build=false" >> "$GITHUB_OUTPUT"
@@ -121,18 +127,22 @@ jobs:
           path: connector-rpm
       - name: Checkout existing engine RPM repositories
         uses: actions/checkout@v4
-        env:
-          GIT_LFS_SKIP_SMUDGE: '0'
         with:
           ref: main
           path: dependency-repository
-          lfs: true
+          lfs: false
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink/1.20.1/
             repo/openeuler-22.03-lts-sp4/bigtop-3.6/hadoop/3.4.3/
             repo/openeuler-22.03-lts-sp4/bigtop-3.6/common/3.6.0/
-      - uses: actions/cache@v4
+      - name: Fetch only the required engine RPM closure
+        run: |
+          git -C dependency-repository lfs pull \
+            --include='repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink/1.20.1/**,repo/openeuler-22.03-lts-sp4/bigtop-3.6/hadoop/3.4.3/**,repo/openeuler-22.03-lts-sp4/bigtop-3.6/common/3.6.0/**' \
+            --exclude=''
+      - uses: actions/cache/restore@v4
+        id: maven
         with:
           path: /tmp/cdc-maven-cache
           key: cdc-mysql-smoke-flink1201-jdk11-v1
@@ -161,6 +171,12 @@ jobs:
             -v /tmp/cdc-maven-cache:/root/.m2 \
             -v /tmp/cdc-evidence:/evidence openeuler/openeuler:22.03-lts-sp4 \
             bash /workspace/scripts/flink-cdc-mysql/test.sh
+      - name: Preserve downloaded Maven dependencies even when the test fails
+        if: always() && steps.maven.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/cdc-maven-cache
+          key: cdc-mysql-smoke-flink1201-jdk11-v1
       - name: Collect fixture logs
         if: always()
         run: |
@@ -205,3 +221,36 @@ jobs:
           name: flink-cdc-mysql-3.4.0-release-candidate
           path: candidate
           retention-days: 30
+
+  promote:
+    name: Open tested RPM repository PR
+    needs: [select, test, candidate]
+    if: github.ref == 'refs/heads/main' && needs.test.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: repository
+          lfs: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: flink-cdc-mysql-3.4.0-tested-rpms
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: flink-cdc-mysql-3.4.0-test-evidence
+          path: test-evidence
+      - name: Stage RPM, checksums and metadata; open promotion PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ needs.select.outputs.rpm_run }}
+        run: bash scripts/flink-cdc-mysql/promote.sh

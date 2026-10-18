@@ -21,7 +21,10 @@ done
 grep -qx 'source_identity: 06581fc73b84b1da45fccf93441d96a118d9bfc1' /rpm/evidence/evidence.md
 grep -qx "build_run_id: $BUILD_RUN_ID" /rpm/evidence/evidence.md
 grep -qx 'status: PASS' /rpm/evidence/evidence.md
-dnf -y install flink flink-jobmanager flink-taskmanager /rpm/rpms/*.rpm
+rpms=(/rpm/rpms/*.rpm)
+[[ "${#rpms[@]}" -eq 1 ]]
+[[ "$(rpm -qp --queryformat '%{NAME} %{VERSION} %{ARCH}' "${rpms[0]}")" == 'bigdata-flink-cdc-mysql 3.4.0 noarch' ]]
+dnf -y install flink flink-jobmanager flink-taskmanager "${rpms[0]}"
 javac_path="$(rpm -ql java-11-openjdk-devel | awk '/[/]bin[/]javac$/ && !found {print; found=1}')"
 JAVA_HOME="$(dirname "$(dirname "$javac_path")")"
 export JAVA_HOME
@@ -90,6 +93,12 @@ for _ in $(seq 1 60); do
   sleep 2
 done
 savepoint="$(python3 /workspace/scripts/flink-cdc-mysql/protocol.py location < /evidence/savepoint.json)"
+for _ in $(seq 1 30); do
+  rest "http://127.0.0.1:8081/jobs/$job_id" > /evidence/stopped-job.json
+  if python3 /workspace/scripts/flink-cdc-mysql/protocol.py stopped < /evidence/stopped-job.json 2>/dev/null; then break; fi
+  sleep 2
+done
+python3 /workspace/scripts/flink-cdc-mysql/protocol.py stopped < /evidence/stopped-job.json
 fixture offline
 flink run -d -m localhost:8081 -s "$savepoint" -c bigdata.ci.MysqlSmoke "$harness" job > /evidence/restore-submit.log 2>&1
 restored_id="$(sed -n 's/.*Job has been submitted with JobID \([0-9a-f]*\).*/\1/p' /evidence/restore-submit.log | tail -1)"

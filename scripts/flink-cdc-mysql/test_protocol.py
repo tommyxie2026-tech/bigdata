@@ -1,5 +1,5 @@
 import unittest
-from protocol import savepoint_location, verify_restored
+from protocol import savepoint_location, verify_restored, verify_stopped
 
 class ProtocolTests(unittest.TestCase):
     def test_completed_savepoint_has_location(self):
@@ -11,6 +11,12 @@ class ProtocolTests(unittest.TestCase):
                          {"status":{"id":"COMPLETED"},"operation":{}}):
             with self.subTest(response=response), self.assertRaises(ValueError):
                 savepoint_location(response)
+    def test_offline_mutations_require_a_finished_original_job(self):
+        verify_stopped({"state": "FINISHED"})
+        for state in ("RUNNING", "RESTARTING", "CANCELED", "FAILED"):
+            with self.subTest(state=state), self.assertRaises(ValueError):
+                verify_stopped({"state": state})
+
     def test_restoration_must_reference_the_exact_savepoint(self):
         path = "file:///state/savepoint-abc"
         verify_restored({"latest":{"restored":{"external_path":path,"is_savepoint":True}}}, path)
