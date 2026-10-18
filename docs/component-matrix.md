@@ -73,7 +73,7 @@ SQL 层：Hive / Trino / Spark SQL
 |---|---|---:|---|---|
 | Kafka | 消息接入 | 3.4.1 | RPM 已发布；KRaft smoke PASS | 补齐与 CDC/Flink 的端到端链路验证 |
 | Flink | 流计算 | 1.20.1 | RPM 已发布；local-job smoke PASS | 补齐 Kafka/CDC 与湖仓表格式端到端验证 |
-| Flink CDC MySQL | 数据接入 | 3.4.0 | [交付 CI #98](https://github.com/tommyxie2026-tech/bigdata/pull/98) 已合并；连接器 RPM 与 PR 专项测试 PASS；[主线专项测试 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39104310948)；[发布门禁修复 #99](https://github.com/tommyxie2026-tech/bigdata/pull/99) 与产物晋级处理中 | 核验主线 RC 和仓库晋级；之后独立推进 PostgreSQL source 与湖仓联调 |
+| Flink CDC MySQL | 数据接入 | 3.4.0 | [交付 CI #98](https://github.com/tommyxie2026-tech/bigdata/pull/98) 已合并；连接器 RPM 与 PR 专项测试 PASS；[主线专项测试 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39104310948)；[发布门禁修复 #99](https://github.com/tommyxie2026-tech/bigdata/pull/99) ；[RC 恢复成功](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39105281957)，[仓库晋级 #100](https://github.com/tommyxie2026-tech/bigdata/pull/100) 待合并 | 核验主线 RC 和仓库晋级；之后独立推进 PostgreSQL source 与湖仓联调 |
 | Iceberg | 主线湖仓表格式 | 1.12.0 | integration RPM 已发布，仓库 manifest PASS | 补齐和 Kafka/Flink、对象存储的组合验收 |
 | Hudi | 可选湖仓 Profile | 1.2.1 | integration RPM 已发布；后续主线回归 PASS；manifest 引用 run 聚合 cancelled、实际 Test/Release success | 分层证据审计已通过；补 CDC upsert 与湖仓恢复验收 |
 | Paimon | 可选湖仓扩展 Profile | 2.1.0 | integration RPM 已发布；主线安装、更新与 Spark/Flink 双向互读 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/paimon/2.1.0/manifest.yaml) | 补齐 CDC、checkpoint 恢复与远端存储组合验收 |
