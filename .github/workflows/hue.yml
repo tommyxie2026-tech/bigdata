@@ -1,0 +1,53 @@
+name: Hue 4.11.0 Build and Test
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/hue.yml"
+      - ".github/workflows/build-one-component.yml"
+      - ".github/workflows/component-lifecycle.yml"
+      - ".github/workflows/test-components.yml"
+      - ".github/workflows/release-components.yml"
+      - "ci/components.yaml"
+      - "scripts/ci/*hue*"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/hue.yml"
+      - ".github/workflows/build-one-component.yml"
+      - ".github/workflows/component-lifecycle.yml"
+      - ".github/workflows/test-components.yml"
+      - ".github/workflows/release-components.yml"
+      - "ci/components.yaml"
+      - "scripts/ci/*hue*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: hue-4.11.0-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hue:
+    name: Hue revision RPM and clean Trino integration test
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/component-lifecycle.yml
+    with:
+      component: hue
+      version: '4.11.0'
+      builder: custom
+      artifact_type: service-rpm
+      build_task: hue-rpm
+      test_profile: hue-single-node-smoke
+      jdk: '25'
+      jdk_package: ''
+      source_identity: 65d9e489f400ac151029b33c5a2bd9df31e167da
+      require_pr_build_test: true

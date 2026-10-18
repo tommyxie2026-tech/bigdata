@@ -4,7 +4,7 @@
 
 ## 当前交付与回归矩阵（2026-10-18）
 
-> 这张表记录仓库当前实际锁定和发布状态，不代表完整集群验收。版本取自主线 `ci/components.yaml`、RPM 仓库 manifest 和最新主线 push CI；“已发布”表示仓库中存在对应 manifest/checksum，不等于 Ambari 七节点部署验收通过。主线 SHA：`52b306b68b407422e1caadb7b00f4481da1cab85`。
+> 这张表记录仓库当前实际锁定和发布状态，不代表完整集群验收。版本取自主线 `ci/components.yaml`、RPM 仓库 manifest 和最新主线 push CI；“已发布”表示仓库中存在对应 manifest/checksum，不等于 Ambari 七节点部署验收通过。主线 SHA：`feb1b4c53eee025dc0a39662e293490e300fa413`。
 
 | 层级 | 组件 | 当前版本 | 运行时 / OS | 状态与证据 |
 |---|---|---:|---|---|
@@ -21,16 +21,18 @@
 | 流计算 | Flink | 1.20.1 | JDK 11；openEuler 22.03 LTS SP4 | RPM 仓库已发布，local-job smoke manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink/1.20.1/manifest.yaml) |
 | 查询引擎 | Trino | 483 | JDK 25；openEuler 22.03 LTS SP4 | RPM 仓库已发布，single-node smoke manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/trino/483/manifest.yaml) |
 | 湖仓格式 | Iceberg | 1.12.0 | JDK 17；Spark 3.5.8 / Flink 1.20.1 | 两个 integration RPM 已发布，manifest 标记 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/iceberg/1.12.0/manifest.yaml) |
-| 湖仓格式 | Hudi | 1.2.1 | JDK 11；Spark 3.5.8 / Flink 1.20.1 | 两个 integration RPM 已发布；最新主线回归 run `39043226367` 真实通过；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/hudi/1.2.1/manifest.yaml) |
-| 湖仓格式 | Paimon | 2.1.0 | JDK 11；Spark 3.5.8 / Flink 1.20.1 | 复用已验证 RPM（build run `39013588597`）；PR #91 已合并。主线 clean-install / cross-engine 回归 run `39046885689` 正在运行；Build 步骤因复用而 skipped，不算新构建通过，尚无发布 manifest |
-| 查询 UI | Hue | 4.11.0 | Python 3.9、JDK 25、Trino 483；openEuler 22.03 LTS SP4 | PR #85 已合并；当前主线尚无 Hue clean-install / 专项查询成功证据，也没有 RPM 仓库发布 manifest，不能标记为已发布 |
+| 湖仓格式 | Hudi | 1.2.1 | JDK 11；Spark 3.5.8 / Flink 1.20.1 | 两个 integration RPM 已发布；[真实跨引擎回归 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39043226367)。[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/hudi/1.2.1/manifest.yaml) 引用 run `39035814730`：聚合状态 cancelled，但实际 Test/Release 作业 success；见下方分层状态说明 |
+| 湖仓格式 | Paimon | 2.1.0 | JDK 11；Spark 3.5.8 / Flink 1.20.1 | 两个 integration RPM 已发布；[主线安装、更新与双向互读 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39048307642)；复用 build `39013588597`，非重新编译；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/paimon/2.1.0/manifest.yaml) |
+| 查询 UI | Hue | 4.11.0；RPM Release `2.oe2203sp4` | Python 3.9；Gunicorn；Trino 483 使用 JDK 25 | 一个 service RPM 已发布；[主线安装、启动、Hue→Trino 查询与 RC PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39086875001)，[晋级 PR #96](https://github.com/tommyxie2026-tech/bigdata/pull/96) 已合并；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/hue/4.11.0/manifest.yaml) |
 
 ### 当前状态口径
 
-- 已发布组件以对应目录下的 manifest、`SHA256SUMS` 和 RPM 文件为准；CI 的 fast-path 校验是复用既有包，不是新构建。
-- Hudi 最新通过状态来自主线 run `39043226367`；Paimon 以当前 main SHA 的 run `39046885689` 为准，完成前不进入 Release Candidate 或仓库晋级。
-- Hue 的合并只代表代码进入主线；要标记已验证/已发布，仍需 Hue 专项实际 Build/Test 和 RPM 发布记录。
-- JDK 版本是组件构建/运行时边界，不能据此推断同一进程共享一个 JDK，也不替代集群级兼容性验收。
+- “RPM 已发布”以仓库中的 RPM、`SHA256SUMS`、manifest 和 repodata 为准；“功能 PASS”必须有实际专项测试成功证据。复用包、skipped 或 cancelled 不能替代功能测试。
+- Hudi manifest 引用 run `39035814730`；API 的 run 聚合状态为 cancelled，但该 run 最新 attempt 的实际 Test、Release 和 gate 作业均为 success。后续 run `39043226367` 的跨引擎回归也为 success。需按 run/attempt/job 与产物逐层审计，不只看 run 聚合状态或 manifest 的 `test_status: PASS` 字段。
+- Paimon 已完成主线测试和仓库晋级。Hue 通过 PR #95 切换 Gunicorn；`4.11.0-2` 复用旧包内已编译应用，只更新启动器和重打包，未重编前端/Python 依赖。
+- Hue 的 `4.11.0` 是钉住源码提交自报版本，来源是 `65d9e489f400ac151029b33c5a2bd9df31e167da` 的开发快照；不能将其描述为新 upstream 稳定发行。Hue 测试使用临时 SQLite 元数据库，不代表生产 PostgreSQL/MySQL、HA 或 TLS 已验收。
+- JDK 是逐组件边界：Hue 应用为 Python；JDK 25 服务于 Trino 集成测试，不表示 Hue 本身要求 JDK 25。三种湖仓格式的 Spark/Flink 本地互读不代表 HDFS/S3、集群恢复或 Trino catalog 已验收。
+- 本轮后续新增组件及集成测试见 [组件 CI 补齐计划](component-ci-backlog.md)。以下第 1—12 节保留历史候选与评估记录，不覆盖上表的实际交付版本。
 
 ## 1. 文档目标
 

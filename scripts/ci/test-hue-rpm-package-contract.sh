@@ -23,7 +23,7 @@ grep -Fq '/usr/lib/systemd/system/hue.service' "${BUILDER}"
 grep -Fq 'Provides:       libgfortran-040039e1.so.5.0.0(GFORTRAN_8)(64bit)' "${BUILDER}"
 grep -Fq 'Provides:       libquadmath-96973f99.so.0.0.0(QUADMATH_1.0)(64bit)' "${BUILDER}"
 grep -Fq 'export DESKTOP_LOG_DIR=/var/log/hue' "${BUILDER}"
-grep -Fq 'exec /usr/share/hue/build/venvs/python3.9/bin/hue runcherrypyserver' "${BUILDER}"
+grep -Fq 'exec /usr/share/hue/build/venvs/python3.9/bin/hue rungunicornserver' "${BUILDER}"
 grep -Fq 'DESKTOP_LOG_DIR=/var/log/hue' "${ROOT}/scripts/ci/test-hue-rpm-openeuler-container.sh"
 grep -Fq 'node.environment=bigdata_ci' "${ROOT}/scripts/ci/test-hue-rpm-openeuler-container.sh"
 
