@@ -118,6 +118,12 @@ class ReleaseEvidenceTests(unittest.TestCase):
 
 
 class TransportTests(unittest.TestCase):
+    def test_empty_jdk_package_for_archive_runtime(self):
+        data = fixture()
+        data["manifest"]["jdk_package"] = ""
+        data["evidence"]["jdk_package"] = ""
+        self.assertEqual(verify_evidence(**data), [])
+
     def test_fields_preserve_quotes_and_reject_duplicates(self):
         self.assertEqual(parse_fields('jdk: 11\njdk_package: "java-11-openjdk-devel"\n'),
                          {"jdk": "11", "jdk_package": "java-11-openjdk-devel"})

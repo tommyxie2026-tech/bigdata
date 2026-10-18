@@ -45,7 +45,7 @@ def verify_evidence(*, manifest, evidence, build_run, test_run, build_jobs,
     for key in ("component", "version", "build_run_id", "test_run_id",
                 "source_identity", "compatibility_identity", "artifact_type",
                 "test_profile", "jdk_package"):
-        if not manifest.get(key) or evidence.get(key) != manifest[key]:
+        if key not in manifest or key not in evidence or evidence[key] != manifest[key]:
             raise EvidenceError(f"evidence mismatch: {key}")
     if (manifest.get("test_status") != "PASS" or evidence.get("status") != "PASS"
             or evidence.get("toolchain_jdk") != manifest.get("jdk")):
