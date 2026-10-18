@@ -1,50 +1,207 @@
-name: Flink CDC MySQL source feasibility
+name: Flink CDC MySQL Build and Test
 
 on:
   pull_request:
     paths:
       - '.github/workflows/flink-cdc-mysql.yml'
       - 'scripts/flink-cdc-mysql/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/flink-cdc-mysql.yml'
+      - 'scripts/flink-cdc-mysql/**'
   workflow_dispatch:
+    inputs:
+      rpm_build_run_id:
+        description: Existing successful connector RPM build to retest without repackaging
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: flink-cdc-mysql-source-${{ github.ref }}
+  group: flink-cdc-mysql-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GIT_LFS_SKIP_SMUDGE: '1'
+
 jobs:
-  compile:
-    name: Compile MySQL connector on openEuler / Java 11
+  select:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    env:
-      GIT_LFS_SKIP_SMUDGE: '1'
+    outputs:
+      build: ${{ steps.select.outputs.build }}
+      rpm_run: ${{ steps.select.outputs.rpm_run }}
+    steps:
+      - id: select
+        env:
+          REUSE_RUN: ${{ inputs.rpm_build_run_id || '' }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$REUSE_RUN" ]]; then
+            [[ "$REUSE_RUN" =~ ^[0-9]+$ ]]
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "rpm_run=$REUSE_RUN" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "rpm_run=$GITHUB_RUN_ID" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build RPM flink-cdc-mysql 3.4.0
+    needs: select
+    if: needs.select.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           lfs: false
+      - name: Verify successful immutable source compilation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/39097088418" \
+            --jq 'select(.conclusion == "success" and .head_sha == "18f45c1d278f71ced56dc4e1e765e6c68946238a") | .id' \
+            | grep -qx 39097088418
+      - uses: actions/download-artifact@v4
+        with:
+          name: flink-cdc-mysql-3.4.0-source-feasibility
+          run-id: 39097088418
+          github-token: ${{ github.token }}
+          path: source-artifact
+      - name: Package compiled connector without rebuilding Java sources
+        run: |
+          mkdir -p /tmp/cdc-rpm
+          docker run --rm \
+            -e BUILD_RUN_ID="$GITHUB_RUN_ID" -e SOURCE_RUN_ID=39097088418 \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" \
+            -v "$GITHUB_WORKSPACE/source-artifact:/source:ro" \
+            -v /tmp/cdc-rpm:/work openeuler/openeuler:22.03-lts-sp4 \
+            bash /workspace/scripts/flink-cdc-mysql/package.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flink-cdc-mysql-3.4.0-rpm
+          path: /tmp/cdc-rpm/output
+          if-no-files-found: error
+          retention-days: 30
+
+  test:
+    name: Test flink-cdc-mysql 3.4.0
+    needs: [select, build]
+    if: >-
+      always() && needs.select.result == 'success' &&
+      (needs.build.result == 'success' ||
+       (needs.select.outputs.build == 'false' && needs.build.result == 'skipped'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Savepoint protocol regression
+        run: python3 scripts/flink-cdc-mysql/test_protocol.py
+      - name: Validate referenced RPM build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ needs.select.outputs.rpm_run }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN/jobs?filter=latest&per_page=100" \
+            --jq '.jobs[] | select(.name == "Build RPM flink-cdc-mysql 3.4.0" and .conclusion == "success") | .id' \
+            | grep -Eq '^[0-9]+$'
+      - uses: actions/download-artifact@v4
+        with:
+          name: flink-cdc-mysql-3.4.0-rpm
+          run-id: ${{ needs.select.outputs.rpm_run }}
+          github-token: ${{ github.token }}
+          path: connector-rpm
+      - name: Checkout existing engine RPM repositories
+        uses: actions/checkout@v4
+        env:
+          GIT_LFS_SKIP_SMUDGE: '0'
+        with:
+          ref: main
+          path: dependency-repository
+          lfs: true
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink/1.20.1/
+            repo/openeuler-22.03-lts-sp4/bigtop-3.6/hadoop/3.4.3/
+            repo/openeuler-22.03-lts-sp4/bigtop-3.6/common/3.6.0/
       - uses: actions/cache@v4
         with:
           path: /tmp/cdc-maven-cache
-          key: cdc-mysql-3.4.0-jdk11-06581fc73b84b1da45fccf93441d96a118d9bfc1
-      - name: Compile only the MySQL SQL connector and its dependencies
-        shell: bash
+          key: cdc-mysql-smoke-flink1201-jdk11-v1
+      - name: Start MySQL binlog fixture
         run: |
           set -euo pipefail
-          mkdir -p /tmp/cdc-maven-cache /tmp/cdc-source-build
-          docker run --rm \
-            -v "${GITHUB_WORKSPACE}:/workspace:ro" \
+          docker run -d --name cdc-mysql -p 3306:3306 \
+            -e MYSQL_ROOT_PASSWORD=cdc-fixture -e MYSQL_ROOT_HOST=% mysql:8.0.36 \
+            --server-id=223344 --log-bin=mysql-bin --binlog-format=ROW --binlog-row-image=FULL
+          for _ in $(seq 1 60); do
+            if docker exec cdc-mysql mysql -uroot -pcdc-fixture -NBe 'SELECT 1' 2>/dev/null | grep -qx 1; then exit 0; fi
+            sleep 2
+          done
+          docker logs cdc-mysql
+          exit 1
+      - name: Clean install, exact changelog rows and verified savepoint recovery
+        env:
+          BUILD_RUN: ${{ needs.select.outputs.rpm_run }}
+        run: |
+          mkdir -p /tmp/cdc-evidence /tmp/cdc-maven-cache
+          docker run --rm --network host \
+            -e BUILD_RUN_ID="$BUILD_RUN" -e TEST_RUN_ID="$GITHUB_RUN_ID" \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" \
+            -v "$GITHUB_WORKSPACE/connector-rpm:/rpm:ro" \
+            -v "$GITHUB_WORKSPACE/dependency-repository/repo/openeuler-22.03-lts-sp4/bigtop-3.6:/dependencies:ro" \
             -v /tmp/cdc-maven-cache:/root/.m2 \
-            -v /tmp/cdc-source-build:/work \
-            openeuler/openeuler:22.03-lts-sp4 \
-            bash /workspace/scripts/flink-cdc-mysql/compile.sh
-      - name: Preserve compilation evidence
+            -v /tmp/cdc-evidence:/evidence openeuler/openeuler:22.03-lts-sp4 \
+            bash /workspace/scripts/flink-cdc-mysql/test.sh
+      - name: Collect fixture logs
         if: always()
-        uses: actions/upload-artifact@v4
+        run: |
+          mkdir -p /tmp/cdc-evidence
+          docker logs cdc-mysql > /tmp/cdc-evidence/mysql.log 2>&1 || true
+          docker rm -f cdc-mysql || true
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: flink-cdc-mysql-3.4.0-source-feasibility
-          path: /tmp/cdc-source-build/output
-          if-no-files-found: error
-          retention-days: 14
+          name: flink-cdc-mysql-3.4.0-test-evidence
+          path: /tmp/cdc-evidence
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: flink-cdc-mysql-3.4.0-tested-rpms
+          path: connector-rpm
+          retention-days: 30
+
+  candidate:
+    name: Release Candidate flink-cdc-mysql 3.4.0
+    needs: test
+    if: github.ref == 'refs/heads/main' && needs.test.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: flink-cdc-mysql-3.4.0-tested-rpms
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: flink-cdc-mysql-3.4.0-test-evidence
+          path: test-evidence
+      - name: Verify candidate payload and actual test evidence
+        run: |
+          set -euo pipefail
+          grep -qx 'status: PASS' test-evidence/evidence.md
+          (cd candidate && sha256sum -c evidence/SHA256SUMS)
+          cp test-evidence/evidence.md candidate/test-evidence.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flink-cdc-mysql-3.4.0-release-candidate
+          path: candidate
+          retention-days: 30
