@@ -1,0 +1,20 @@
+schema: bigdata.rpm-repo/v2
+component: flink-cdc-postgres
+version: 3.4.0
+bigtop_version: 3.6.0
+artifact_type: integration-rpm
+test_profile: postgres-snapshot-wal-savepoint
+jdk: 11
+jdk_package: java-11-openjdk-devel
+build_run_id: 39124662344
+test_run_id: 39139306230
+tested_artifact_run_id: 39139306230
+promotion_workflow_commit: db65f9ff42b7478a4f3ee1a738314ee3f419408f
+source_identity: 06581fc73b84b1da45fccf93441d96a118d9bfc1
+compatibility_identity: 84e3497bf5e91a2f6c41983ba80dd3d61d2aafc367cabc3cdebbab29f6b0fdb4
+compatibility_identity_format: flink-cdc-postgres-contract-json/v1
+os: openEuler 22.03 LTS SP4
+rpm_count: 1
+test_status: PASS
+build_input_identity: c0c725259e316dd63d254dd2d818ebeefeda1123980452cf77f3a384dc4da2b0
+repository_layout: split-runtime/v2

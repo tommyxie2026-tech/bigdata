@@ -1,0 +1,12 @@
+{
+  "component": "flink-cdc-postgres",
+  "version": "3.4.0",
+  "source_identity": "06581fc73b84b1da45fccf93441d96a118d9bfc1",
+  "flink": "1.20.1",
+  "java": "11",
+  "runtime_packages": [
+    "bigdata-flink-cdc-postgres"
+  ],
+  "test_profile": "postgres-snapshot-wal-savepoint",
+  "postgres_jdbc_driver_bundled": true
+}
