@@ -27,8 +27,8 @@ jobs:
       AWS_EC2_METADATA_DISABLED: 'true'
       AWS_CONFIG_FILE: /dev/null
       AWS_SHARED_CREDENTIALS_FILE: /dev/null
-      EVIDENCE: ${{ runner.temp }}/s3-evidence
-      FIXTURE: ${{ runner.temp }}/s3-fixture
+      EVIDENCE: /tmp/bigdata-s3-evidence
+      FIXTURE: /tmp/bigdata-s3-fixture
     steps:
       - uses: actions/checkout@v4
         with:
@@ -109,6 +109,6 @@ jobs:
         if: always()
         with:
           name: s3-fixture-4.48-api-evidence
-          path: ${{ runner.temp }}/s3-evidence
+          path: ${{ env.EVIDENCE }}
           if-no-files-found: error
           retention-days: 30
