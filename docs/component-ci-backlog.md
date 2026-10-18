@@ -1,7 +1,7 @@
 # 下一轮组件 CI 补齐计划
 
 核验日期：2026-10-18（Asia/Tokyo）  
-实现基线：main `06a520c4ec8594f25206595b0a366989bcc56634`。既有已发布包与新 CDC 晋级状态分列。  
+实现基线：main `50639533eebf915815292be52f4cbbe98b2c0f43`。既有已发布包与新 CDC 晋级状态分列。  
 范围：记录已核验的交付进展和后续实施清单；只有注明证据的组件才表示已锁定版本或已完成对应阶段。
 
 ## 1. 已完成的组件交付
@@ -23,7 +23,7 @@ Hudi 的 manifest 引用 run `39035814730`：run 聚合为 cancelled，最新 at
 
 | 顺序 / 优先级 | 新增项 | 依赖与版本边界 | 首个交付范围 | 必须通过的测试 |
 |---|---|---|---|---|
-| 1 / P1 | Flink CDC MySQL source | 已锁定 3.4.0 / source `06581fc73b84b1da45fccf93441d96a118d9bfc1`；Flink 1.20.1 / JDK 11 | [#98](https://github.com/tommyxie2026-tech/bigdata/pull/98) 已合并；RPM 与 PR 回归 PASS；[主线专项测试 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39104310948)；[发布门禁修复 #99](https://github.com/tommyxie2026-tech/bigdata/pull/99) ；[RC 恢复成功](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39105281957)，[仓库晋级 #100](https://github.com/tommyxie2026-tech/bigdata/pull/100) 待合并 | 已验证 snapshot、I/U/D、completed checkpoint、停止原作业后从实际 savepoint 恢复及最终完整行集；不代表湖仓联调已过 |
+| 1 / P1 | Flink CDC MySQL source | 已锁定 3.4.0 / source `06581fc73b84b1da45fccf93441d96a118d9bfc1`；Flink 1.20.1 / JDK 11 | [RPM 已发布](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink-cdc-mysql/3.4.0/manifest.yaml)；[#100](https://github.com/tommyxie2026-tech/bigdata/pull/100) 已合并；[主线 Test / RC / 发布作业 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39106575363) | 已验证 snapshot、I/U/D、completed checkpoint、停止原作业后从实际 savepoint 恢复及最终完整行集；不代表湖仓联调已过 |
 | 2 / P1 | Flink CDC PostgreSQL source | 复用已建立的 CDC 生命周期；核验数据库版本及复制配置 | 第二个独立 PR，避免与 MySQL 同次引入多个变量 | snapshot + WAL 增量 + restart/恢复；断流失败应可诊断，不能仅凭任务 RUNNING 判通过 |
 | 3 / P1 | S3 兼容存储 fixture / adapter | 具体存储实现、发布形态、许可证与维护方式待选；客户端对齐 Hadoop 3.4.3 及各引擎的依赖 | 先集成测试端点和凭据/TLS配置；只有确定交付自建存储服务时，才新增其服务 RPM CI | bucket 读写/删除、无权限拒绝、凭据错误、TLS、multipart；Spark/Flink 对同一湖仓表读写，Trino 查询按实际 connector 能力验证 |
 | 4 / P1 | Ambari Metrics | 先确认 Ambari 3.0.0 对应源码/recipe、包名和运行时；不能因 Ambari Server RPM 已有就认为 Metrics 已交付 | Collector/Monitor 的独立包或现有 recipe 可行性 PR | 干净安装、采集代理上报、查询带时间戳的真实指标、服务重启 |
@@ -61,7 +61,7 @@ S3 fixture 不等于已经选定某个对象存储产品；使用假端点通过
 ## 5. 建议接下来的 PR
 
 - PR A：[#97](https://github.com/tommyxie2026-tech/bigdata/pull/97) 已合并，既有 7 个 v2 组件审计通过；校验仓库摘要、job/artifact 来源和轻量 evidence，不下载大 RPM artifact 做逐字节比较。
-- PR B：[#98](https://github.com/tommyxie2026-tech/bigdata/pull/98) 已合并，MySQL 连接器 RPM、安装与恢复测试已交付；主线实际 Test run 39104310948 已通过；RPM 复用导致发布被 skipped 的门禁问题由 [#99](https://github.com/tommyxie2026-tech/bigdata/pull/99) 修复，RC 已恢复成功；[仓库晋级 #100](https://github.com/tommyxie2026-tech/bigdata/pull/100) 的 RPM LFS 摘要、checksums、repodata 和原始 Build/Test 证据已核验，待合并后才计为发布。
+- PR B：[#98](https://github.com/tommyxie2026-tech/bigdata/pull/98)、发布门禁修复 [#99](https://github.com/tommyxie2026-tech/bigdata/pull/99) 和仓库晋级 [#100](https://github.com/tommyxie2026-tech/bigdata/pull/100) 均已合并。MySQL CDC RPM 已发布；主线 run `39106575363` 的实际 Test、Release Candidate 和发布作业 success；仓库主线 `50639533` 的 CI 和审计 success。发布目录的 Git blobs 与已核验晋级产物完全一致，复用 Build `39102586103`，未重新编译 RPM。
 - PR C：Flink CDC PostgreSQL source，复用 B 已验证的基础流程。
 - PR D：S3 fixture/adapter 选型和远端湖仓读写 CI；选型前可继续用 HDFS 做基线验收。
 - PR E：Ambari Metrics 可行性和采集/查询 CI；与传统集群集成验收并行安排，但分别提交。

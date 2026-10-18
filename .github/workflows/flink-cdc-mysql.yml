@@ -12,6 +12,10 @@ on:
       - 'scripts/flink-cdc-mysql/**'
   workflow_dispatch:
     inputs:
+      promote_test_run_id:
+        description: Resume publication from an unchanged successful mainline Test run
+        type: string
+        default: ''
       rpm_build_run_id:
         description: Existing successful connector RPM build to retest without repackaging
         type: string
@@ -34,6 +38,7 @@ env:
 
 jobs:
   select:
+    if: inputs.promote_test_run_id == ''
     runs-on: ubuntu-latest
     outputs:
       build: ${{ steps.select.outputs.build }}
@@ -99,7 +104,7 @@ jobs:
     name: Test flink-cdc-mysql 3.4.0
     needs: [select, build]
     if: >-
-      always() && needs.select.result == 'success' &&
+      !cancelled() && needs.select.result == 'success' &&
       (needs.build.result == 'success' ||
        (needs.select.outputs.build == 'false' && needs.build.result == 'skipped'))
     runs-on: ubuntu-latest
@@ -109,7 +114,9 @@ jobs:
         with:
           lfs: false
       - name: Savepoint protocol regression
-        run: python3 scripts/flink-cdc-mysql/test_protocol.py
+        run: |
+          python3 scripts/flink-cdc-mysql/test_protocol.py
+          python3 scripts/flink-cdc-mysql/test_resume_release.py
       - name: Validate referenced RPM build
         env:
           GH_TOKEN: ${{ github.token }}
@@ -199,7 +206,9 @@ jobs:
   candidate:
     name: Release Candidate flink-cdc-mysql 3.4.0
     needs: test
-    if: github.ref == 'refs/heads/main' && needs.test.result == 'success'
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      needs.test.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -225,7 +234,10 @@ jobs:
   promote:
     name: Open tested RPM repository PR
     needs: [select, test, candidate]
-    if: github.ref == 'refs/heads/main' && needs.test.result == 'success'
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      needs.select.result == 'success' && needs.test.result == 'success' &&
+      needs.candidate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -253,4 +265,58 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BUILD_RUN_ID: ${{ needs.select.outputs.rpm_run }}
+        run: bash scripts/flink-cdc-mysql/promote.sh
+
+  resume:
+    name: Resume verified mainline publication
+    if: github.event_name == 'workflow_dispatch' && inputs.promote_test_run_id != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TEST_RUN_ID: ${{ inputs.promote_test_run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Verify latest mainline Test and unchanged package/runtime sources
+        run: |
+          python3 scripts/flink-cdc-mysql/test_resume_release.py
+          python3 scripts/flink-cdc-mysql/resume_release.py verify "$TEST_RUN_ID"
+      - uses: actions/download-artifact@v4
+        with:
+          name: flink-cdc-mysql-3.4.0-tested-rpms
+          run-id: ${{ inputs.promote_test_run_id }}
+          github-token: ${{ github.token }}
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: flink-cdc-mysql-3.4.0-test-evidence
+          run-id: ${{ inputs.promote_test_run_id }}
+          github-token: ${{ github.token }}
+          path: test-evidence
+      - name: Verify original evidence and candidate checksum
+        id: evidence
+        run: |
+          set -euo pipefail
+          python3 scripts/flink-cdc-mysql/resume_release.py evidence "$TEST_RUN_ID"
+          (cd candidate && sha256sum -c evidence/SHA256SUMS)
+          cp test-evidence/evidence.md candidate/test-evidence.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flink-cdc-mysql-3.4.0-release-candidate
+          path: candidate
+          retention-days: 30
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: repository
+          lfs: false
+      - name: Open RPM repository PR with original Build/Test provenance
+        env:
+          BUILD_RUN_ID: ${{ steps.evidence.outputs.build_run }}
         run: bash scripts/flink-cdc-mysql/promote.sh

@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Called only after this run's actual clean install and recovery test succeeds.
+# Publish only artifacts from an actual successful clean install and recovery test.
 set -euo pipefail
 : "${GITHUB_WORKSPACE:?}"
 : "${GITHUB_REPOSITORY:?}"
 : "${GITHUB_RUN_ID:?}"
 : "${GITHUB_SHA:?}"
 : "${BUILD_RUN_ID:?}"
+TEST_RUN_ID="${TEST_RUN_ID:-$GITHUB_RUN_ID}"
 source_root="$GITHUB_WORKSPACE"
 checkout="$source_root/repository"
 evidence="$source_root/test-evidence/evidence.md"
 grep -qx 'status: PASS' "$evidence"
-grep -qx "test_run_id: $GITHUB_RUN_ID" "$evidence"
+grep -qx "test_run_id: $TEST_RUN_ID" "$evidence"
 grep -qx "build_run_id: $BUILD_RUN_ID" "$evidence"
 grep -qx 'source_identity: 06581fc73b84b1da45fccf93441d96a118d9bfc1' "$evidence"
 for field in clean_install snapshot_exact_rows insert_update_delete_exact_rows completed_checkpoint savepoint_restore_path restored_exact_rows; do
@@ -61,8 +62,8 @@ test_profile: mysql-snapshot-changelog-savepoint
 jdk: 11
 jdk_package: java-11-openjdk-devel
 build_run_id: $BUILD_RUN_ID
-test_run_id: $GITHUB_RUN_ID
-tested_artifact_run_id: $GITHUB_RUN_ID
+test_run_id: $TEST_RUN_ID
+tested_artifact_run_id: $TEST_RUN_ID
 promotion_workflow_commit: $GITHUB_SHA
 source_identity: 06581fc73b84b1da45fccf93441d96a118d9bfc1
 compatibility_identity: $compatibility_identity
@@ -86,7 +87,7 @@ git -c user.name='github-actions[bot]' \
 git push origin HEAD
 body_file="$(mktemp)"
 cat > "$body_file" <<EOF
-Publishes the connector-only RPM tested in run $GITHUB_RUN_ID from RPM build $BUILD_RUN_ID.
+Publishes the connector-only RPM tested in run $TEST_RUN_ID from RPM build $BUILD_RUN_ID.
 The clean openEuler test verified exact snapshot and I/U/D rows, a completed checkpoint,
 and restoration from the exact savepoint with offline MySQL changes.
 MySQL's JDBC driver is a test fixture dependency and is excluded from this RPM.

@@ -1,0 +1,19 @@
+schema: bigdata.rpm-repo/v2
+component: flink-cdc-mysql
+version: 3.4.0
+bigtop_version: 3.6.0
+artifact_type: integration-rpm
+test_profile: mysql-snapshot-changelog-savepoint
+jdk: 11
+jdk_package: java-11-openjdk-devel
+build_run_id: 39102586103
+test_run_id: 39104310948
+tested_artifact_run_id: 39104310948
+promotion_workflow_commit: 6377cde9ccb250cd22d87d4261a55bfe50e68988
+source_identity: 06581fc73b84b1da45fccf93441d96a118d9bfc1
+compatibility_identity: 4c538ec6f6c35cbc0e962b2258042a93f0e966b6c21e49a3f18cb008c39b86a6
+compatibility_identity_format: flink-cdc-mysql-contract-json/v1
+os: openEuler 22.03 LTS SP4
+rpm_count: 1
+test_status: PASS
+repository_layout: split-runtime/v2
