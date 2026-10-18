@@ -157,5 +157,25 @@ class TransportTests(unittest.TestCase):
                 pages("runs/1/attempts/2/jobs", "jobs")
 
 
+
+class CatalogPolicyTests(unittest.TestCase):
+    def test_no_compatibility_contract_is_not_missing_evidence(self):
+        data = fixture()
+        del data["manifest"]["compatibility_identity"]
+        del data["evidence"]["compatibility_identity"]
+        self.assertEqual(verify_evidence(**data, compatibility_required=False), [])
+        with self.assertRaises(EvidenceError):
+            verify_evidence(**data)
+
+    def test_runtime_jdk_mapping_requires_explicit_policy(self):
+        data = fixture()
+        data["evidence"]["jdk_package"] = "java-11-openjdk"
+        with self.assertRaises(EvidenceError):
+            verify_evidence(**data)
+        self.assertEqual(verify_evidence(**data, test_jdk_package="java-11-openjdk"), [])
+        with self.assertRaises(EvidenceError):
+            verify_evidence(**data, test_jdk_package="java-17-openjdk")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

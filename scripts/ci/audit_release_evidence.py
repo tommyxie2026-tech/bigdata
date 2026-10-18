@@ -14,7 +14,8 @@ class EvidenceError(ValueError):
     pass
 
 def verify_evidence(*, manifest, evidence, build_run, test_run, build_jobs,
-                    test_jobs, artifact_names, repository):
+                    test_jobs, artifact_names, repository, compatibility_required=True,
+                    test_jdk_package=None):
     warnings = []
     component, version = manifest["component"], manifest["version"]
     if manifest.get("tested_artifact_run_id") != manifest.get("test_run_id"):
@@ -45,7 +46,14 @@ def verify_evidence(*, manifest, evidence, build_run, test_run, build_jobs,
     for key in ("component", "version", "build_run_id", "test_run_id",
                 "source_identity", "compatibility_identity", "artifact_type",
                 "test_profile", "jdk_package"):
-        if key not in manifest or key not in evidence or evidence[key] != manifest[key]:
+        if key == "compatibility_identity" and not compatibility_required:
+            if manifest.get(key, "") or evidence.get(key, ""):
+                raise EvidenceError("unexpected compatibility identity without catalog contract")
+            continue
+        expected = test_jdk_package if key == "jdk_package" and test_jdk_package is not None else manifest.get(key)
+        if key not in manifest and key != "compatibility_identity":
+            raise EvidenceError(f"missing manifest field: {key}")
+        if key not in evidence or evidence[key] != expected:
             raise EvidenceError(f"evidence mismatch: {key}")
     if (manifest.get("test_status") != "PASS" or evidence.get("status") != "PASS"
             or evidence.get("toolchain_jdk") != manifest.get("jdk")):
@@ -121,8 +129,22 @@ def audit_manifest(repository, path, root):
     manifest = parse_fields(path.read_text())
     if manifest.get("schema") != "bigdata.rpm-repo/v2":
         raise EvidenceError("only v2 manifests are covered")
-    required = {"source_identity", "compatibility_identity", "artifact_type",
+    catalog_text = (root / "ci/components.yaml").read_text()
+    blocks = re.split(r"(?m)^  ([a-z0-9_-]+):\\s*$", catalog_text)
+    entries = dict(zip(blocks[1::2], blocks[2::2]))
+    entry = entries.get(manifest["component"], "")
+    compatibility_required = bool(re.search(
+        r"(?m)^    (compatibility|jdk_runtime_archive):", entry))
+    builder = re.search(r"(?m)^    builder: (\\S+)", entry)
+    build_jdk_package = manifest.get("jdk_package", "")
+    test_jdk_package = build_jdk_package
+    if (manifest["component"] in {"kafka", "flink"} and builder
+            and builder.group(1) == "bigtop"):
+        test_jdk_package = build_jdk_package.removesuffix("-devel")
+    required = {"source_identity", "artifact_type",
                 "test_profile", "jdk", "jdk_package", "build_run_id", "test_run_id"}
+    if compatibility_required:
+        required.add("compatibility_identity")
     missing = required - manifest.keys()
     if missing:
         raise EvidenceError("historical manifest evidence gap: missing " + ", ".join(sorted(missing)))
@@ -134,7 +156,7 @@ def audit_manifest(repository, path, root):
         component=manifest["component"], version=manifest["version"],
         repo_checkout=root, components_file=root / "ci/components.yaml",
         source_identity=manifest["source_identity"],
-        compatibility_identity=manifest["compatibility_identity"],
+        compatibility_identity=manifest.get("compatibility_identity", ""),
         artifact_type=manifest["artifact_type"], test_profile=manifest["test_profile"],
         jdk=manifest["jdk"], jdk_package=manifest["jdk_package"]))
     runs, jobs = {}, {}
@@ -163,7 +185,8 @@ def audit_manifest(repository, path, root):
         build_run=runs["build_run_id"], test_run=runs["test_run_id"],
         build_jobs=jobs["build_run_id"], test_jobs=jobs["test_run_id"],
         artifact_names={a["name"] for a in artifacts if not a["expired"]},
-        repository=repository)
+        repository=repository, compatibility_required=compatibility_required,
+        test_jdk_package=test_jdk_package)
     return {"component": manifest["component"], "version": manifest["version"],
             "status": "PASS", "warnings": warnings}
 
