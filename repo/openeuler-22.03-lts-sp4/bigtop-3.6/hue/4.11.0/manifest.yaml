@@ -1,0 +1,19 @@
+schema: bigdata.rpm-repo/v2
+component: hue
+version: 4.11.0
+bigtop_version: 3.6.0
+artifact_type: service-rpm
+test_profile: hue-single-node-smoke
+jdk: 25
+jdk_package: ""
+build_run_id: 39086875001
+test_run_id: 39086875001
+os: openEuler 22.03 LTS SP4
+promotion_workflow_commit: 88217bf92236a0e7778bfb1bdebdc7cb7e4753d1
+tested_artifact_run_id: 39086875001
+rpm_count: 1
+test_status: PASS
+repository_layout: split-runtime/v2
+jdk_runtime_archive_sha256: e58fcdcd637b25c03ca84cbbcefc70d11efb8f4b4cbd05decc9f661769d77f94
+source_identity: 65d9e489f400ac151029b33c5a2bd9df31e167da
+compatibility_identity: 9abd58aec1d638a3933b75ac869d5799fe4e2b4701fb22031a8ed074441ac441
