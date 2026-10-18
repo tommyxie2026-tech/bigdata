@@ -70,6 +70,9 @@ jobs:
           python3 scripts/ci/test-component-dependency-contract.py
           python3 scripts/ci/validate-components.py --config ci/components.yaml
 
+      - name: Release evidence audit contracts
+        run: python3 scripts/ci/test-release-evidence-audit.py
+
       - name: Merged PR tested artifact reuse contracts
         run: python3 scripts/ci/test-reuse-merged-pr-test-artifacts.py
 

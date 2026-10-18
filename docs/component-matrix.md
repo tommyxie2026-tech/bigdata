@@ -73,9 +73,9 @@ SQL 层：Hive / Trino / Spark SQL
 |---|---|---:|---|---|
 | Kafka | 消息接入 | 3.4.1 | RPM 已发布；KRaft smoke PASS | 补齐与 CDC/Flink 的端到端链路验证 |
 | Flink | 流计算 | 1.20.1 | RPM 已发布；local-job smoke PASS | 补齐 Kafka/CDC 与湖仓表格式端到端验证 |
-| CDC Connector | 数据接入 | 未定 | 未接入构建/发布矩阵；未选定连接器及版本 | 明确数据源与 CDC 技术选型，再补构建、部署和一致性测试 |
+| Flink CDC MySQL | 数据接入 | 3.4.0 | [交付 CI #98](https://github.com/tommyxie2026-tech/bigdata/pull/98) 已合并；连接器 RPM 与 PR 专项测试 PASS；[主线专项测试 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39104310948)；[发布门禁修复 #99](https://github.com/tommyxie2026-tech/bigdata/pull/99) 与产物晋级处理中 | 核验主线 RC 和仓库晋级；之后独立推进 PostgreSQL source 与湖仓联调 |
 | Iceberg | 主线湖仓表格式 | 1.12.0 | integration RPM 已发布，仓库 manifest PASS | 补齐和 Kafka/Flink、对象存储的组合验收 |
-| Hudi | 可选湖仓 Profile | 1.2.1 | integration RPM 已发布；后续主线回归 PASS；manifest 引用 run 聚合 cancelled、实际 Test/Release success | 补齐分层证据审计、CDC upsert 与恢复验收 |
+| Hudi | 可选湖仓 Profile | 1.2.1 | integration RPM 已发布；后续主线回归 PASS；manifest 引用 run 聚合 cancelled、实际 Test/Release success | 分层证据审计已通过；补 CDC upsert 与湖仓恢复验收 |
 | Paimon | 可选湖仓扩展 Profile | 2.1.0 | integration RPM 已发布；主线安装、更新与 Spark/Flink 双向互读 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/paimon/2.1.0/manifest.yaml) | 补齐 CDC、checkpoint 恢复与远端存储组合验收 |
 | Hive Metastore | 湖仓元数据 | 随 Hive 4.0.1 | Hive RPM 已发布；Phase 3 多引擎元数据协同未单独验收 | 验证 Trino、Spark、Flink 对同一 catalog 的读写与 schema 一致性 |
 | Trino | 交互式查询 | 483 | RPM 已发布；single-node smoke PASS | 补齐 Iceberg/Hudi/Paimon catalog 端到端查询验证 |
@@ -91,7 +91,7 @@ Hue 是辅助查询 UI；`4.11.0-2.oe2203sp4` 已发布，[主线安装、Gunico
 
 | 顺序 | 工作 | 分类 | 首个验收目标 |
 |---|---|---|---|
-| 0 | 发布证据溯源校验；解释 Hudi run/job 状态差异 | 共用 CI 修复，P0 | 校验 manifest 对应 attempt 的实际 Test、被复用 Build 证据与产物 SHA256；区分 run 聚合状态 |
+| 0 | 发布证据溯源校验 | [#97](https://github.com/tommyxie2026-tech/bigdata/pull/97) 已合并，7 个既有 v2 组件审计 PASS | 核验仓库 checksum/repodata、实际 jobs 和轻量 evidence；不下载大 RPM artifact 做逐字节比较 |
 | 1 | Flink CDC：先 MySQL source，后 PostgreSQL source | 新增 connector 构建/测试/发布，P1 | 全量快照 + INSERT/UPDATE/DELETE + checkpoint 重启恢复，验证下游最终行集合 |
 | 2 | S3 兼容存储适配与 fixture | 新增集成 CI，P1；存储实现另行选型 | Spark/Flink/Trino 对同一远端表的读写、凭据与失败恢复 |
 | 3 | Hive Metastore / HiveServer2、Kafka→Flink→湖仓、HDFS/S3 湖仓组合 | 已发布组件集成 CI，P1 | 不重编现有 RPM，验证真实服务端口、数据变化及跨进程恢复 |
@@ -218,5 +218,5 @@ cloud-native-data:
 - [ ] 补充 Kafka / Flink / Iceberg 选型细节
 - [ ] 补充 Profile 交付模板
 
-- [ ] 加入 manifest 引用的 run/attempt/job 分层审计
+- [x] 加入 manifest 引用的 run/attempt/job 分层审计（#97，7 个既有 v2 组件；独立 CDC 契约另行核验）
 - [ ] 按 [CI 补齐计划](component-ci-backlog.md) 推进 CDC、S3 与现有组件集成测试

@@ -1,0 +1,55 @@
+name: Audit Release Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Released v2 component to audit
+        type: choice
+        default: all
+        options: [all, kafka, flink, trino, iceberg, hudi, paimon, hue]
+  pull_request:
+    paths:
+      - '.github/workflows/audit-release-evidence.yml'
+      - 'scripts/ci/audit_release_evidence.py'
+      - 'scripts/ci/test-release-evidence-audit.py'
+      - 'repo/**/manifest.yaml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/audit-release-evidence.yml'
+      - 'scripts/ci/audit_release_evidence.py'
+      - 'repo/**/manifest.yaml'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Regression tests
+        run: python3 scripts/ci/test-release-evidence-audit.py
+      - name: Audit repository and release provenance
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COMPONENT: ${{ inputs.component || 'all' }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/audit_release_evidence.py \
+            --repository "${GITHUB_REPOSITORY}" --component "${COMPONENT}" \
+            | tee release-evidence-audit.json
+      - name: Preserve audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-audit
+          path: release-evidence-audit.json
+          if-no-files-found: warn
