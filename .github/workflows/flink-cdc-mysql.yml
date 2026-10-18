@@ -1,0 +1,50 @@
+name: Flink CDC MySQL source feasibility
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/flink-cdc-mysql.yml'
+      - 'scripts/flink-cdc-mysql/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flink-cdc-mysql-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: Compile MySQL connector on openEuler / Java 11
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/cache@v4
+        with:
+          path: /tmp/cdc-maven-cache
+          key: cdc-mysql-3.4.0-jdk11-06581fc73b84b1da45fccf93441d96a118d9bfc1
+      - name: Compile only the MySQL SQL connector and its dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/cdc-maven-cache /tmp/cdc-source-build
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace:ro" \
+            -v /tmp/cdc-maven-cache:/root/.m2 \
+            -v /tmp/cdc-source-build:/work \
+            openeuler/openeuler:22.03-lts-sp4 \
+            bash /workspace/scripts/flink-cdc-mysql/compile.sh
+      - name: Preserve compilation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flink-cdc-mysql-3.4.0-source-feasibility
+          path: /tmp/cdc-source-build/output
+          if-no-files-found: error
+          retention-days: 14
