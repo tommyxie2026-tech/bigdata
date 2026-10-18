@@ -11,7 +11,7 @@ SOURCE_DIR="${WORK_ROOT}/hue-source"
 ARTIFACTS="${WORK_ROOT}/artifacts"
 RPM_TOP="${WORK_ROOT}/rpmbuild"
 INSTALL_DIR=/usr/share/hue
-RPM_NAME="bigdata-hue-server-${VERSION}-1.oe2203sp4.x86_64.rpm"
+RPM_NAME="bigdata-hue-server-${VERSION}-2.oe2203sp4.x86_64.rpm"
 NODE_ARCHIVE=/tmp/node-v22.23.0-linux-x64.tar.xz
 NODE_SHA256=14d7de44f235534799f8b171a4050d9a6a4bc99c87e053a25d3d54afa580aa20
 mkdir -p "${ARTIFACTS}/rpms" "${ARTIFACTS}/logs" "${ARTIFACTS}/evidence"
@@ -24,6 +24,25 @@ mkdir -p "${ARTIFACTS}/rpms" "${ARTIFACTS}/logs" "${ARTIFACTS}/evidence"
 [[ "$(uname -m)" == x86_64 ]]
 grep -qi openEuler /etc/os-release
 
+BASE_ARTIFACT_ROOT=/workspace/.hue-base-artifact
+if [[ -s "${BASE_ARTIFACT_ROOT}/evidence/evidence.md" ]]; then
+  # Repackage the already compiled application; never rebuild Node or Python dependencies.
+  dnf -y install ca-certificates python3 rpm-build shadow-utils openEuler-rpm-config tar gzip findutils
+  base_evidence="${BASE_ARTIFACT_ROOT}/evidence/evidence.md"
+  grep -qx "source_identity: ${EXPECTED_SOURCE_IDENTITY}" "${base_evidence}"
+  grep -qx "version: ${VERSION}" "${base_evidence}"
+  grep -qx 'component: hue' "${base_evidence}"
+  grep -qx 'build_run_id: 38904003747' "${base_evidence}"
+  grep -qx "compatibility_identity: ${COMPONENT_COMPATIBILITY_IDENTITY}" "${base_evidence}"
+  grep -qx 'status: PASS' "${base_evidence}"
+  (cd "${BASE_ARTIFACT_ROOT}" && sha256sum -c evidence/SHA256SUMS)
+  base_rpm="${BASE_ARTIFACT_ROOT}/rpms/bigdata-hue-server-${VERSION}-1.oe2203sp4.x86_64.rpm"
+  [[ "$(rpm -qp --queryformat '%{NAME}:%{VERSION}:%{RELEASE}' "${base_rpm}")" == "bigdata-hue-server:${VERSION}:1.oe2203sp4" ]]
+  dnf -y install "${base_rpm}"
+  actual_source_identity="${EXPECTED_SOURCE_IDENTITY}"
+  install -m 0644 /usr/share/licenses/bigdata-hue/LICENSE "${WORK_ROOT}/hue-LICENSE.txt"
+  install -m 0644 /usr/share/licenses/bigdata-hue/NOTICE "${WORK_ROOT}/hue-NOTICE.txt"
+else
 dnf -y install \
   ca-certificates curl gcc gcc-c++ git gmp-devel krb5-devel libffi-devel \
   libxml2-devel libxslt-devel make openldap-devel openssl-devel python3 \
@@ -59,57 +78,6 @@ hue_source_version="$(sed -n 's/^VERSION="\([^"]*\)"$/\1/p' "${SOURCE_DIR}/VERSI
 [[ "${hue_source_version}" == "${VERSION}" ]]
 grep -Eq '^apps: desktop$' "${SOURCE_DIR}/Makefile"
 
-# The pinned upstream CherryPy server probes socket._fileobject, removed in Python 3.9.
-# Its flag only chooses the Python 2 string-buffer path; Python 3 must use the bytes-buffer path.
-python3 - "${SOURCE_DIR}/desktop/core/src/desktop/lib/wsgiserver.py" <<'PY'
-from pathlib import Path
-import sys
-
-path = Path(sys.argv[1])
-source = path.read_text()
-old = "_fileobject_uses_str_type = isinstance(socket._fileobject(None)._rbuf, basestring)"
-new = """try:
-    _fileobject_uses_str_type = isinstance(socket._fileobject(None)._rbuf, basestring)
-except AttributeError:
-    # Python 3 removed the socket._fileobject base used by this pinned server.
-    import io
-    class _SocketFileObject:
-        default_bufsize = 8192
-        def __init__(self, sock, mode="rb", bufsize=-1, close=False):
-            self._sock = sock
-            self._rbufsize = bufsize if bufsize > 0 else self.default_bufsize
-            self._wbufsize = bufsize if bufsize > 0 else self.default_bufsize
-            self._rbuf = io.BytesIO()
-            self._wbuf = []
-            self._close = close
-        def write(self, data):
-            self._wbuf.append(data)
-            if sum(map(len, self._wbuf)) >= self._wbufsize:
-                self.flush()
-        def close(self):
-            self.flush()
-            if self._close:
-                self._sock.close()
-    socket._fileobject = _SocketFileObject
-    _fileobject_uses_str_type = False"""
-if source.count(old) != 1:
-    raise SystemExit("Pinned Hue wsgiserver compatibility anchor changed")
-source = source.replace(old, new)
-replacements = (
-    ("from io import StringIO as string_io", "from io import BytesIO as string_io"),
-    ('buffer = "".join(self._wbuf)', 'buffer = b"".join(self._wbuf)'),
-    ("bline.endswith('\\n')", "bline.endswith(b'\\n')"),
-    ("data.find('\\n', 0, left)", "data.find(b'\\n', 0, left)"),
-    ("data.find('\\n')", "data.find(b'\\n')"),
-    ('data != "\\n"', 'data != b"\\n"'),
-)
-for before, after in replacements:
-    if before not in source:
-        raise SystemExit(f"Missing Python 3 socket buffer compatibility anchor: {before}")
-    source = source.replace(before, after)
-path.write_text(source)
-PY
-
 # Bootstrap Hue's pinned build tooling in an isolated Python environment.
 # The target image's RPM-owned pip has no RECORD file, so upgrading it directly
 # from upstream's Makefile fails. A venv-local pip can be upgraded safely.
@@ -128,15 +96,19 @@ PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python \
   PREFIX=/usr/share INSTALL_DIR="${INSTALL_DIR}" PYTHON_VER=python3.9 \
   make apps install 2>&1 | tee "${ARTIFACTS}/logs/hue-build.log"
 
+  install -m 0644 "${SOURCE_DIR}/LICENSE.txt" "${WORK_ROOT}/hue-LICENSE.txt"
+  install -m 0644 "${SOURCE_DIR}/NOTICE.txt" "${WORK_ROOT}/hue-NOTICE.txt"
+  install -d -m 0755 /etc/hue
+  install -m 0644 "${SOURCE_DIR}/desktop/conf.dist/hue.ini" /etc/hue/hue.ini
+fi
+
 HUE_PYTHON="${INSTALL_DIR}/build/venvs/python3.9/bin/python"
 HUE_BIN="${INSTALL_DIR}/build/venvs/python3.9/bin/hue"
 [[ -x "${HUE_PYTHON}" && -x "${HUE_BIN}" ]]
+"${HUE_PYTHON}" -c 'import gunicorn'
 "${HUE_PYTHON}" -m pip install --disable-pip-version-check 'trino==0.329.0'
 "${HUE_PYTHON}" -m pip freeze | LC_ALL=C sort > "${ARTIFACTS}/evidence/python-requirements.freeze"
 install -d -m 0755 /etc/hue /usr/lib/systemd/system /usr/libexec/hue /var/lib/hue /var/log/hue
-install -m 0644 "${SOURCE_DIR}/desktop/conf.dist/hue.ini" /etc/hue/hue.ini
-install -m 0644 "${SOURCE_DIR}/LICENSE.txt" "${WORK_ROOT}/hue-LICENSE.txt"
-install -m 0644 "${SOURCE_DIR}/NOTICE.txt" "${WORK_ROOT}/hue-NOTICE.txt"
 cat > /usr/libexec/hue/hue-server <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -144,7 +116,7 @@ export HUE_CONF_DIR=/etc/hue
 export DESKTOP_LOG_DIR=/var/log/hue
 export HOME=/var/lib/hue
 cd /usr/share/hue
-exec /usr/share/hue/build/venvs/python3.9/bin/hue runcherrypyserver
+exec /usr/share/hue/build/venvs/python3.9/bin/hue rungunicornserver
 EOF
 chmod 0755 /usr/libexec/hue/hue-server
 cat > /usr/lib/systemd/system/hue.service <<'EOF'
@@ -182,7 +154,7 @@ install -m 0644 /usr/lib/systemd/system/hue.service "${RPM_TOP}/SOURCES/hue.serv
 cat > "${RPM_TOP}/SPECS/bigdata-hue-server.spec" <<'EOF'
 Name:           bigdata-hue-server
 Version:        4.11.0
-Release:        1.oe2203sp4
+Release:        2.oe2203sp4
 Summary:        Hue SQL Assistant service
 License:        Apache-2.0
 URL:            https://github.com/cloudera/hue
@@ -248,6 +220,8 @@ fi
 /usr/share/hue
 
 %changelog
+* Sun Oct 18 2026 BIGDATA CI <ci@example.invalid> - 4.11.0-2.oe2203sp4
+- Use upstream Gunicorn command; reuse existing compiled runtime
 * Thu Oct 15 2026 BIGDATA CI <ci@example.invalid> - 4.11.0-1.oe2203sp4
 - Build the pinned Hue service for openEuler 22.03 SP4
 EOF
@@ -279,5 +253,6 @@ toolchain_node: 22.23.0
 node_archive_sha256: ${NODE_SHA256}
 trino_python_client: 0.329.0
 rpm_count: 1
+rpm_release: 2.oe2203sp4
 status: PASS
 EOF

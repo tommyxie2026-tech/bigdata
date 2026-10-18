@@ -55,6 +55,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Reuse compiled Hue runtime for RPM revision
+        if: inputs.component == 'hue'
+        uses: actions/download-artifact@v4
+        with:
+          name: hue-4.11.0-bigtop-3.6-openeuler22-rpm
+          path: .hue-base-artifact
+          run-id: 38904003747
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Runner capacity
         run: |
           df -h

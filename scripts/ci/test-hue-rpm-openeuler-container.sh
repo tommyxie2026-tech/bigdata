@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+report_failure() {
+  local rc=$?
+  echo "Hue smoke failed (exit ${rc}) at line ${BASH_LINENO[0]}: ${BASH_COMMAND}" >&2
+  local log_file
+  for log_file in "${LOG_DIR:-/nonexistent}"/*.log; do
+    [[ -f "${log_file}" ]] || continue
+    echo "Last output: ${log_file}" >&2
+    tail -n 100 "${log_file}" >&2
+  done
+  return "${rc}"
+}
+trap report_failure ERR
 
 : "${COMPONENT:?COMPONENT is required}"
 : "${VERSION:?VERSION is required}"
@@ -21,7 +33,7 @@ grep -qi openEuler /etc/os-release
 
 REPO_DIR=/tmp/bigdata-hue-rpm-repo
 LOG_DIR="${EVIDENCE_ROOT}/logs"
-RPM_NAME="bigdata-hue-server-${VERSION}-1.oe2203sp4.x86_64.rpm"
+RPM_NAME="bigdata-hue-server-${VERSION}-2.oe2203sp4.x86_64.rpm"
 mkdir -p "${REPO_DIR}" "${EVIDENCE_ROOT}" "${LOG_DIR}"
 dnf -y install ca-certificates coreutils createrepo_c curl dnf-utils \
   findutils procps-ng python3 rpm shadow-utils sudo tar util-linux
@@ -83,7 +95,7 @@ rpm -q bigdata-hue-server trino-server-rpm
 
 test -x /usr/share/hue/build/venvs/python3.9/bin/hue
 test -s /etc/hue/hue.ini
-grep -Fq 'exec /usr/share/hue/build/venvs/python3.9/bin/hue runcherrypyserver' /usr/libexec/hue/hue-server
+grep -Fq 'exec /usr/share/hue/build/venvs/python3.9/bin/hue rungunicornserver' /usr/libexec/hue/hue-server
 sed -i \
   -e "s|^secret_key=.*|secret_key=bigdata-hue-ci-disposable-key-2026|" \
   -e 's|^## engine=sqlite3$|engine=sqlite3|' \
@@ -91,7 +103,7 @@ sed -i \
   /etc/hue/hue.ini
 install -d -o hue -g hue -m 0750 /var/lib/hue /var/log/hue
 runuser -u hue -- env HUE_CONF_DIR=/etc/hue DESKTOP_LOG_DIR=/var/log/hue HOME=/var/lib/hue \
-  /usr/share/hue/build/venvs/python3.9/bin/hue migrate \
+  timeout --kill-after=10s 120s /usr/share/hue/build/venvs/python3.9/bin/hue migrate \
   2>&1 | tee "${LOG_DIR}/hue-migrate.log"
 
 cat > /etc/trino/config.properties <<'EOF'
@@ -118,18 +130,23 @@ runuser -u trino -- env JAVA_HOME="${JAVA_HOME}" PATH="${JAVA_HOME}/bin:${PATH}"
 trino_pid=$!
 hue_pid=''
 cleanup() {
-  if [[ -n "${hue_pid}" ]]; then
-    kill -TERM "${hue_pid}" 2>/dev/null || true
-    wait "${hue_pid}" 2>/dev/null || true
-  fi
-  kill -TERM "${trino_pid}" 2>/dev/null || true
-  wait "${trino_pid}" 2>/dev/null || true
+  local pid attempt
+  for pid in "${hue_pid}" "${trino_pid}"; do
+    [[ -n "${pid}" ]] || continue
+    kill -TERM "${pid}" 2>/dev/null || true
+    for attempt in $(seq 1 10); do
+      kill -0 "${pid}" 2>/dev/null || break
+      sleep 1
+    done
+    kill -KILL "${pid}" 2>/dev/null || true
+    wait "${pid}" 2>/dev/null || true
+  done
 }
 trap cleanup EXIT
 
 trino_ready=false
-for attempt in $(seq 1 180); do
-  if curl --fail --silent http://127.0.0.1:8080/v1/info -o "${LOG_DIR}/trino-health.json"; then
+for attempt in $(seq 1 60); do
+  if curl --connect-timeout 2 --max-time 5 --fail --silent http://127.0.0.1:8080/v1/info -o "${LOG_DIR}/trino-health.json"; then
     if python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get("nodeVersion",{}).get("version")=="483" and not d.get("starting",False) else 1)' "${LOG_DIR}/trino-health.json"; then
       trino_ready=true
       break
@@ -144,15 +161,15 @@ runuser -u hue -- env HUE_CONF_DIR=/etc/hue DESKTOP_LOG_DIR=/var/log/hue HOME=/v
   /usr/libexec/hue/hue-server >"${LOG_DIR}/hue-server.log" 2>&1 &
 hue_pid=$!
 hue_ready=false
-for attempt in $(seq 1 120); do
-  status="$(curl --silent --output "${LOG_DIR}/hue-health.html" --write-out '%{http_code}' \
+for attempt in $(seq 1 60); do
+  status="$(curl --connect-timeout 2 --max-time 5 --silent --output "${LOG_DIR}/hue-health.html" --write-out '%{http_code}' \
     http://127.0.0.1:8888/ || true)"
   if [[ "${status}" =~ ^(200|302)$ ]]; then
     hue_ready=true
     break
   fi
   kill -0 "${hue_pid}" || { cat "${LOG_DIR}/hue-server.log" >&2; exit 1; }
-  if (( attempt % 30 == 0 )); then echo "Waiting for Hue startup (${attempt}/120 attempts)..."; fi
+  if (( attempt % 30 == 0 )); then echo "Waiting for Hue startup (${attempt}/60 attempts)..."; fi
   sleep 2
 done
 [[ "${hue_ready}" == true ]] || { cat "${LOG_DIR}/hue-server.log" >&2; exit 1; }
@@ -162,7 +179,7 @@ echo 'health_check: PASS' > "${EVIDENCE_ROOT}/health-check.txt"
 # a direct HTTP check alone is not considered a backend smoke test.
 cd /usr/share/hue
 runuser -u hue -- env HUE_CONF_DIR=/etc/hue DESKTOP_LOG_DIR=/var/log/hue HOME=/var/lib/hue \
-  /usr/share/hue/build/venvs/python3.9/bin/hue shell \
+  timeout --kill-after=10s 120s /usr/share/hue/build/venvs/python3.9/bin/hue shell \
   >"${LOG_DIR}/hue-trino-query.log" 2>&1 <<'PY'
 import os
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "desktop.settings")
