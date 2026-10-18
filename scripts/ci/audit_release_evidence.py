@@ -121,6 +121,11 @@ def audit_manifest(repository, path, root):
     manifest = parse_fields(path.read_text())
     if manifest.get("schema") != "bigdata.rpm-repo/v2":
         raise EvidenceError("only v2 manifests are covered")
+    required = {"source_identity", "compatibility_identity", "artifact_type",
+                "test_profile", "jdk", "jdk_package", "build_run_id", "test_run_id"}
+    missing = required - manifest.keys()
+    if missing:
+        raise EvidenceError("historical manifest evidence gap: missing " + ", ".join(sorted(missing)))
     spec = importlib.util.spec_from_file_location(
         "repo_check", Path(__file__).with_name("check-component-repo-fast-path.py"))
     checker = importlib.util.module_from_spec(spec)
@@ -146,6 +151,12 @@ def audit_manifest(repository, path, root):
     selected = [a for a in artifacts if a["name"] == name and not a["expired"]]
     if len(selected) != 1:
         raise EvidenceError("missing or ambiguous live evidence artifact")
+    for artifact in artifacts:
+        if artifact["name"] in {name, f"{manifest['component']}-{manifest['version']}-tested-rpms"}:
+            origin = artifact.get("workflow_run", {})
+            if (str(origin.get("id")) != manifest["test_run_id"]
+                    or origin.get("head_sha") != runs["test_run_id"]["head_sha"]):
+                raise EvidenceError("artifact origin differs from referenced test run")
     evidence = download_evidence(repository, selected[0])
     warnings = verify_evidence(
         manifest=manifest, evidence=evidence,

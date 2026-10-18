@@ -31,3 +31,9 @@ Authenticated live audit from a checkout with LFS smudge disabled:
 
 The workflow is read-only and independent of component Build/Test/Release.
 An audit failure never dispatches a build.
+
+Initial live audit found Kafka 3.4.1 and Flink 1.20.1 v2 manifests lack
+compatibility_identity. These are explicit historical evidence gaps, not RPM
+build failures. The audit remains failed until the historical evidence is
+recovered and verified or an explicit migration policy is reviewed; it does
+not invent missing identities or relabel incomplete evidence as success.
