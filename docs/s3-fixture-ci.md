@@ -13,7 +13,10 @@ and container image ID. The S3 client and transitive dependencies are pinned.
 
 The fixture binds to runner loopback, uses temporary self-signed TLS and public
 dummy CI-only identities, and retains filer/volume data in a mounted temporary
-directory. The private key and configuration directory are not uploaded.
+directory. The image entrypoint drops to UID/GID 1000; the ephemeral private
+key is assigned to that identity with mode 600. A preflight using the same
+container UID checks that both key and certificate can be read before startup.
+The private key and configuration directory are not uploaded.
 Both positive and negative requests use HTTPS; no request disables certificate
 verification. The default trust store must reject the fixture certificate,
 while explicitly trusting its certificate permits the test.

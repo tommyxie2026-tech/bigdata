@@ -55,6 +55,14 @@ jobs:
             -addext 'extendedKeyUsage=serverAuth' \
             -keyout "$FIXTURE/config/server.key" -out "$FIXTURE/config/server.crt"
           image="$(python3 -c 'import json; print(json.load(open("scripts/s3-fixture/contract.json"))["image"])')"
+          # The pinned image drops privileges to seaweed UID/GID 1000.
+          # Its refreshing TLS provider blocks if the key cannot be read.
+          sudo chown 1000:1000 "$FIXTURE/config/server.key"
+          test "$(stat -c %a "$FIXTURE/config/server.key")" = 600
+          stat -c 'private-key owner=%u group=%g mode=%a' "$FIXTURE/config/server.key" > "$EVIDENCE/tls-permissions.txt"
+          docker run --rm --user 1000:1000 --entrypoint /bin/sh \
+            -v "$FIXTURE/config:/etc/seaweedfs:ro" "$image" \
+            -c 'test -r /etc/seaweedfs/server.key && test -r /etc/seaweedfs/server.crt'
           docker run -d --name bigdata-s3 --network host --user 0:0 \
             -v "$FIXTURE/data:/data" -v "$FIXTURE/config:/etc/seaweedfs:ro" \
             "$image" server -ip=127.0.0.1 -ip.bind=127.0.0.1 -dir=/data \
