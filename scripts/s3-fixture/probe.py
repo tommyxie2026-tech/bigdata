@@ -7,8 +7,8 @@ from pathlib import Path
 import boto3
 from botocore import UNSIGNED
 from botocore.config import Config
-from botocore.exceptions import ClientError,SSLError
-from checks import require_denied,exact_keys,write_report
+from botocore.exceptions import ClientError,SSLError,EndpointConnectionError,ConnectionClosedError,ReadTimeoutError,ConnectTimeoutError
+from checks import require_denied,exact_keys,write_report,wait_ready
 
 BUCKET="bigdata-ci-fixture"
 PROOF=b"seaweedfs-4.48-bigdata-restart-proof-v1"
@@ -38,14 +38,11 @@ def main():
                 connect_timeout=2,read_timeout=5,retries={"max_attempts":1,"mode":"standard"},
                 s3={"addressing_style":"path"}))
     admin=client()
-    deadline=time.monotonic()+180
-    while True:
-        try:
-            admin.list_buckets()
-            break
-        except Exception:
-            if time.monotonic()>=deadline:raise
-            time.sleep(2)
+    def transient(error):
+        if isinstance(error,ClientError):
+            return error.response.get("ResponseMetadata",{}).get("HTTPStatusCode") in {500,502,503,504}
+        return isinstance(error,(EndpointConnectionError,ConnectionClosedError,ReadTimeoutError,ConnectTimeoutError))
+    wait_ready(admin.list_buckets,transient)
     checks["tls_verified"]="PASS"
     def read(key):
         response=admin.get_object(Bucket=BUCKET,Key=key)
@@ -110,11 +107,19 @@ def main():
         assert not admin.list_multipart_uploads(Bucket=BUCKET).get("Uploads")
         checks["multipart_abort"]="PASS"
         admin.put_object(Bucket=BUCKET,Key=KEY,Body=PROOF,Metadata={"sha256":hashlib.sha256(PROOF).hexdigest()})
-        assert read(KEY)==PROOF
+        # ListBuckets can succeed before the restarted volume registers with master.
+        # Retry only transport/5xx failures; missing objects, denied access and
+        # mismatched bytes remain fatal and cannot become a successful restart.
+        actual=wait_ready(lambda:read(KEY),transient)
+        assert actual==PROOF
         exact_keys(admin.list_objects_v2(Bucket=BUCKET).get("Contents",[]),{KEY})
         checks["retained_object"]="PASS"
     else:
-        assert read(KEY)==PROOF
+        # ListBuckets can succeed before the restarted volume registers with master.
+        # Retry only transport/5xx failures; missing objects, denied access and
+        # mismatched bytes remain fatal and cannot become a successful restart.
+        actual=wait_ready(lambda:read(KEY),transient)
+        assert actual==PROOF
         assert admin.head_object(Bucket=BUCKET,Key=KEY)["Metadata"]["sha256"]==hashlib.sha256(PROOF).hexdigest()
         exact_keys(admin.list_objects_v2(Bucket=BUCKET).get("Contents",[]),{KEY})
         observed["restart"]={"size":len(PROOF),"sha256":hashlib.sha256(read(KEY)).hexdigest()}

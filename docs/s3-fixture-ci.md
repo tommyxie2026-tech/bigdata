@@ -60,3 +60,5 @@ References:
 - [Pinned release](https://github.com/seaweedfs/seaweedfs/releases/tag/4.48)
 - [Pinned server/TLS flags](https://github.com/seaweedfs/seaweedfs/blob/530be3e37337488ecc34d58441e0bc476e121c93/weed/command/server.go)
 - [Pinned S3 credential format](https://github.com/seaweedfs/seaweedfs/blob/530be3e37337488ecc34d58441e0bc476e121c93/weed/command/s3.go)
+
+Restart readiness reads the retained object with a 180-second deadline because bucket metadata can be available before volume registration. Only transport errors and HTTP 500/502/503/504 are retried; authorization errors, missing objects, and byte/checksum mismatches fail immediately.

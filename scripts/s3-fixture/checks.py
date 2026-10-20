@@ -13,3 +13,17 @@ def write_report(path, checks, required):
     if not required.issubset(checks) or any(checks[k]!="PASS" for k in required):
         raise ValueError("Required checks did not all pass")
     path.write_text(json.dumps({"status":"PASS","checks":checks},indent=2)+"\n")
+
+def wait_ready(operation, transient, timeout=180, clock=None, sleep=None):
+    """Wait for transport/server readiness, preserving permanent failures."""
+    import time
+    clock = clock or time.monotonic
+    sleep = sleep or time.sleep
+    deadline = clock() + timeout
+    while True:
+        try:
+            return operation()
+        except Exception as error:
+            if not transient(error) or clock() >= deadline:
+                raise
+            sleep(2)
