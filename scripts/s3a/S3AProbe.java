@@ -55,7 +55,8 @@ public final class S3AProbe {
   }
   static void inventory(FileSystem f,Set<String> expected)throws Exception{
     Set<String> keys=new HashSet<>();RemoteIterator<LocatedFileStatus> it=f.listFiles(new Path(ROOT),true);
-    while(it.hasNext()){String key=it.next().getPath().getName();require(keys.add(key),"duplicate key");}
+    String prefix=new URI(ROOT).getPath();
+    while(it.hasNext()){String path=it.next().getPath().toUri().getPath();require(path.startsWith(prefix),"outside prefix");String key=path.substring(prefix.length());require(keys.add(key),"duplicate key");}
     require(keys.equals(expected),"unexpected inventory: "+keys);
   }
   public static void main(String[] args)throws Exception{
