@@ -1,13 +1,13 @@
 # Hadoop S3A integration profile
 
-This test-only profile consumes the published Hadoop 3.4.3 and Hadoop client RPMs,
+This test-only profile consumes the published Hadoop 3.4.3 and Hadoop client/HDFS/MapReduce/YARN RPMs,
 plus Bigtop utils 3.6.0, at immutable repository commit
 `865074386ad88dd82ea9fd043e385e7b1cfe0ca9`. Each RPM is checked against that
 commit's SHA256SUMS on the CI runner. No RPM is compiled or repackaged, and no
 release/promotion workflow is added. Large inputs are fetched only on CI.
 
 The pinned SeaweedFS 4.48 TLS/IAM fixture and SDK assertion tests from #103 are
-retained. A clean openEuler 22.03 LTS SP4 container installs only those three
+retained. A clean openEuler 22.03 LTS SP4 container installs only those six
 published RPMs and system Java 8. S3A and AWS SDK must come from the installed
 RPM closure. Missing classes fail preflight; no replacement JAR is downloaded.
 The fixture CA is imported into a temporary JVM trust store. A separate JVM
