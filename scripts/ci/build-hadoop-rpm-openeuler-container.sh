@@ -60,10 +60,12 @@ jdk=8
 EOF
 
 echo "== build Hadoop RPMs with dependencies =="
+export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.rto=60000 -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Dmaven.wagon.httpconnectionManager.ttlSeconds=60"
 set +e
-./gradlew hadoop-rpm -Dbuildwithdeps=true --stacktrace 2>&1 \
-  | tee "${WORK_ROOT}/artifacts/logs/hadoop-build.log"
-build_rc=${PIPESTATUS[0]}
+bash /workspace/scripts/ci/retry-maven-downloads.sh \
+  "${WORK_ROOT}/artifacts/logs/hadoop-build.log" \
+  ./gradlew hadoop-rpm -Dbuildwithdeps=true --stacktrace
+build_rc=$?
 set -e
 
 echo "== collect RPM artifacts =="

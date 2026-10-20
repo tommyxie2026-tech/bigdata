@@ -5,6 +5,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RETRY_SCRIPT="${REPO_ROOT}/scripts/ci/retry-maven-downloads.sh"
 PREFETCH_SCRIPT="${REPO_ROOT}/scripts/ci/prefetch-hadoop-maven-artifacts.sh"
 BUILD_SCRIPT="${REPO_ROOT}/scripts/ci/build-bigtop-component.sh"
+HADOOP_BUILD_SCRIPT="${REPO_ROOT}/scripts/ci/build-hadoop-rpm-openeuler-container.sh"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -75,7 +76,17 @@ test_component_build_bounds_and_prefetches_maven() {
     fail "component build does not prefetch known Hadoop dependencies"
 }
 
+test_hadoop_build_retries_transient_maven_downloads() {
+  grep -q 'retry-maven-downloads.sh' "${HADOOP_BUILD_SCRIPT}" ||
+    fail "Hadoop build bypasses transient Maven download retries"
+  grep -q 'hadoop-build.log' "${HADOOP_BUILD_SCRIPT}" ||
+    fail "Hadoop Maven retry log is not preserved"
+  grep -q './gradlew hadoop-rpm -Dbuildwithdeps=true --stacktrace' "${HADOOP_BUILD_SCRIPT}" ||
+    fail "Hadoop RPM task is not run through the retry wrapper"
+}
+
 test_retry_count_is_configurable
 test_hadoop_prefetch_covers_observed_failures
 test_component_build_bounds_and_prefetches_maven
+test_hadoop_build_retries_transient_maven_downloads
 echo "Maven download resilience tests: PASS"
