@@ -1,0 +1,167 @@
+name: Hadoop S3A Integration
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/hadoop-s3a.yml'
+      - 'scripts/s3a/**'
+      - 'scripts/s3-fixture/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hadoop-s3a.yml'
+      - 'scripts/s3a/**'
+      - 'scripts/s3-fixture/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: hadoop-s3a-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: Published Hadoop S3A HTTPS and restart
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AWS_EC2_METADATA_DISABLED: 'true'
+      AWS_CONFIG_FILE: /dev/null
+      AWS_SHARED_CREDENTIALS_FILE: /dev/null
+      EVIDENCE: /tmp/bigdata-s3-evidence
+      FIXTURE: /tmp/bigdata-s3-fixture
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: scripts/s3-fixture/requirements.txt
+      - name: Strict result assertion regressions
+        run: |
+          python3 scripts/s3-fixture/test_checks.py -v
+          python3 scripts/s3a/test_results.py -v
+      - name: Install pinned S3 client
+        run: python3 -m pip install --disable-pip-version-check --timeout 20 --retries 2 -r scripts/s3-fixture/requirements.txt
+      - name: Checkout immutable published RPM inputs without rebuilding
+        uses: actions/checkout@v4
+        with:
+          ref: 865074386ad88dd82ea9fd043e385e7b1cfe0ca9
+          path: dependency-repository
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /repo/openeuler-22.03-lts-sp4/bigtop-3.6/hadoop/3.4.3/hadoop-3.4.3-1.x86_64.rpm
+            /repo/openeuler-22.03-lts-sp4/bigtop-3.6/hadoop/3.4.3/hadoop-client-3.4.3-1.x86_64.rpm
+            /repo/openeuler-22.03-lts-sp4/bigtop-3.6/hadoop/3.4.3/SHA256SUMS
+            /repo/openeuler-22.03-lts-sp4/bigtop-3.6/common/3.6.0/bigtop-utils-3.6.0-1.noarch.rpm
+            /repo/openeuler-22.03-lts-sp4/bigtop-3.6/common/3.6.0/SHA256SUMS
+      - name: Fetch and verify only the three required published RPMs
+        run: |
+          set -euo pipefail
+          git -C dependency-repository lfs pull --include='repo/openeuler-22.03-lts-sp4/bigtop-3.6/hadoop/3.4.3/hadoop-3.4.3-1.x86_64.rpm,repo/openeuler-22.03-lts-sp4/bigtop-3.6/hadoop/3.4.3/hadoop-client-3.4.3-1.x86_64.rpm,repo/openeuler-22.03-lts-sp4/bigtop-3.6/common/3.6.0/bigtop-utils-3.6.0-1.noarch.rpm' --exclude=''
+          mkdir -p "$EVIDENCE"
+          root="$GITHUB_WORKSPACE/dependency-repository/repo/openeuler-22.03-lts-sp4/bigtop-3.6"
+          (cd "$root/hadoop/3.4.3" && grep -E '  ./hadoop(-client)?-3[.]4[.]3-1[.]x86_64[.]rpm$' SHA256SUMS | sha256sum -c -) | tee "$EVIDENCE/s3a-rpm-checksums.txt"
+          (cd "$root/common/3.6.0" && grep '  ./bigtop-utils-' SHA256SUMS | sha256sum -c -) | tee -a "$EVIDENCE/s3a-rpm-checksums.txt"
+      - name: Prepare ephemeral TLS and authenticated fixture
+        run: |
+          set -euo pipefail
+          mkdir -p "$FIXTURE/config" "$FIXTURE/data" "$EVIDENCE"
+          cp scripts/s3-fixture/identities.json "$FIXTURE/config/s3.json"
+          cp scripts/s3-fixture/filer.toml "$FIXTURE/config/filer.toml"
+          openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
+            -subj '/CN=localhost' \
+            -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' \
+            -addext 'basicConstraints=critical,CA:TRUE' \
+            -addext 'extendedKeyUsage=serverAuth' \
+            -keyout "$FIXTURE/config/server.key" -out "$FIXTURE/config/server.crt"
+          image="$(python3 -c 'import json; print(json.load(open("scripts/s3-fixture/contract.json"))["image"])')"
+          # The pinned image drops privileges to seaweed UID/GID 1000.
+          # Its refreshing TLS provider blocks if the key cannot be read.
+          sudo chown 1000:1000 "$FIXTURE/config/server.key"
+          test "$(stat -c %a "$FIXTURE/config/server.key")" = 600
+          stat -c 'private-key owner=%u group=%g mode=%a' "$FIXTURE/config/server.key" > "$EVIDENCE/tls-permissions.txt"
+          docker run --rm --user 1000:1000 --entrypoint /bin/sh \
+            -v "$FIXTURE/config:/etc/seaweedfs:ro" "$image" \
+            -c 'test -r /etc/seaweedfs/server.key && test -r /etc/seaweedfs/server.crt'
+          docker run -d --name bigdata-s3 --network host --user 0:0 \
+            -v "$FIXTURE/data:/data" -v "$FIXTURE/config:/etc/seaweedfs:ro" \
+            "$image" server -ip=127.0.0.1 -ip.bind=127.0.0.1 -dir=/data \
+            -master.telemetry=false -volume.max=8 -s3 \
+            -s3.port=8333 -s3.port.https=8334 -s3.port.iceberg=0 -s3.port.lance=0 \
+            -s3.config=/etc/seaweedfs/s3.json \
+            -s3.cert.file=/etc/seaweedfs/server.crt -s3.key.file=/etc/seaweedfs/server.key
+          docker exec bigdata-s3 weed version | tee "$EVIDENCE/version.txt"
+          grep -Eq '4[.]48([ .]|$)' "$EVIDENCE/version.txt"
+          docker inspect --format '{{.Image}}' bigdata-s3 > "$EVIDENCE/container-image-id.txt"
+          cp scripts/s3-fixture/contract.json "$EVIDENCE/contract.json"
+      - name: Verified TLS, exact CRUD, IAM rejection and multipart
+        run: |
+          set -euo pipefail
+          timeout 300 python3 scripts/s3-fixture/probe.py initial \
+            --endpoint https://localhost:8334 --ca "$FIXTURE/config/server.crt" \
+            --evidence "$EVIDENCE" 2>&1 | tee "$EVIDENCE/initial.log"
+      - name: Clean openEuler installation and JVM trust setup
+        run: |
+          set -euo pipefail
+          docker run -d --name s3a-client --network host \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" \
+            -v "$GITHUB_WORKSPACE/dependency-repository/repo/openeuler-22.03-lts-sp4/bigtop-3.6:/dependencies:ro" \
+            -v "$FIXTURE/config:/fixture:ro" -v "$EVIDENCE:/evidence" \
+            openeuler/openeuler:22.03-lts-sp4 sleep infinity
+          timeout 420 docker exec s3a-client bash /workspace/scripts/s3a/client.sh prepare
+      - name: S3A exact read write seek rename and actual 403 rejection
+        run: |
+          set -euo pipefail
+          docker exec s3a-client bash /workspace/scripts/s3a/client.sh initial
+          python3 scripts/s3a/observe.py multipart --ca "$FIXTURE/config/server.crt" --evidence "$EVIDENCE"
+      - name: Restart same fixture against persistent data directory
+        run: docker restart --time 10 bigdata-s3
+      - name: Fresh JVM reads retained S3A objects and verifies permissions
+        run: |
+          set -euo pipefail
+          timeout 210 python3 scripts/s3a/observe.py ready --ca "$FIXTURE/config/server.crt" --evidence "$EVIDENCE"
+          docker exec s3a-client bash /workspace/scripts/s3a/client.sh restored
+          python3 scripts/s3a/results.py "$EVIDENCE"
+      - name: Verify persisted object, retained permissions and cleanup
+        run: |
+          set -euo pipefail
+          timeout 300 python3 scripts/s3-fixture/probe.py restored \
+            --endpoint https://localhost:8334 --ca "$FIXTURE/config/server.crt" \
+            --evidence "$EVIDENCE" 2>&1 | tee "$EVIDENCE/restored.log"
+      - name: Require every initial and restart assertion
+        env:
+          PYTHONPATH: scripts/s3-fixture
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from probe import INITIAL,RESTORED
+          from checks import write_report
+          evidence=Path(os.environ["EVIDENCE"])
+          combined={}
+          required=set()
+          for phase,checks in (("initial",INITIAL),("restored",RESTORED)):
+              report=json.loads((evidence/(phase+".json")).read_text())
+              assert report["status"]=="PASS"
+              combined.update({phase+"."+k:v for k,v in report["checks"].items()})
+              required.update(phase+"."+k for k in checks)
+          write_report(evidence/"summary.json",combined,required)
+          PY
+      - name: Preserve fixture logs and remove container
+        if: always()
+        run: |
+          mkdir -p "$EVIDENCE"
+          docker logs --timestamps bigdata-s3 > "$EVIDENCE/server.log" 2>&1 || true
+          docker rm -f bigdata-s3 s3a-client || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hadoop-3.4.3-s3a-evidence
+          path: ${{ env.EVIDENCE }}
+          if-no-files-found: error
+          retention-days: 30
