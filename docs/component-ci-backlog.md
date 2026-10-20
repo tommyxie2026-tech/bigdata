@@ -1,7 +1,7 @@
 # 下一轮组件 CI 补齐计划
 
-核验日期：2026-10-18（Asia/Tokyo）  
-实现基线：main `50639533eebf915815292be52f4cbbe98b2c0f43`。既有已发布包与新 CDC 晋级状态分列。  
+核验日期：2026-10-19（Asia/Tokyo）
+实现基线：main `5b7be72a2c159799d6fda4c6b3e9c23a6e0abdf4`。既有已发布包与新 CDC 晋级状态分列。
 范围：记录已核验的交付进展和后续实施清单；只有注明证据的组件才表示已锁定版本或已完成对应阶段。
 
 ## 1. 已完成的组件交付
@@ -19,13 +19,13 @@ Hudi 的 manifest 引用 run `39035814730`：run 聚合为 cancelled，最新 at
 
 ## 2. 新增组件与服务 CI
 
-按当前实时湖仓路线提出以下实施顺序；P1/P2 是本轮建议，不改变既定 Phase 1 范围。下列组件目前未进入 `ci/components.yaml`，除 MySQL source 外，也没有对应的独立组件交付工作流。MySQL 已通过 #98 接入独立 CI，以专属 contract 锁定，尚未进入统一 catalog。所有新版本都需先确认 immutable source、目标 OS、JDK 和依赖组合，不能把网站“latest”直接写入构建配置。
+按当前实时湖仓路线提出以下实施顺序；P1/P2 是本轮建议，不改变既定 Phase 1 范围。下列组件目前未进入 `ci/components.yaml`，除 MySQL/PostgreSQL source 外，也没有对应的独立组件交付工作流。两个 CDC source 已分别通过 #98/#101 接入独立 CI，并通过 #100/#102 发布 RPM，以专属 contract 锁定，尚未进入统一 catalog。S3 fixture 使用独立测试工作流，不是新增生产服务包。所有新版本都需先确认 immutable source、目标 OS、JDK 和依赖组合，不能把网站“latest”直接写入构建配置。
 
 | 顺序 / 优先级 | 新增项 | 依赖与版本边界 | 首个交付范围 | 必须通过的测试 |
 |---|---|---|---|---|
 | 1 / P1 | Flink CDC MySQL source | 已锁定 3.4.0 / source `06581fc73b84b1da45fccf93441d96a118d9bfc1`；Flink 1.20.1 / JDK 11 | [RPM 已发布](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink-cdc-mysql/3.4.0/manifest.yaml)；[#100](https://github.com/tommyxie2026-tech/bigdata/pull/100) 已合并；[主线 Test / RC / 发布作业 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39106575363) | 已验证 snapshot、I/U/D、completed checkpoint、停止原作业后从实际 savepoint 恢复及最终完整行集；不代表湖仓联调已过 |
-| 2 / P1 | Flink CDC PostgreSQL source | 复用已建立的 CDC 生命周期；核验数据库版本及复制配置 | 第二个独立 PR，避免与 MySQL 同次引入多个变量 | snapshot + WAL 增量 + restart/恢复；断流失败应可诊断，不能仅凭任务 RUNNING 判通过 |
-| 3 / P1 | S3 兼容存储 fixture / adapter | 具体存储实现、发布形态、许可证与维护方式待选；客户端对齐 Hadoop 3.4.3 及各引擎的依赖 | 先集成测试端点和凭据/TLS配置；只有确定交付自建存储服务时，才新增其服务 RPM CI | bucket 读写/删除、无权限拒绝、凭据错误、TLS、multipart；Spark/Flink 对同一湖仓表读写，Trino 查询按实际 connector 能力验证 |
+| 2 / P1 | Flink CDC PostgreSQL source | 3.4.0 / source `06581fc73b84b1da45fccf93441d96a118d9bfc1`；Flink 1.20.1 / JDK 11；fixture PostgreSQL 14.15 | [RPM 已发布](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink-cdc-postgres/3.4.0/manifest.yaml)，#101/#102 已合并 | [主线 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39139306230)：快照、WAL I/U/D、checkpoint、原作业 FINISHED、inactive slot、离线变更及精确 savepoint 恢复；不代表湖仓联调 |
+| 3 / P1 | S3 兼容存储 fixture / adapter | 临时 SeaweedFS 4.48 / source `530be3e37337488ecc34d58441e0bc476e121c93`，镜像按 digest 固定；客户端后续对齐 Hadoop 3.4.3 | [首个 API fixture CI](s3-fixture-ci.md)：只提供测试端点，不新增服务 RPM；不是生产存储选型 | 首轮：HTTPS、精确 CRUD/list、权限/错误凭据拒绝、multipart 完成/中止、重启持久化；Hadoop/Spark/Flink 远端湖仓读写另立验收 |
 | 4 / P1 | Ambari Metrics | 先确认 Ambari 3.0.0 对应源码/recipe、包名和运行时；不能因 Ambari Server RPM 已有就认为 Metrics 已交付 | Collector/Monitor 的独立包或现有 recipe 可行性 PR | 干净安装、采集代理上报、查询带时间戳的真实指标、服务重启 |
 | 5 / P1 | Kerberos | 优先复用 openEuler 系统 krb5 包；KDC realm/keytab 为临时测试数据 | 新增安全集成 profile，通常不需要重编第三方系统 RPM | kinit/票据续期、HDFS/Hive 合法访问、无票据/过期票据拒绝、服务 principal 和时钟边界 |
 | 6 / P2 | Ranger | 版本、服务及插件依赖待核验；先选一个 HDFS 或 Hive 插件组合 | 一个服务与一个插件链路，后续再扩 Kafka/Trino | 同一资源 allow/deny、策略更新生效、审计记录落地和服务重启 |
@@ -62,8 +62,8 @@ S3 fixture 不等于已经选定某个对象存储产品；使用假端点通过
 
 - PR A：[#97](https://github.com/tommyxie2026-tech/bigdata/pull/97) 已合并，既有 7 个 v2 组件审计通过；校验仓库摘要、job/artifact 来源和轻量 evidence，不下载大 RPM artifact 做逐字节比较。
 - PR B：[#98](https://github.com/tommyxie2026-tech/bigdata/pull/98)、发布门禁修复 [#99](https://github.com/tommyxie2026-tech/bigdata/pull/99) 和仓库晋级 [#100](https://github.com/tommyxie2026-tech/bigdata/pull/100) 均已合并。MySQL CDC RPM 已发布；主线 run `39106575363` 的实际 Test、Release Candidate 和发布作业 success；仓库主线 `50639533` 的 CI 和审计 success。发布目录的 Git blobs 与已核验晋级产物完全一致，复用 Build `39102586103`，未重新编译 RPM。
-- PR C：Flink CDC PostgreSQL source，复用 B 已验证的基础流程。
-- PR D：S3 fixture/adapter 选型和远端湖仓读写 CI；选型前可继续用 HDFS 做基线验收。
+- PR C：[#101](https://github.com/tommyxie2026-tech/bigdata/pull/101) 已合并，PostgreSQL CDC 经主线 run `39139306230` 实际 Test、RC 和晋级成功；[#102](https://github.com/tommyxie2026-tech/bigdata/pull/102) 已发布 RPM，发布主线 CI 和审计通过，包/metadata Git blobs 与核验产物一致。
+- PR D：临时 SeaweedFS 4.48 的 [S3 API fixture](s3-fixture-ci.md) 独立 CI，先验证 HTTPS、权限、multipart 与重启；其后消费既有 Hadoop 3.4.3 依赖做远端湖仓 profile，绝不把 API fixture PASS 当作跨引擎验收。
 - PR E：Ambari Metrics 可行性和采集/查询 CI；与传统集群集成验收并行安排，但分别提交。
 - 后续按安全优先级推进 Kerberos、Ranger，再补 Prometheus/JMX 和其他可选组件。
 

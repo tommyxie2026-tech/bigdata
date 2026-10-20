@@ -1,0 +1,33 @@
+{
+  "identities": [
+    {
+      "name": "fixture-admin",
+      "credentials": [
+        {
+          "accessKey": "fixture-admin",
+          "secretKey": "fixture-admin-secret"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging"
+      ]
+    },
+    {
+      "name": "fixture-reader",
+      "credentials": [
+        {
+          "accessKey": "fixture-reader",
+          "secretKey": "fixture-reader-secret"
+        }
+      ],
+      "actions": [
+        "Read:bigdata-ci-fixture",
+        "List:bigdata-ci-fixture"
+      ]
+    }
+  ]
+}
