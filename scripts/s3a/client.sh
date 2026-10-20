@@ -15,10 +15,18 @@ if [[ "$phase" == prepare ]]; then
   cp="$(hadoop classpath --glob)"
   aws="$(find /usr/lib/hadoop* -type f -name 'hadoop-aws-3.4.3.jar' -print -quit)"
   [[ -n "$aws" ]] || { echo 'Published RPM lacks matching hadoop-aws'; exit 1; }
-  tools="$(dirname "$aws")"
-  cp="$cp:$tools/*"
+  # Bigtop keeps optional SDK dependencies in tools/lib, separately from
+  # hadoop-aws copies in lib. Do not infer the SDK directory from that copy.
+  tools=/usr/lib/hadoop/tools/lib
+  [[ -d "$tools" ]]
+  rpm -ql hadoop > /evidence/s3a-rpm-files.txt
+  find /usr/lib/hadoop -name '*.jar' -print > /evidence/s3a-jar-inventory.txt
+  cp="$cp:$(dirname "$aws")/*:$tools/*"
+  javap -classpath "$cp" software.amazon.awssdk.auth.credentials.AwsCredentialsProvider \
+    > /evidence/s3a-sdk-preflight.txt
   printf '%s' "$cp" > /opt/s3a/classpath
-  find "$tools" -maxdepth 1 -type f \( -name '*aws*jar' -o -name 'bundle-*jar' \) -exec sha256sum {} \; > /evidence/s3a-dependency-sha256.txt
+  sha256sum "$aws" > /evidence/s3a-dependency-sha256.txt
+  find "$tools" -maxdepth 1 -type f -name '*.jar' -exec sha256sum {} \; >> /evidence/s3a-dependency-sha256.txt
   javac -cp "$cp" /opt/s3a/S3AProbe.java
   keytool -importcert -noprompt -alias fixture -file /fixture/server.crt \
     -keystore /opt/s3a/trust.jks -storepass fixture-trust
