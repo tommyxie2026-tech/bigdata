@@ -2,10 +2,10 @@
 set -euo pipefail
 phase="$1"
 if [[ "$phase" == prepare ]]; then
-  dnf -y install java-1.8.0-openjdk-devel findutils diffutils procps-ng
-  # The published, checksum-verified RPM closure is mounted read-only.
-  dnf -y install /dependencies/common/3.6.0/bigtop-utils-3.6.0-1.noarch.rpm \
-    /dependencies/hadoop/3.4.3/*.rpm
+  # Resolve the whole published closure before downloading the JDK.
+  dnf -y --setopt=timeout=20 --setopt=retries=2 install \
+    /dependencies/common/3.6.0/*.rpm /dependencies/hadoop/3.4.3/*.rpm \
+    java-1.8.0-openjdk-devel findutils diffutils procps-ng
   rpm -q hadoop hadoop-client > /evidence/s3a-installed-rpms.txt
   hadoop version > /evidence/s3a-hadoop-version.txt 2>&1
   grep -qx 'Hadoop 3.4.3' /evidence/s3a-hadoop-version.txt
