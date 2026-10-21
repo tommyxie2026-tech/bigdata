@@ -39,6 +39,7 @@ public final class PostgresSmoke {
         else if (phase.equals("changes")) { expected.put(1,"after"); expected.put(3,"inserted"); }
         else if (phase.equals("restored")) { expected.put(1,"offline-update"); expected.put(4,"offline-insert"); }
         else throw new IllegalArgumentException("unknown assertion phase");
+        if (PaimonTarget.enabled()) { PaimonTarget.assertRows(expected); return; }
         long deadline = System.nanoTime() + 120_000_000_000L;
         Map<Integer,String> actual = new TreeMap<>();
         do {
@@ -103,6 +104,7 @@ public final class PostgresSmoke {
             + "'connector'='postgres-cdc','hostname'='127.0.0.1','port'='5432',"
             + "'username'='postgres','password'='cdc-fixture','database-name'='cdc_test',"
             + "'schema-name'='public','table-name'='source_rows','slot.name'='bigdata_ci','decoding.plugin.name'='pgoutput','scan.incremental.snapshot.enabled'='true','scan.lsn-commit.checkpoints-num-delay'='100000','scan.startup.mode'='initial','debezium.slot.drop.on.stop'='false','debezium.publication.name'='bigdata_ci_publication','debezium.publication.autocreate.mode'='filtered')");
+        if (PaimonTarget.enabled()) { PaimonTarget.submit(table, "postgres_source"); return; }
         table.toChangelogStream(table.from("postgres_source"))
             .addSink(new Materialize()).name("test-only-postgres-materializer")
             .uid("test-only-postgres-materializer").setParallelism(1);

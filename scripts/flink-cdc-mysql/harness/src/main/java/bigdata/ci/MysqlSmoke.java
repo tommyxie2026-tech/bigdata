@@ -39,6 +39,7 @@ public final class MysqlSmoke {
         else if (phase.equals("changes")) { expected.put(1,"after"); expected.put(3,"inserted"); }
         else if (phase.equals("restored")) { expected.put(1,"offline-update"); expected.put(4,"offline-insert"); }
         else throw new IllegalArgumentException("unknown assertion phase");
+        if (PaimonTarget.enabled()) { PaimonTarget.assertRows(expected); return; }
         long deadline = System.nanoTime() + 120_000_000_000L;
         Map<Integer,String> actual = new TreeMap<>();
         do {
@@ -86,6 +87,7 @@ public final class MysqlSmoke {
             + "'connector'='mysql-cdc','hostname'='127.0.0.1','port'='3306',"
             + "'username'='root','password'='cdc-fixture','database-name'='cdc_test',"
             + "'table-name'='source_rows','server-id'='5401-5404','scan.startup.mode'='initial')");
+        if (PaimonTarget.enabled()) { PaimonTarget.submit(table, "mysql_source"); return; }
         table.toChangelogStream(table.from("mysql_source"))
             .addSink(new Materialize()).name("test-only-mysql-materializer")
             .uid("test-only-mysql-materializer").setParallelism(1);

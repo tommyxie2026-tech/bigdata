@@ -5,11 +5,13 @@ on:
     paths:
       - '.github/workflows/flink-cdc-mysql.yml'
       - 'scripts/flink-cdc-mysql/**'
+      - 'scripts/cdc-lakehouse/**'
   push:
     branches: [main]
     paths:
       - '.github/workflows/flink-cdc-mysql.yml'
       - 'scripts/flink-cdc-mysql/**'
+      - 'scripts/cdc-lakehouse/**'
   workflow_dispatch:
     inputs:
       promote_test_run_id:

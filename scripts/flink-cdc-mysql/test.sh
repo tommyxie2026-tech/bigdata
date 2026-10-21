@@ -31,6 +31,7 @@ export JAVA_HOME
 export PATH="$JAVA_HOME/bin:$PATH"
 java -version 2>&1 | grep -Eq 'version "11([.]|")'
 cp -R /workspace/scripts/flink-cdc-mysql/harness /tmp/cdc-harness
+source /workspace/scripts/cdc-lakehouse/prepare-target.sh
 bash /workspace/scripts/ci/retry-maven-downloads.sh /evidence/harness-build.log \
   mvn -B -ntp -f /tmp/cdc-harness/pom.xml -DskipTests package
 mvn -B -ntp org.apache.maven.plugins:maven-dependency-plugin:3.6.1:copy \
@@ -39,7 +40,7 @@ mvn -B -ntp org.apache.maven.plugins:maven-dependency-plugin:3.6.1:copy \
 jar tf /usr/lib/flink/lib/flink-sql-connector-mysql-cdc-3.4.0.jar > /evidence/connector-entries.txt
 if grep -q '^com/mysql/' /evidence/connector-entries.txt; then exit 1; fi
 harness=/tmp/cdc-harness/target/cdc-mysql-smoke-1.jar
-fixture() { timeout 150 java -cp "/usr/lib/flink/lib/*:$harness" bigdata.ci.MysqlSmoke "$@"; }
+fixture() { timeout 150 java -cp "/usr/lib/flink/lib/*:$harness:${HADOOP_CLASSPATH:-}" bigdata.ci.MysqlSmoke "$@"; }
 fixture prepare
 mkdir -p /var/lib/flink/cdc-tmp /var/lib/flink/cdc-savepoints /var/lib/flink/cdc-checkpoints
 chown -R flink:flink /var/lib/flink
@@ -58,6 +59,7 @@ io.tmp.dirs: /var/lib/flink/cdc-tmp
 CONF
 flink() {
   timeout 120 runuser -u flink -- env JAVA_HOME="$JAVA_HOME" FLINK_LOG_DIR=/var/log/flink \
+    CDC_TARGET="${CDC_TARGET:-jdbc}" HADOOP_CLASSPATH="${HADOOP_CLASSPATH:-}" \
     FLINK_CONF_DIR=/etc/flink/conf /usr/lib/flink/bin/flink "$@"
 }
 rest() { curl --fail --silent --show-error --connect-timeout 2 --max-time 5 "$@"; }
@@ -125,5 +127,6 @@ insert_update_delete_exact_rows: PASS
 completed_checkpoint: PASS
 savepoint_restore_path: PASS
 restored_exact_rows: PASS
+target: ${CDC_TARGET:-jdbc}
 status: PASS
 EOF
