@@ -158,8 +158,10 @@ EOF
 
 echo "== build ZooKeeper RPM =="
 set +e
-./gradlew zookeeper-rpm -Dbuildwithdeps=true --stacktrace 2>&1 | tee "${WORK_ROOT}/artifacts/logs/zookeeper-build.log"
-build_rc=${PIPESTATUS[0]}
+bash /workspace/scripts/ci/retry-maven-downloads.sh \
+  "${WORK_ROOT}/artifacts/logs/zookeeper-build.log" \
+  ./gradlew zookeeper-rpm -Dbuildwithdeps=true --stacktrace
+build_rc=$?
 set -e
 
 echo "== collect artifacts =="

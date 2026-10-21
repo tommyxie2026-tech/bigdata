@@ -51,6 +51,8 @@ jobs:
     env:
       OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
       WORK_ROOT: /tmp/bigdata-component-build
+      MAVEN_MIRROR_URL: ${{ vars.MAVEN_MIRROR_URL }}
+      MAVEN_NETWORK_MODE: ${{ vars.MAVEN_NETWORK_MODE || 'online' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -100,22 +102,26 @@ jobs:
             --scripts-dir scripts/ci \
             --github-output "${GITHUB_OUTPUT}"
 
-      - name: Restore Maven and Gradle downloads
-        uses: actions/cache@v4
+      - name: Restore dependency downloads
+        id: dependencies
+        uses: ./.github/actions/restore-build-dependencies
         with:
-          path: |
-            /tmp/bigdata-component-cache/m2
-            /tmp/bigdata-component-cache/gradle
-          key: openeuler22-bigtop36-jdk${{ inputs.jdk }}-${{ hashFiles('ci/components.yaml', 'scripts/ci/build-bigtop-component.sh') }}
+          component: ${{ inputs.component }}
+          version: ${{ inputs.version }}
+          jdk: ${{ inputs.jdk }}
+          source_identity: ${{ inputs.source_identity }}
 
       - name: Build RPMs
+        id: build
+        timeout-minutes: 220
         shell: bash
         run: |
           set -euo pipefail
           rm -rf "${WORK_ROOT}"
           mkdir -p "${WORK_ROOT}" /tmp/bigdata-component-cache/{m2,gradle}
           docker pull "${OPENEULER_IMAGE}"
-          docker run --rm \
+          docker run --rm --init \
+            -e MAVEN_MIRROR_URL -e MAVEN_NETWORK_MODE \
             -e COMPONENT="${{ inputs.component }}" \
             -e VERSION="${{ inputs.version }}" \
             -e BUILD_TASK="${{ inputs.task }}" \
@@ -138,6 +144,12 @@ jobs:
             -v /tmp/bigdata-component-cache/gradle:/root/.gradle \
             "${OPENEULER_IMAGE}" \
             bash "/workspace/scripts/ci/${{ steps.adapter.outputs.script }}"
+
+      - name: Save newly downloaded dependencies
+        if: ${{ always() && steps.dependencies.outcome == 'success' && (steps.build.outcome == 'success' || steps.build.outcome == 'failure') }}
+        uses: ./.github/actions/save-build-dependencies
+        with:
+          key: ${{ steps.dependencies.outputs.key }}
 
       - name: Publish summary
         if: always()

@@ -59,11 +59,16 @@ os_image=openeuler/openeuler:22.03-lts-sp4
 jdk=8
 EOF
 
+echo "== prepare known Hadoop dependencies =="
+bash /workspace/scripts/ci/prefetch-hadoop-maven-artifacts.sh \
+  "${WORK_ROOT}/artifacts/logs"
+
 echo "== build Hadoop RPMs with dependencies =="
 set +e
-./gradlew hadoop-rpm -Dbuildwithdeps=true --stacktrace 2>&1 \
-  | tee "${WORK_ROOT}/artifacts/logs/hadoop-build.log"
-build_rc=${PIPESTATUS[0]}
+bash /workspace/scripts/ci/retry-maven-downloads.sh \
+  "${WORK_ROOT}/artifacts/logs/hadoop-build.log" \
+  ./gradlew hadoop-rpm -Dbuildwithdeps=true --stacktrace
+build_rc=$?
 set -e
 
 echo "== collect RPM artifacts =="

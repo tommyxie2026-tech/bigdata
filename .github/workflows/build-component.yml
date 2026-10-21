@@ -2,6 +2,11 @@ name: Build Component
 
 on:
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: Rebuild even when the exact tested RPM repository is current
+        type: boolean
+        default: false
 
   push:
     branches:
@@ -10,9 +15,12 @@ on:
     paths:
       - ".github/workflows/build-component.yml"
       - "scripts/ci/build-zookeeper-rpm-openeuler-container.sh"
+      - "scripts/ci/retry-maven-downloads.sh"
+      - "scripts/ci/configure-maven-policy.py"
+      - "scripts/ci/run-with-deadline.py"
+      - ".github/actions/*-build-dependencies/**"
       - "scripts/ci/test-zookeeper-rpm-openeuler-container.sh"
       - "packaging/bigtop/**"
-      - "docs/version-matrix.md"
 
 permissions:
   contents: read
@@ -22,7 +30,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  repo_check:
+    if: inputs.force_build != true
+    uses: ./.github/workflows/check-component-repo.yml
+    with:
+      component: zookeeper
+      version: '3.8.4'
+
   build-zookeeper:
+    needs: repo_check
+    if: ${{ always() && (inputs.force_build == true || (needs.repo_check.result == 'success' && needs.repo_check.outputs.already_current != 'true')) }}
     name: ZooKeeper RPM on openEuler container
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -32,6 +49,8 @@ jobs:
       COMPONENT: zookeeper
       WORK_ROOT: /tmp/bigdata-bigtop-build
       OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
+      MAVEN_MIRROR_URL: ${{ vars.MAVEN_MIRROR_URL }}
+      MAVEN_NETWORK_MODE: ${{ vars.MAVEN_NETWORK_MODE || 'online' }}
 
     steps:
       - name: Checkout BIGDATA
@@ -61,19 +80,38 @@ jobs:
           docker image inspect "${OPENEULER_IMAGE}" \
             --format 'image={{.RepoTags}} digest={{.RepoDigests}}'
 
+      - name: Restore dependency downloads
+        id: dependencies
+        uses: ./.github/actions/restore-build-dependencies
+        with:
+          component: zookeeper
+          version: '3.8.4'
+          jdk: '8'
+
       - name: Build ZooKeeper RPM in openEuler
+        id: build
+        timeout-minutes: 160
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm \
+          docker run --rm --init \
+            -e MAVEN_MIRROR_URL -e MAVEN_NETWORK_MODE \
             --name bigdata-bigtop-zookeeper-build \
             -e BIGTOP_REF="${BIGTOP_REF}" \
             -e COMPONENT="${COMPONENT}" \
             -e WORK_ROOT=/work \
             -v "${GITHUB_WORKSPACE}:/workspace:ro" \
             -v "${WORK_ROOT}:/work" \
+            -v /tmp/bigdata-component-cache/m2:/root/.m2 \
+            -v /tmp/bigdata-component-cache/gradle:/root/.gradle \
             "${OPENEULER_IMAGE}" \
             bash /workspace/scripts/ci/build-zookeeper-rpm-openeuler-container.sh
+
+      - name: Save newly downloaded dependencies
+        if: ${{ always() && steps.dependencies.outcome == 'success' && (steps.build.outcome == 'success' || steps.build.outcome == 'failure') }}
+        uses: ./.github/actions/save-build-dependencies
+        with:
+          key: ${{ steps.dependencies.outputs.key }}
 
       - name: Validate host-side artifacts
         if: always()

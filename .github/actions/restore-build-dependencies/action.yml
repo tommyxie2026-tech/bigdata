@@ -1,0 +1,45 @@
+name: Restore component dependency downloads
+description: Restore only Maven repository and Gradle downloads, never credentials or RPM evidence.
+inputs:
+  component:
+    required: true
+    description: Component cache boundary
+  version:
+    required: true
+    description: Component version
+  jdk:
+    required: true
+    description: Toolchain JDK
+  source_identity:
+    default: branch-3.6
+    description: Upstream source identity
+outputs:
+  key:
+    description: New immutable snapshot key
+    value: ${{ steps.key.outputs.key }}
+runs:
+  using: composite
+  steps:
+    - name: Resolve dependency cache scope
+      id: key
+      shell: bash
+      env:
+        CACHE_SCOPE: deps-v2-${{ runner.os }}-${{ runner.arch }}-oe2203sp4-${{ inputs.component }}-${{ inputs.version }}-jdk${{ inputs.jdk }}-${{ inputs.source_identity || 'branch-3.6' }}-${{ hashFiles('ci/components.yaml', 'scripts/ci/*maven*', 'scripts/ci/build-*.sh', 'scripts/ci/run-with-deadline.py', 'packaging/**') }}
+      run: |
+        set -euo pipefail
+        mirror_scope=$(printf '%s' "${MAVEN_MIRROR_URL:-direct}" | sha256sum | cut -c1-16)
+        printf 'prefix=%s-%s-\n' "${CACHE_SCOPE}" "${mirror_scope}" >> "${GITHUB_OUTPUT}"
+        printf 'key=%s-%s-%s-%s\n' "${CACHE_SCOPE}" "${mirror_scope}" "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
+        mkdir -p /tmp/bigdata-component-cache/m2/repository /tmp/bigdata-component-cache/gradle/{caches,wrapper}
+    - uses: actions/cache/restore@v4
+      with:
+        path: |
+          /tmp/bigdata-component-cache/m2/repository
+          /tmp/bigdata-component-cache/gradle/caches
+          /tmp/bigdata-component-cache/gradle/wrapper
+        key: ${{ steps.key.outputs.key }}
+        restore-keys: ${{ steps.key.outputs.prefix }}
+    - name: Record restored download inventory
+      shell: bash
+      run: |
+        find /tmp/bigdata-component-cache/m2/repository /tmp/bigdata-component-cache/gradle/caches /tmp/bigdata-component-cache/gradle/wrapper -type f -printf '%p %s %T@\n' | LC_ALL=C sort | sha256sum > "${RUNNER_TEMP}/dependency-cache-before"

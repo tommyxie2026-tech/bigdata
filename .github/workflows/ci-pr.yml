@@ -52,6 +52,9 @@ jobs:
           fi
           shellcheck -S warning "${files[@]}"
 
+      - name: Dependency retry and deadline behavior
+        run: python3 scripts/ci/test-build-dependency-policy.py
+
       - name: Maven download resilience contracts
         run: bash scripts/ci/test-maven-download-resilience.sh
 

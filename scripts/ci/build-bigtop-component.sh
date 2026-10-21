@@ -86,7 +86,6 @@ if [[ "${COMPONENT}" == "spark" ]]; then
   export GITHUB_ACTIONS=true
 fi
 
-export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.rto=60000 -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Dmaven.wagon.httpconnectionManager.ttlSeconds=60"
 
 rm -rf "${BIGTOP_DIR}"
 mkdir -p "${WORK_ROOT}/artifacts"/{rpms,logs,evidence}
