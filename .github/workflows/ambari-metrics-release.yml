@@ -1,0 +1,78 @@
+name: Ambari Metrics evidence and reviewed publication
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ambari-metrics-release.yml'
+      - 'scripts/metrics-release/**'
+  workflow_dispatch:
+    inputs:
+      package_run_id:
+        description: Successful original Metrics RPM packaging run
+        required: true
+        type: string
+      test_run_id:
+        description: Successful clean installation, actual host query and restart run
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: metrics-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --disable-pip-version-check --timeout 20 --retries 2 PyYAML==6.0.3
+      - run: python3 -m unittest discover -s scripts/metrics-release -p 'test_*.py'
+      - run: bash -n scripts/metrics-release/promote.sh
+  candidate:
+    needs: contract
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --disable-pip-version-check --timeout 20 --retries 2 PyYAML==6.0.3
+      - name: Validate original RPM producer and actual runtime evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+          TEST_RUN_ID: ${{ inputs.test_run_id }}
+        run: >-
+          timeout --kill-after=20 1200 python3 scripts/metrics-release/assemble.py
+          --package-run-id "$PACKAGE_RUN_ID" --test-run-id "$TEST_RUN_ID" --output candidate
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ambari-metrics-3.0.0-release-candidate
+          path: candidate
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
+  promote:
+    needs: candidate
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.candidate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: repository
+          lfs: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: ambari-metrics-3.0.0-release-candidate
+          path: candidate
+      - name: Stage verified RPM metadata and open a review PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: timeout --kill-after=20 900 bash scripts/metrics-release/promote.sh
