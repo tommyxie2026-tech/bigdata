@@ -1,0 +1,89 @@
+name: Ambari Metrics RPM installation and persistence
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ambari-metrics-rpms.yml'
+      - 'scripts/ambari-metrics/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: metrics-rpms-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  SOURCE_BUILD_RUN_ID: '39637960371'
+  SOURCE_BUILD_HEAD: '5f1547e79a1d09e50fd006cd2adad237cd93490f'
+jobs:
+  package:
+    name: Package real Collector and Monitor RPMs
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify strict Collector acceptance assertions
+        run: python3 scripts/ambari-metrics/test_rpm_acceptance.py
+      - name: Validate original successful source build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_BUILD_RUN_ID" > /tmp/source-run.json
+          python3 - <<'PY'
+          import os,json
+          run=json.load(open('/tmp/source-run.json'))
+          assert run['head_repository']['full_name']==os.environ['GITHUB_REPOSITORY']
+          assert run['head_sha']==os.environ['SOURCE_BUILD_HEAD']
+          assert run['status']=='completed' and run['conclusion']=='success'
+          PY
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_BUILD_RUN_ID/jobs?filter=latest&per_page=100" \
+            --jq '.jobs[] | select(.name == "Compile pinned Ambari Metrics 3.0.0 Collector" and .conclusion == "success") | .id' | grep -Eq '^[0-9]+$'
+      - uses: actions/download-artifact@v4
+        with:
+          name: ambari-metrics-3.0.0-pinned-source-build
+          run-id: ${{ env.SOURCE_BUILD_RUN_ID }}
+          github-token: ${{ github.token }}
+          path: source-output
+      - name: Restore checksum-pinned embedded distributions
+        uses: actions/cache@v4
+        with:
+          path: /tmp/metrics-package/downloads
+          key: metrics-embedded-hbase2413-phoenix512-sha512-v1
+      - name: Assemble RPM payloads in openEuler
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/metrics-package
+          timeout --kill-after=20 1500 docker run --rm --init \
+            -e SOURCE_BUILD_RUN_ID \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$GITHUB_WORKSPACE/source-output:/input:ro" \
+            -v /tmp/metrics-package:/work \
+            openeuler/openeuler:22.03-lts-sp4 bash /workspace/scripts/ambari-metrics/package-rpms.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ambari-metrics-3.0.0-candidate-rpms
+          path: /tmp/metrics-package/output
+  test:
+    name: Clean openEuler install and real Collector restart persistence
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ambari-metrics-3.0.0-candidate-rpms
+          path: rpm-output
+      - name: Real installation, host metrics and persisted queries
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/metrics-rpm-evidence
+          timeout --kill-after=20 1800 docker run --rm --init \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$GITHUB_WORKSPACE/rpm-output:/rpm:ro" \
+            -v /tmp/metrics-rpm-evidence:/evidence \
+            openeuler/openeuler:22.03-lts-sp4 bash /workspace/scripts/ambari-metrics/test-rpms.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ambari-metrics-3.0.0-rpm-installation-evidence
+          path: /tmp/metrics-rpm-evidence

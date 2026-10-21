@@ -1,0 +1,19 @@
+[Unit]
+Description=Ambari Metrics Collector
+Requires=ambari-metrics-hbase.service
+After=network.target ambari-metrics-hbase.service
+
+[Service]
+User=ams
+Group=ams
+Type=simple
+RuntimeDirectory=ambari-metrics-collector
+StateDirectory=ambari-metrics-collector
+LogsDirectory=ambari-metrics-collector
+ExecStart=/usr/libexec/ambari-metrics/runtime collector
+TimeoutStopSec=60
+KillMode=control-group
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

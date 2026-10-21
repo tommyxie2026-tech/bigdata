@@ -1,0 +1,18 @@
+[Unit]
+Description=Ambari Metrics embedded HBase storage
+After=network.target
+
+[Service]
+User=ams
+Group=ams
+Type=simple
+RuntimeDirectory=ams-hbase
+LogsDirectory=ams-hbase
+ExecStart=/usr/libexec/ambari-metrics/runtime hbase
+TimeoutStopSec=60
+KillMode=control-group
+Restart=on-failure
+LimitNOFILE=32768
+
+[Install]
+WantedBy=multi-user.target
