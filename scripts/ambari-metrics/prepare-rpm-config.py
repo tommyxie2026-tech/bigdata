@@ -28,6 +28,10 @@ for relative in ['etc/ams-hbase/conf/hbase-site.xml', 'etc/ambari-metrics-collec
         'hbase.tmp.dir': '/var/lib/ambari-metrics-collector/hbase-tmp',
         'hbase.cluster.distributed': 'false', 'hbase.zookeeper.quorum': 'localhost',
         'hbase.zookeeper.property.clientPort': '2182'})
+# Stock HBase/Collector Hadoop native libraries are not ABI-compatible for Snappy.
+# GZ keeps compression and HBase table checks without a platform-specific JNI codec.
+properties(collector/'etc/ambari-metrics-collector/conf/ams-site.xml',
+    {'timeline.metrics.hbase.compression.scheme': 'GZ'})
 path = monitor/'etc/ambari-metrics-monitor/conf'
 (path/'metric_groups.conf').write_text(metric_groups_json(metric_groups.read_text()))
 config = configparser.RawConfigParser()
