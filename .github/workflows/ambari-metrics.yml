@@ -1,0 +1,65 @@
+name: Ambari Metrics source and delivery
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ambari-metrics.yml'
+      - 'scripts/ambari-metrics/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ambari-metrics.yml'
+      - 'scripts/ambari-metrics/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ambari-metrics-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source:
+    name: Compile pinned Ambari Metrics 3.0.0 Collector
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Metrics source contract
+        run: |
+          python3 -m pip install --disable-pip-version-check PyYAML==6.0.3
+          python3 scripts/ambari-metrics/test_contract.py
+      - name: Checkout independent immutable Metrics source
+        uses: actions/checkout@v4
+        with:
+          repository: apache/ambari-metrics
+          ref: ce919386e963841ea37f032c5ba6ed9c48298dd8
+          path: metrics-source
+          persist-credentials: false
+      - name: Restore dependency downloads
+        id: dependencies
+        uses: ./.github/actions/restore-build-dependencies
+        with:
+          component: ambari-metrics
+          version: '3.0.0'
+          jdk: '8'
+          source_identity: ce919386e963841ea37f032c5ba6ed9c48298dd8
+      - name: Compile actual Collector sources in openEuler
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/metrics-build
+          docker run --rm --init -e BUILD_RUN_ID="$GITHUB_RUN_ID" \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$GITHUB_WORKSPACE/metrics-source:/source:ro" \
+            -v /tmp/metrics-build:/work -v /tmp/bigdata-component-cache/m2:/root/.m2 \
+            openeuler/openeuler:22.03-lts-sp4 bash /workspace/scripts/ambari-metrics/build-source.sh
+      - name: Preserve new dependencies even after a source failure
+        if: always()
+        uses: ./.github/actions/save-build-dependencies
+        with:
+          key: ${{ steps.dependencies.outputs.key }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ambari-metrics-3.0.0-pinned-source-build
+          path: /tmp/metrics-build/output
+          retention-days: 30
