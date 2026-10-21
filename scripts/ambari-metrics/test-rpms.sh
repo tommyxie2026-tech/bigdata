@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 # A fresh openEuler container installs the RPMs, without Maven or build artifacts.
 set -Eeuo pipefail
+collect_runtime_logs() {
+  status=$?
+  for service in collector monitor; do
+    if [[ -d /var/log/ambari-metrics-$service ]]; then
+      cp -a "/var/log/ambari-metrics-$service" "/evidence/$service-runtime-logs"
+    fi
+  done
+  return "$status"
+}
+trap collect_runtime_logs EXIT
 trap 'echo "Metrics RPM acceptance failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 timeout 600 dnf -y --setopt=timeout=30 --setopt=retries=2 install python3 procps-ng util-linux
 test ! -e /usr/lib/ambari-metrics-collector

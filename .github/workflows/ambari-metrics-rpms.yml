@@ -12,10 +12,25 @@ concurrency:
   group: metrics-rpms-${{ github.ref }}
   cancel-in-progress: true
 env:
+  RPM_REUSE_RUN: '39645591431'
   SOURCE_BUILD_RUN_ID: '39637960371'
   SOURCE_BUILD_HEAD: '5f1547e79a1d09e50fd006cd2adad237cd93490f'
 jobs:
+  select:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.select.outputs.build }}
+      run: ${{ steps.select.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --disable-pip-version-check --timeout 20 --retries 2 PyYAML==6.0.3
+      - id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ambari-metrics/select-rpm.py
   package:
+    needs: select
+    if: needs.select.outputs.build == 'true'
     name: Package real Collector and Monitor RPMs
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -76,7 +91,11 @@ jobs:
           path: /tmp/metrics-package/output
   test:
     name: Clean openEuler install and real Collector restart persistence
-    needs: package
+    needs: [select, package]
+    if: >-
+      !cancelled() && needs.select.result == 'success' &&
+      (needs.package.result == 'success' ||
+       (needs.select.outputs.build == 'false' && needs.package.result == 'skipped'))
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -84,6 +103,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: ambari-metrics-3.0.0-candidate-rpms
+          run-id: ${{ needs.select.outputs.run }}
+          github-token: ${{ github.token }}
           path: rpm-output
       - name: Real installation, host metrics and persisted queries
         run: |
