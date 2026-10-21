@@ -35,17 +35,17 @@ Files: .github/workflows/component-lifecycle.yml; scripts/ci/test-component-life
 - [x] Write failing tests executing the lifecycle gate for main/PR/failed-check cases.
 - [x] Write selector tests separating unchanged package recipes from changed retry policy, retaining original build identity and rejecting changed payload inputs.
 - [x] Implement minimal fixes and validate behavior/contracts. Live API proof selects original published Build 39124662344 with identity c0c725259e316dd63d254dd2d818ebeefeda1123980452cf77f3a384dc4da2b0; no RPM was downloaded locally.
-- [ ] Create an independent repair PR, track its latest head, and present the reviewed/green result for merge. Recheck main after merge.
+- [x] Repair PR #107 merged as 2d4826a; main Hue run 39631347762 and PostgreSQL run 39631347479 actually succeeded.
 
 ### Task 2: Reduce duplicated CI and measure time
 
 Files: scripts/ci/reuse_merged_pr_test_artifacts.py and its tests; reusable lifecycle workflows; scripts/ci/component input/CI timing utilities; docs/ci/dependency-resilience.md.
 
-- [ ] Add conservative component-scoped payload/test identity closure with dependency and shared-script coverage.
-- [ ] Reuse actual successful component-specific PR tests after merge even when unrelated files changed, requiring CI success, trusted source and both evidence/tested-RPM artifacts.
+- [x] #108 added component-scoped payload/test identity with dependency/shared-script closure.
+- [x] #108 requires successful actual component tests, required CI, trusted original builds and retained artifacts before reuse.
 - [ ] Emit reuse decision, original build/test provenance, cache state and queue/build/test durations as structured evidence.
-- [ ] Validate positive reuse and negative cases (changed test/recipe/dependency, expired artifact, skipped/failed job, foreign repository).
-- [ ] Submit and verify a separate CI-efficiency PR, then measure a mainline warm run after merge.
+- [x] #108 validated positive and negative scope/provenance cases.
+- [x] #108 merged as 195f709; all eight push workflows succeeded. Hue report artifact 12360840301 records 265s repository check and skipped stage durations as null; Hudi representative dispatch 39628608297 reused original RPM without repeat Build/Test.
 
 ### Task 3: Connect a dependency proxy
 
@@ -77,3 +77,12 @@ Files: standalone Metrics contract, build/test adapters, .github/workflows/ambar
 ## Completion audit
 
 The goal remains active until all five tasks have their full acceptance evidence. Repository code, fixture success or an unmerged PR alone does not prove actual proxy deployment, full component offline readiness, lakehouse recovery or Metrics delivery. Log external blockers precisely and keep advancing unaffected work.
+
+## Delivery ledger — 2026-10-22 continuation
+
+- Progress: #109 merged as 56f3737 after actual MySQL and PostgreSQL → Paimon run 39637652324 passed. Small evidence artifacts 12364930947/12364840331 prove exact snapshot/IUD/restored values, checkpoint and savepoint paths. Main post-merge run 39641238958 also succeeded. This is local-filesystem warehouse evidence only.
+- Progress: #111 merged as fd967df. Original successful Collector source run 39637960371 is reused by RPM packaging; Monitor #112 merged as e52b289 after actual run 39639490456 proved repeated fresh CPU/memory emissions before/after restart. Main Monitor run 39641267918 also succeeded. Neither proves the real Collector persistence requirement.
+- Progress: #113 implements actual Collector/Monitor RPMs and strict Collector historical/new timestamp assertions. Initial packaging correctly rejected a nonmatching Bigtop Phoenix archive; it now uses the original Apache archive and retains only verified downloads. Actual RPM installation/persistence remains pending.
+- Ruling: user chose an open-source combination instead of Nexus onboarding. #110 now uses Reposilite/Verdaccio/devpi with persistent volumes and TLS; real deployment host/domain is still required. The fixture must pass actual byte, physical egress isolation and restart proof before any cache-success claim.
+- Next stage: an independent HDFS matrix uses separate storage/client containers, guarded NameNode formatting, checkpoint/savepoint recovery and a fresh final-row reader after storage restart. This is not evidence for S3A or Iceberg/Hudi; those remain required follow-on work.
+- Remaining audit: complete per-stage timing/provenance coverage, actual production proxy and representative full component cold/warm/offline closure, remote HDFS/S3 plus Iceberg/Hudi, and actual Metrics RPM installation/query/restart and reviewed repository promotion. No new PR is automatically merged.

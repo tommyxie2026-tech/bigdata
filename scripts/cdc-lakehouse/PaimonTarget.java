@@ -19,7 +19,7 @@ public final class PaimonTarget {
     }
     private static void define(TableEnvironment table) {
         table.executeSql("CREATE CATALOG lakehouse WITH ('type'='paimon',"
-            + "'warehouse'='file:///var/lib/flink/cdc-paimon')");
+            + "'warehouse'='" + WarehouseLocation.configured() + "')");
         table.executeSql("CREATE DATABASE IF NOT EXISTS lakehouse.cdc_ci");
         table.executeSql("CREATE TABLE IF NOT EXISTS lakehouse.cdc_ci.lake_rows (id INT, name STRING, "
             + "PRIMARY KEY(id) NOT ENFORCED) WITH ('bucket'='1')");
