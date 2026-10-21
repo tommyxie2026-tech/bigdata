@@ -219,6 +219,7 @@ jobs:
           set -euo pipefail
           timeout 210 python3 scripts/s3a/observe.py ready --ca "$FIXTURE/config/server.crt" --evidence "$EVIDENCE"
           docker exec s3a-client bash /workspace/scripts/s3a/client.sh restored
+          python3 scripts/s3a/observe.py cleanup --ca "$FIXTURE/config/server.crt" --evidence "$EVIDENCE"
           python3 scripts/s3a/results.py "$EVIDENCE"
       - name: Verify persisted object, retained permissions and cleanup
         run: |

@@ -80,7 +80,11 @@ public final class S3AProbe {
         exact(f,"proof.bin",SMALL);exact(f,"multipart.bin",payload());pass("restart_exact");
         try(FileSystem r=fs(true)){exact(r,"proof.bin",SMALL);pass("readonly");denied(()->r.delete(new Path(ROOT+"proof.bin"),false));pass("denied_delete");}
         require(f.delete(new Path(ROOT),true),"delete failed");
-        require(!f.exists(new Path(ROOT)),"cleanup left data");pass("cleanup");
+        // This backend removes empty directory entries asynchronously. Require
+        // no children; the independent SDK check rejects any retained payload.
+        try{require(f.listStatus(new Path(ROOT)).length==0,"cleanup left entries");}
+        catch(FileNotFoundException absent){}
+        pass("cleanup");
       }
     }
   }

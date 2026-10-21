@@ -26,8 +26,11 @@ without that store must fail with a certificate-path validation error.
   HTTP status of 403. Generic IO exceptions, 404 and timeouts cannot pass denial.
 - Stop/restart the same storage container. Bounded data readiness precedes a
   fresh JVM, which must read both exact payloads and retain reader permissions.
-- Delete the S3A prefix; original fixture cleanup then verifies the entire bucket
-  is empty. A strict summary requires every phase assertion and multipart proof.
+- Delete all S3A data and require no child entries. The pinned backend removes
+  empty directories asynchronously; an independent SDK check may remove only
+  the exact zero-byte `s3a/` marker, and rejects every other remaining key.
+  It then requires an exact empty prefix inventory. Original fixture cleanup
+  verifies the entire bucket is empty. A strict summary requires every phase assertion and multipart proof.
 
 Every service/network wait and Java invocation has a deadline. Integration job ceiling: 20 minutes; optional binary packaging has its own 15-minute ceiling. Failure uploads server and JVM logs, checksum/package/dependency
 records and partial results, excluding the private TLS key and trust store.

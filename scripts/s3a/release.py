@@ -5,7 +5,7 @@ from results import INITIAL,RESTORED
 API_INITIAL={'tls_verified','crud','list_exact','multipart_complete','multipart_abort','readonly_denied','bad_key_denied','bad_secret_denied','anonymous_denied','untrusted_tls_denied','retained_object'}
 API_RESTORED={'tls_verified','restart_read','permissions_retained','cleanup'}
 def validate(s3a,api):
-    expected_s3a={'initial.'+k for k in INITIAL}|{'restored.'+k for k in RESTORED}|{'s3a_multipart'}
+    expected_s3a={'initial.'+k for k in INITIAL}|{'restored.'+k for k in RESTORED}|{'s3a_multipart','sdk_cleanup'}
     expected_api={'initial.'+k for k in API_INITIAL}|{'restored.'+k for k in API_RESTORED}
     for report,expected in [(s3a,expected_s3a),(api,expected_api)]:
         if report.get('status')!='PASS' or set(report.get('checks',{}))!=expected or any(v!='PASS' for v in report['checks'].values()):

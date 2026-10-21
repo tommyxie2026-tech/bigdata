@@ -14,6 +14,11 @@ def parse_phase(lines,phase,required):
         seen[fields[2]]='PASS'
     if set(seen)!=required:raise ValueError('Incomplete or unexpected assertion set: '+repr(seen))
     return seen
+def cleanup_marker(contents):
+    """Only an empty directory marker is fixture metadata, never retained data."""
+    if not contents:return False
+    if len(contents)==1 and contents[0].get('Key')=='s3a/' and contents[0].get('Size')==0:return True
+    raise ValueError('S3A deletion left unexpected objects: '+repr(contents))
 if __name__=='__main__':
     root=Path(sys.argv[1]);checks={}
     for phase,required in [('initial',INITIAL),('restored',RESTORED)]:
@@ -22,5 +27,10 @@ if __name__=='__main__':
     multipart=json.loads((root/'s3a-multipart.json').read_text())
     if multipart.get('status')!='PASS' or multipart.get('size')!=12*1024*1024 or not multipart.get('etag','').strip('"').endswith('-3'):
         raise ValueError('S3A multipart upload not independently verified')
-    checks['s3a_multipart']='PASS'
+    cleanup=json.loads((root/'s3a-cleanup.json').read_text())
+    if cleanup.get('status')!='PASS' or cleanup.get('after')!=[]:
+        raise ValueError('S3A cleanup not independently verified')
+    cleanup_marker(cleanup['before'])
+    checks['sdk_cleanup']='PASS'
+    checks['s3a_multipart']='PASS' 
     (root/'s3a-summary.json').write_text(json.dumps({'status':'PASS','checks':checks},indent=2)+'\n')
