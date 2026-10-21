@@ -14,6 +14,7 @@ import sys
 import threading
 import time
 from verify_monitor_payload import host_samples
+from port_monitor import metric_groups_json
 
 
 def main():
@@ -40,7 +41,7 @@ def main():
     server=ThreadingHTTPServer(('127.0.0.1',0),Receiver)
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     conf=Path('/etc/ambari-metrics-monitor/conf');conf.mkdir(parents=True,exist_ok=True)
-    (conf/'metric_groups.conf').write_bytes((args.config_source/'metric_groups.conf').read_bytes())
+    (conf/'metric_groups.conf').write_text(metric_groups_json((args.config_source/'metric_groups.conf').read_text()))
     config=configparser.RawConfigParser();config.read(args.config_source/'metric_monitor.ini')
     for section,key,value in [('default','metrics_servers','127.0.0.1'),('emitter','send_interval','12'),
         ('emitter','kinit_cmd',''),('emitter','klist_cmd',''),('collector','collector_sleep_interval','1'),

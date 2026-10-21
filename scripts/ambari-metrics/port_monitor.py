@@ -14,6 +14,15 @@ from fissix.refactor import RefactoringTool, get_fixers_from_package
 _TOOL = RefactoringTool(get_fixers_from_package('fissix.fixes'))
 
 
+def metric_groups_json(source):
+    """Prepare upstream's commented configuration for the runtime JSON reader."""
+    value = json.loads('\n'.join(line for line in source.splitlines()
+                               if not line.lstrip().startswith('#')))
+    if not isinstance(value, dict) or 'host_metric_groups' not in value:
+        raise ValueError('Unexpected upstream metric group configuration')
+    return json.dumps(value, indent=2) + '\n'
+
+
 def convert_python(source, relative_path, source_filename=None):
     if relative_path == 'core/__init__.py':
         marker = 'import platform'

@@ -10,6 +10,16 @@ class MonitorPortTests(unittest.TestCase):
         self.assertTrue(path.exists(),'deterministic Python 3 port helper missing')
         spec=importlib.util.spec_from_file_location('monitor_port',path)
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
+    def test_upstream_metric_group_config_keeps_values_and_removes_only_comments(self):
+        port=self.load()
+        value=port.metric_groups_json('# License\n{"host_metric_groups": {"all": {"metrics": ["cpu_user", "mem_total"]}}, "literal": "#value"}\n')
+        import json
+        self.assertEqual(json.loads(value)['literal'],'#value')
+        upstream=os.environ.get('METRICS_MONITOR_UPSTREAM_SOURCE')
+        if upstream:
+            conf=Path(upstream).parents[2]/'conf/unix/metric_groups.conf'
+            parsed=json.loads(port.metric_groups_json(conf.read_text()))
+            self.assertIn('host_metric_groups',parsed)
     def test_python2_collection_logic_runs_with_python3(self):
         port=self.load()
         source="""from Queue import Queue
