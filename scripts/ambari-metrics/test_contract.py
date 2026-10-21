@@ -18,6 +18,8 @@ class MetricsSourceContract(unittest.TestCase):
         for marker in ['retry-maven-downloads.sh','org/apache/ambari/metrics/AMSApplicationServer.class','sha256sum','-P!linux','MAVEN_RETRY_TOTAL_SECONDS']:
             self.assertIn(marker,source)
         self.assertNotIn('mvn clean',source)
+        self.assertIn('cp LICENSE.txt /work/output/',source)
+        self.assertNotIn('cp LICENSE NOTICE',source)
         self.assertIn('git config --global --add safe.directory /source',source)
     def test_workflow_restores_and_saves_downloads_on_failure(self):
         path=ROOT/'.github/workflows/ambari-metrics.yml'

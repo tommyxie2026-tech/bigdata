@@ -37,8 +37,8 @@ cp -a ambari-metrics-timelineservice/target/lib /work/output/collector/
 cp -a ambari-metrics-timelineservice/conf/unix /work/output/collector/conf
 cp -a ambari-metrics-host-monitoring/src/main/python /work/output/monitor/
 cp -a ambari-metrics-host-monitoring/conf/unix /work/output/monitor/conf
-cp LICENSE NOTICE /work/output/
-(cd /work/output && find collector monitor -type f -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS)
+cp LICENSE.txt /work/output/
+(cd /work/output && find collector monitor LICENSE.txt -type f -print0 | sort -z | xargs -0 sha256sum > evidence/SHA256SUMS)
 cat > /work/output/evidence/evidence.md <<EOF
 stage: compile
 component: ambari-metrics
