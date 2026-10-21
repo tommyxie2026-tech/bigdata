@@ -33,6 +33,12 @@ on:
       already_current:
         description: Whether main contains the exact tested, installable RPM set
         value: ${{ jobs.check.outputs.already_current }}
+      build_run_id:
+        description: Original build from the verified repository manifest
+        value: ${{ jobs.check.outputs.build_run_id }}
+      test_run_id:
+        description: Actual test from the verified repository manifest
+        value: ${{ jobs.check.outputs.test_run_id }}
 
 permissions:
   contents: read
@@ -44,6 +50,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       already_current: ${{ steps.repo.outputs.already_current }}
+      build_run_id: ${{ steps.provenance.outputs.build_run_id }}
+      test_run_id: ${{ steps.provenance.outputs.test_run_id }}
     steps:
       - name: Checkout workflow and component config
         uses: actions/checkout@v4
@@ -130,3 +138,20 @@ jobs:
           else
             echo "Normal Build/Test/Release required for ${COMPONENT} ${VERSION}." >> "${GITHUB_STEP_SUMMARY}"
           fi
+
+      - name: Record verified repository provenance
+        id: provenance
+        if: steps.repo.outputs.already_current == 'true'
+        env:
+          MANIFEST: rpm-repository/repo/openeuler-22.03-lts-sp4/bigtop-3.6/${{ inputs.component }}/${{ inputs.version }}/manifest.yaml
+        run: |
+          python3 - <<'PY_PROVENANCE'
+          import os,yaml
+          from pathlib import Path
+          manifest=yaml.safe_load(Path(os.environ['MANIFEST']).read_text())
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              for key,field in [('build_run_id','build_run_id'),('test_run_id','tested_artifact_run_id')]:
+                  value=str(manifest.get(field,''))
+                  if value.isdigit() and int(value)>0:
+                      out.write(key+'='+value+'\n')
+          PY_PROVENANCE

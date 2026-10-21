@@ -19,13 +19,32 @@ def elapsed(start, end):
     return seconds if seconds >= 0 else None
 
 
-def timing_report(run, jobs, *, component, build_run_id='', test_run_id=''):
+def timing_report(run, jobs, *, component, build_run_id='', test_run_id='',
+                  repo_current=False, repo_build_run_id='', repo_test_run_id='',
+                  pr_build_run_id='', build_result='', test_result=''):
+    if build_result == 'success':
+        origin, build, test = 'fresh', run.get('id'), run.get('id') if test_result == 'success' else None
+    elif test_run_id:
+        origin, build, test = 'merged_pr', pr_build_run_id or build_run_id, test_run_id
+    elif build_run_id and test_result == 'success':
+        origin, build, test = 'explicit_rpm', build_run_id, run.get('id')
+    elif repo_current:
+        origin, build, test = 'verified_repository', repo_build_run_id, repo_test_run_id
+    elif build_run_id:
+        origin, build, test = 'explicit_rpm', build_run_id, run.get('id') if test_result == 'success' else None
+    else:
+        origin, build, test = 'unknown', None, None
+    def run_id(value):
+        text = str(value or '')
+        return text if text.isdigit() and int(text) > 0 else None
     return {'schema':'bigdata.ci-timing/v1', 'component':component,
             'run_id':run.get('id'), 'head_sha':run.get('head_sha'),
             'run_status':run.get('status'), 'run_conclusion':run.get('conclusion'),
             'observed_at':datetime.now(timezone.utc).isoformat(),
             'run_queue_seconds':elapsed(run.get('created_at'),run.get('run_started_at')),
-            'original_build_run_id':build_run_id or None,
+            'original_build_run_id':run_id(build),
+            'original_test_run_id':run_id(test),
+            'artifact_reuse_state':origin,
             'reused_test_run_id':test_run_id or None,
             'jobs':[{'id':job.get('id'), 'name':job.get('name'),
                      'status':job.get('status'), 'conclusion':job.get('conclusion'),
@@ -58,7 +77,13 @@ def main():
         raise ValueError('Timing job inventory is incomplete')
     report=timing_report(run,jobs,component=args.component,
                          build_run_id=os.environ.get('RPM_BUILD_RUN_ID',''),
-                         test_run_id=os.environ.get('PR_TEST_RUN_ID',''))
+                         test_run_id=os.environ.get('PR_TEST_RUN_ID',''),
+                         pr_build_run_id=os.environ.get('PR_BUILD_RUN_ID',''),
+                         repo_current=os.environ.get('REPO_ALREADY_CURRENT') == 'true',
+                         repo_build_run_id=os.environ.get('REPO_BUILD_RUN_ID',''),
+                         repo_test_run_id=os.environ.get('REPO_TEST_RUN_ID',''),
+                         build_result=os.environ.get('BUILD_RESULT',''),
+                         test_result=os.environ.get('TEST_RESULT',''))
     args.output.parent.mkdir(parents=True,exist_ok=True)
     args.output.write_text(json.dumps(report,indent=2)+'\n')
     summary=os.environ.get('GITHUB_STEP_SUMMARY')
