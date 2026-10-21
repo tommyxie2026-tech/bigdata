@@ -20,6 +20,23 @@ class MonitorPortTests(unittest.TestCase):
             conf=Path(upstream).parents[2]/'conf/unix/metric_groups.conf'
             parsed=json.loads(port.metric_groups_json(conf.read_text()))
             self.assertIn('host_metric_groups',parsed)
+    def test_actual_blacklist_supports_initial_hosts_and_timeout(self):
+        upstream=os.environ.get('METRICS_MONITOR_UPSTREAM_SOURCE')
+        if not upstream:self.skipTest('actual upstream source not supplied')
+        port=self.load();source=Path(upstream)/'core/blacklisted_set.py'
+        converted=port.convert_python(source.read_text(),'core/blacklisted_set.py',str(source))
+        scope={};exec(compile(converted,'blacklisted_set.py','exec'),scope)
+        from unittest.mock import patch
+        with patch.object(scope['time'],'time',return_value=100):
+            hosts=scope['BlacklistedSet'](['collector'],60)
+            self.assertEqual(list(hosts),['collector'])
+            self.assertIn('collector',hosts)
+            hosts.blacklist('collector')
+            self.assertEqual(hosts.get_actual_size(),0)
+        with patch.object(scope['time'],'time',return_value=161):
+            self.assertEqual(hosts.get_item_at_index(0),'collector')
+            self.assertIn('collector',hosts)
+
     def test_python2_collection_logic_runs_with_python3(self):
         port=self.load()
         source="""from Queue import Queue

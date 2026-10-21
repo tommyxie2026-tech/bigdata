@@ -34,6 +34,13 @@ def convert_python(source, relative_path, source_filename=None):
     converted = str(_TOOL.refactor_string(source.rstrip() + '\n', filename))
     if relative_path == 'core/config_reader.py':
         converted = converted.replace('ambari-metrics-host-monitoring', 'ambari-metrics-monitor')
+    if relative_path == 'core/blacklisted_set.py':
+        converted = converted.replace('self.__dict.get(item)', 'self.__dict.get(item, 0)')
+        converted = converted.replace('item in self.__dict and time.time()',
+                                      'set.__contains__(self, item) and time.time()')
+    if relative_path == 'core/emitter.py':
+        converted = converted.replace("logger.warn('Unable to emit events. %s' % str(e))",
+                                      "logger.exception('Unable to emit events. %s' % str(e))")
     if relative_path == 'core/application_metric_map.py':
         if converted.count(' / 60000') != 2:
             raise ValueError('Unexpected upstream minute-bucket arithmetic')
