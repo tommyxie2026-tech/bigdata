@@ -1,0 +1,13 @@
+{
+  "schema": "bigdata.optional-dependency/v1",
+  "component": "hadoop-aws-sdk",
+  "version": "2.35.4",
+  "rpm_release": "1.oe2203sp4",
+  "hadoop_version": "3.4.3",
+  "coordinate": "software.amazon.awssdk:bundle:2.35.4",
+  "url": "https://repo.maven.apache.org/maven2/software/amazon/awssdk/bundle/2.35.4/bundle-2.35.4.jar",
+  "sha256": "db4b55f24ad1b4e70f17eb1717a4de76a8dadc5a27d764be7c44ff67b2c1c677",
+  "size": 686119507,
+  "license": "Apache-2.0",
+  "upstream_dependency_definition": "https://github.com/apache/hadoop/blob/rel/release-3.4.3/hadoop-project/pom.xml"
+}

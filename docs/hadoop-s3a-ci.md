@@ -3,13 +3,16 @@
 This test-only profile consumes the published Hadoop 3.4.3 and Hadoop client/HDFS/MapReduce/YARN RPMs,
 plus Bigtop utils/Groovy/jsvc common packages, at immutable repository commit
 `865074386ad88dd82ea9fd043e385e7b1cfe0ca9`. Each RPM is checked against that
-commit's SHA256SUMS on the CI runner. No RPM is compiled or repackaged, and no
-release/promotion workflow is added. Large inputs are fetched only on CI.
+commit's SHA256SUMS on the CI runner. No existing RPM is rebuilt. A new optional `bigdata-hadoop-aws-sdk` dependency
+RPM packages the upstream SDK binary once; no Java sources are compiled. Large inputs are fetched only on CI.
 
 The pinned SeaweedFS 4.48 TLS/IAM fixture and SDK assertion tests from #103 are
-retained. A clean openEuler 22.03 LTS SP4 container installs only those eight
-published RPMs and system Java 8. S3A and AWS SDK must come from the installed
-RPM closure. Missing classes fail preflight; no replacement JAR is downloaded.
+retained. A clean openEuler 22.03 LTS SP4 container installs the eight published RPMs, the new optional SDK RPM, and system Java 8. S3A and AWS SDK must come from the installed RPM closure. The SDK bundle
+2.35.4 matches Hadoop 3.4.3 upstream dependency management and is pinned by
+SHA-256 `db4b55f24ad1b4e70f17eb1717a4de76a8dadc5a27d764be7c44ff67b2c1c677`.
+The published Hadoop RPM lacks this optional bundle; it is supplied through
+a separately named dependency RPM, with upstream license material retained.
+Missing classes fail preflight; no ad-hoc JAR is copied over the installed package.
 The fixture CA is imported into a temporary JVM trust store. A separate JVM
 without that store must fail with a certificate-path validation error.
 
@@ -38,3 +41,5 @@ The next independent profile can consume this endpoint for one lakehouse table.
 Primary sources:
 - https://hadoop.apache.org/docs/r3.4.3/hadoop-aws/tools/hadoop-aws/connecting.html
 - https://github.com/apache/hadoop/blob/rel/release-3.4.3/hadoop-tools/hadoop-aws/pom.xml
+
+Packaging reuse: the manual `sdk_package_run_id` input verifies that the referenced packaging job actually succeeded and its package script/contract exactly match current inputs. It then verifies artifact and package-input checksums. Test-only edits do not require repackaging; skipped packaging is reuse, never a new build PASS.

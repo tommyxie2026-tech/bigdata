@@ -13,15 +13,73 @@ on:
       - 'scripts/s3a/**'
       - 'scripts/s3-fixture/**'
   workflow_dispatch:
+    inputs:
+      sdk_package_run_id:
+        description: Reuse an unchanged successful SDK packaging job; no Hadoop compilation
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: hadoop-s3a-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  SDK_REUSE_RUN: ''
+
 jobs:
+  select:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.select.outputs.build }}
+      sdk_run: ${{ steps.select.outputs.sdk_run }}
+    steps:
+      - id: select
+        env:
+          REQUESTED_RUN: ${{ inputs.sdk_package_run_id }}
+        run: |
+          set -euo pipefail
+          reuse="${REQUESTED_RUN:-$SDK_REUSE_RUN}"
+          if [[ -n "$reuse" ]]; then
+            [[ "$reuse" =~ ^[0-9]+$ ]]
+            echo 'build=false' >> "$GITHUB_OUTPUT"
+            echo "sdk_run=$reuse" >> "$GITHUB_OUTPUT"
+          else
+            echo 'build=true' >> "$GITHUB_OUTPUT"
+            echo "sdk_run=$GITHUB_RUN_ID" >> "$GITHUB_OUTPUT"
+          fi
+  package:
+    name: Package optional SDK RPM
+    needs: select
+    if: needs.select.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Package checksum-pinned SDK binary without source compilation
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/s3a-sdk-package
+          timeout 720 docker run --rm -e GITHUB_RUN_ID="$GITHUB_RUN_ID" \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" -v /tmp/s3a-sdk-package:/work \
+            openeuler/openeuler:22.03-lts-sp4 bash /workspace/scripts/s3a/package-sdk.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hadoop-aws-sdk-2.35.4-rpm
+          path: /tmp/s3a-sdk-package/output
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
   api:
+    needs: [select, package]
+    if: >-
+      !cancelled() && needs.select.result == 'success' &&
+      (needs.package.result == 'success' ||
+       (needs.select.outputs.build == 'false' && needs.package.result == 'skipped'))
     name: Published Hadoop S3A HTTPS and restart
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -46,6 +104,34 @@ jobs:
           python3 scripts/s3a/test_results.py -v
       - name: Install pinned S3 client
         run: python3 -m pip install --disable-pip-version-check --timeout 20 --retries 2 -r scripts/s3-fixture/requirements.txt
+      - name: Verify reused SDK packaging provenance
+        if: needs.select.outputs.build == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_RUN: ${{ needs.select.outputs.sdk_run }}
+        run: |
+          set -euo pipefail
+          [[ "$PACKAGE_RUN" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN/jobs?filter=latest&per_page=100" \
+            --jq '.jobs[] | select(.name == "Package optional SDK RPM" and .conclusion == "success") | .id' | grep -Eq '^[0-9]+$'
+          sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN" --jq .head_sha)"
+          for file in scripts/s3a/package-sdk.sh scripts/s3a/sdk-contract.json; do
+            gh api "repos/$GITHUB_REPOSITORY/contents/$file?ref=$sha" --jq .content | base64 -d | cmp - "$file"
+          done
+      - uses: actions/download-artifact@v4
+        with:
+          name: hadoop-aws-sdk-2.35.4-rpm
+          run-id: ${{ needs.select.outputs.sdk_run }}
+          github-token: ${{ github.token }}
+          path: sdk-rpm
+      - name: Verify SDK RPM digest and exact packaging inputs
+        run: |
+          set -euo pipefail
+          (cd sdk-rpm && sha256sum -c evidence/SHA256SUMS)
+          sha256sum -c sdk-rpm/evidence/package-inputs.sha256
+          mkdir -p "$EVIDENCE"
+          cp sdk-rpm/evidence/sdk-contract.json "$EVIDENCE/"
+          cp sdk-rpm/evidence/package-inputs.sha256 "$EVIDENCE/"
       - name: Checkout immutable published RPM inputs without rebuilding
         uses: actions/checkout@v4
         with:
@@ -114,6 +200,7 @@ jobs:
           docker run -d --name s3a-client --network host \
             -v "$GITHUB_WORKSPACE:/workspace:ro" \
             -v "$GITHUB_WORKSPACE/dependency-repository/repo/openeuler-22.03-lts-sp4/bigtop-3.6:/dependencies:ro" \
+            -v "$GITHUB_WORKSPACE/sdk-rpm:/sdk:ro" \
             -v "$FIXTURE/config:/fixture:ro" -v "$EVIDENCE:/evidence" \
             openeuler/openeuler:22.03-lts-sp4 sleep infinity
           timeout 420 docker exec s3a-client bash /workspace/scripts/s3a/client.sh prepare 2>&1 | tee "$EVIDENCE/s3a-install.log"
