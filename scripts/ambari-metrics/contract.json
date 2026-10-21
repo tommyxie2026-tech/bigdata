@@ -1,0 +1,13 @@
+{
+  "component": "ambari-metrics",
+  "version": "3.0.0",
+  "repository": "apache/ambari-metrics",
+  "source_identity": "ce919386e963841ea37f032c5ba6ed9c48298dd8",
+  "source_tag": "release-3.0.0",
+  "java": "8",
+  "monitor_python": "3",
+  "embedded_hbase": "2.4.13",
+  "embedded_phoenix": "5.1.2",
+  "runtime_packages": ["ambari-metrics-collector", "ambari-metrics-monitor"],
+  "delivery_acceptance": ["clean-openEuler-install", "real-host-metrics", "collector-timestamp-query", "restart-persistence"]
+}
