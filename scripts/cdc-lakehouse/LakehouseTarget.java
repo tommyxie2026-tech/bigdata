@@ -7,18 +7,20 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 public final class LakehouseTarget {
     private static String target() {
         String target = System.getenv().getOrDefault("CDC_TARGET", "jdbc");
-        if (!target.equals("jdbc") && !target.equals("paimon") && !target.equals("hudi"))
+        if (!target.equals("jdbc") && !target.equals("paimon") && !target.equals("hudi") && !target.equals("iceberg"))
             throw new IllegalArgumentException("Unsupported CDC_TARGET: " + target);
         return target;
     }
     public static boolean enabled() { return !target().equals("jdbc"); }
     public static void submit(StreamTableEnvironment table, String source) {
-        if (target().equals("hudi")) HudiTarget.submit(table, source);
+        if (target().equals("iceberg")) IcebergTarget.submit(table, source);
+        else if (target().equals("hudi")) HudiTarget.submit(table, source);
         else if (target().equals("paimon")) PaimonTarget.submit(table, source);
         else throw new IllegalStateException("JDBC uses its existing materializer");
     }
     public static void assertRows(Map<Integer,String> expected) throws Exception {
-        if (target().equals("hudi")) HudiTarget.assertRows(expected);
+        if (target().equals("iceberg")) IcebergTarget.assertRows(expected);
+        else if (target().equals("hudi")) HudiTarget.assertRows(expected);
         else if (target().equals("paimon")) PaimonTarget.assertRows(expected);
         else throw new IllegalStateException("JDBC uses its existing assertion");
     }

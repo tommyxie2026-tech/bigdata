@@ -11,7 +11,9 @@ cleanup() {
   return "$status"
 }
 trap cleanup EXIT
-dnf -y install java-11-openjdk-devel maven python3 curl procps-ng
+# shellcheck source=scripts/cdc-lakehouse/java-runtime.sh
+source /workspace/scripts/cdc-lakehouse/java-runtime.sh
+dnf -y install "java-$CDC_JDK-openjdk-devel" maven python3 curl procps-ng
 for component in flink/1.20.1 hadoop/3.4.3 common/3.6.0; do
   name="${component%%/*}"
   printf '[cdc-%s]\nname=CDC fixture %s\nbaseurl=file:///dependencies/%s\nenabled=1\ngpgcheck=0\n' \
@@ -25,12 +27,13 @@ rpms=(/rpm/rpms/*.rpm)
 [[ "${#rpms[@]}" -eq 1 ]]
 [[ "$(rpm -qp --queryformat '%{NAME} %{VERSION} %{ARCH}' "${rpms[0]}")" == 'bigdata-flink-cdc-mysql 3.4.0 noarch' ]]
 dnf -y install flink flink-jobmanager flink-taskmanager "${rpms[0]}"
-javac_path="$(rpm -ql java-11-openjdk-devel | awk '/[/]bin[/]javac$/ && !found {print; found=1}')"
+javac_path="$(rpm -ql "java-$CDC_JDK-openjdk-devel" | awk '/[/]bin[/]javac$/ && !found {print; found=1}')"
 JAVA_HOME="$(dirname "$(dirname "$javac_path")")"
 export JAVA_HOME
 export PATH="$JAVA_HOME/bin:$PATH"
-java -version 2>&1 | grep -Eq 'version "11([.]|")'
+java -version 2>&1 | grep -Eq "version \"$CDC_JDK([.]|\")"
 cp -R /workspace/scripts/flink-cdc-mysql/harness /tmp/cdc-harness
+# shellcheck source=scripts/cdc-lakehouse/prepare-target.sh
 source /workspace/scripts/cdc-lakehouse/prepare-target.sh
 bash /workspace/scripts/ci/retry-maven-downloads.sh /evidence/harness-build.log \
   mvn -B -ntp -f /tmp/cdc-harness/pom.xml -DskipTests package
@@ -118,7 +121,7 @@ build_run_id: $BUILD_RUN_ID
 test_run_id: $TEST_RUN_ID
 artifact_type: integration-rpm
 test_profile: mysql-snapshot-changelog-savepoint
-jdk: 11
+jdk: $CDC_JDK
 flink_version: 1.20.1
 mysql_version: 8.0.36
 mysql_jdbc_driver: 8.0.27

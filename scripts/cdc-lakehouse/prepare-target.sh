@@ -39,11 +39,25 @@ source /workspace/scripts/cdc-lakehouse/prepare-s3.sh
     HADOOP_CLASSPATH="$(hadoop classpath)"
     test -n "$HADOOP_CLASSPATH"
     ;;
+  iceberg)
+    iceberg_repo=/dependencies/iceberg/1.12.0
+    grep -qx 'source_identity: 212aa894e919ff9fdf89160da4aadcbe6858ac01' "$iceberg_repo/manifest.yaml"
+    grep -qx 'compatibility_identity: 1afa381f72a739ec42aacc9d0edc6b7e19da6f561dded92ea7b6b7b889077045' "$iceberg_repo/manifest.yaml"
+    grep -qx 'test_status: PASS' "$iceberg_repo/manifest.yaml"
+    (cd "$iceberg_repo" && sha256sum -c SHA256SUMS)
+    printf '[cdc-iceberg]\nname=Published Iceberg\nbaseurl=file://%s\nenabled=1\ngpgcheck=0\n' "$iceberg_repo" > /etc/yum.repos.d/cdc-iceberg.repo
+    dnf -y --disablerepo='*' --enablerepo=OS,everything,cdc-flink,cdc-hadoop,cdc-common,cdc-iceberg install bigdata-iceberg-flink hadoop-client
+    test -s /usr/lib/flink/lib/iceberg-flink-runtime-1.20-1.12.0.jar
+    rpm -q bigdata-iceberg-flink > /evidence/iceberg-package.txt
+    export HADOOP_CLASSPATH
+    HADOOP_CLASSPATH="$(hadoop classpath)"
+    test -n "$HADOOP_CLASSPATH"
+    ;;
   *) echo "Unsupported CDC_TARGET: $CDC_TARGET" >&2; exit 1 ;;
 esac
 cp /workspace/scripts/cdc-lakehouse/PaimonTarget.java /tmp/cdc-harness/src/main/java/bigdata/ci/
 cp /workspace/scripts/cdc-lakehouse/WarehouseLocation.java /tmp/cdc-harness/src/main/java/bigdata/ci/
 
-for helper in LakehouseTarget HudiTarget; do
+for helper in LakehouseTarget HudiTarget IcebergTarget; do
   cp "/workspace/scripts/cdc-lakehouse/$helper.java" /tmp/cdc-harness/src/main/java/bigdata/ci/
 done
