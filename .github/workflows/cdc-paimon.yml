@@ -94,10 +94,24 @@ jobs:
           for component in flink/1.20.1 hadoop/3.4.3 common/3.6.0 paimon/2.1.0; do
             (cd "dependency-repository/$prefix/$component" && sha256sum -c SHA256SUMS)
           done
-      - uses: actions/cache@v4
+      - name: Restore shared harness repository
+        id: harness-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/cdc-paimon-maven/repository
+          key: cdc-paimon-m2-flink1201-jdk11-v2-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.connector }}
+          restore-keys: cdc-paimon-m2-flink1201-jdk11-v2-
+      - name: Seed from successful legacy connector cache
+        if: steps.harness-cache.outputs.cache-matched-key == ''
+        uses: actions/cache/restore@v4
         with:
           path: /tmp/cdc-paimon-maven
           key: cdc-paimon-${{ matrix.connector }}-flink1201-jdk11-v1
+          restore-keys: cdc-paimon-
+      - name: Clear failed transfer markers
+        run: |
+          mkdir -p /tmp/cdc-paimon-maven/repository
+          find /tmp/cdc-paimon-maven/repository -type f -name '*.lastUpdated' -delete
       - name: Start pinned source database
         env:
           CONNECTOR: ${{ matrix.connector }}
@@ -141,6 +155,19 @@ jobs:
           for phase in snapshot changes restored-rows; do
             grep -q '^paimon: PASS exact_rows=' "/tmp/cdc-paimon-evidence/$phase.txt"
           done
+      - name: Prepare dependency cache ownership
+        if: always()
+        run: |
+          if [[ -d /tmp/cdc-paimon-maven/repository ]]; then
+            sudo chown -R "$(id -u):$(id -g)" /tmp/cdc-paimon-maven/repository
+            find /tmp/cdc-paimon-maven/repository -type f -name '*.lastUpdated' -delete
+          fi
+      - name: Preserve downloaded harness dependencies
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/cdc-paimon-maven/repository
+          key: cdc-paimon-m2-flink1201-jdk11-v2-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.connector }}
       - name: Collect source logs
         if: always()
         run: |

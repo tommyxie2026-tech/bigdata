@@ -27,6 +27,17 @@ class LakehouseContract(unittest.TestCase):
         self.assertEqual(config['jobs']['test']['strategy']['matrix']['connector'],['mysql','postgres'])
         self.assertEqual(set(config['jobs']),{'test'})
         self.assertIn('CDC_TARGET: paimon',path.read_text())
+    def test_shared_repository_cache_and_bounded_harness_downloads(self):
+        workflow=(ROOT/'.github/workflows/cdc-paimon.yml').read_text()
+        self.assertIn('actions/cache/restore@v4',workflow)
+        self.assertIn('actions/cache/save@v4',workflow)
+        self.assertIn('path: /tmp/cdc-paimon-maven/repository',workflow)
+        self.assertIn('cdc-paimon-m2-flink1201-jdk11-v2-',workflow)
+        self.assertIn('Preserve downloaded harness dependencies',workflow)
+        prepare=(ROOT/'scripts/cdc-lakehouse/prepare-target.sh').read_text()
+        self.assertIn('MAVEN_RETRY_TOTAL_SECONDS:-600',prepare)
+        mysql=(ROOT/'scripts/flink-cdc-mysql/test.sh').read_text()
+        self.assertIn('retry-maven-downloads.sh /evidence/jdbc-driver-download.log',mysql)
     def test_existing_recovery_test_enables_target_before_harness_compile(self):
         for name in ['mysql','postgres']:
             source=(ROOT/f'scripts/flink-cdc-{name}/test.sh').read_text()

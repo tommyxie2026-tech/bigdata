@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Sourced by both connector test drivers before compilation. Keep original JDBC tests unchanged.
+# Sourced by both connector test drivers before compilation.
+# Small test harnesses must not inherit multi-hour component build budgets.
+export MAVEN_RETRY_ATTEMPTS="${MAVEN_RETRY_ATTEMPTS:-2}"
+export MAVEN_RETRY_ATTEMPT_SECONDS="${MAVEN_RETRY_ATTEMPT_SECONDS:-300}"
+export MAVEN_RETRY_TOTAL_SECONDS="${MAVEN_RETRY_TOTAL_SECONDS:-600}"
 case "${CDC_TARGET:-jdbc}" in
   jdbc) ;;
   paimon)
