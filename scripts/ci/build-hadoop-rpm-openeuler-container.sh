@@ -59,8 +59,11 @@ os_image=openeuler/openeuler:22.03-lts-sp4
 jdk=8
 EOF
 
+echo "== prepare known Hadoop dependencies =="
+bash /workspace/scripts/ci/prefetch-hadoop-maven-artifacts.sh \
+  "${WORK_ROOT}/artifacts/logs"
+
 echo "== build Hadoop RPMs with dependencies =="
-export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.rto=60000 -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Dmaven.wagon.httpconnectionManager.ttlSeconds=60"
 set +e
 bash /workspace/scripts/ci/retry-maven-downloads.sh \
   "${WORK_ROOT}/artifacts/logs/hadoop-build.log" \

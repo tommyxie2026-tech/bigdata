@@ -1,0 +1,31 @@
+name: Save component dependency downloads
+description: Preserve newly downloaded dependencies even when compilation fails.
+inputs:
+  key:
+    required: true
+    description: Immutable snapshot key from restore action
+runs:
+  using: composite
+  steps:
+    - name: Prepare changed downloads for snapshot
+      id: changes
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo chown -R "$(id -u):$(id -g)" /tmp/bigdata-component-cache
+        find /tmp/bigdata-component-cache/m2/repository -type f -name '*.lastUpdated' -delete
+        find /tmp/bigdata-component-cache/gradle -type f -name '*.lock' -delete
+        find /tmp/bigdata-component-cache/m2/repository /tmp/bigdata-component-cache/gradle/caches /tmp/bigdata-component-cache/gradle/wrapper -type f -printf '%p %s %T@\n' | LC_ALL=C sort | sha256sum > "${RUNNER_TEMP}/dependency-cache-after"
+        if cmp -s "${RUNNER_TEMP}/dependency-cache-before" "${RUNNER_TEMP}/dependency-cache-after"; then
+          echo 'changed=false' >> "${GITHUB_OUTPUT}"
+        else
+          echo 'changed=true' >> "${GITHUB_OUTPUT}"
+        fi
+    - uses: actions/cache/save@v4
+      if: steps.changes.outputs.changed == 'true'
+      with:
+        path: |
+          /tmp/bigdata-component-cache/m2/repository
+          /tmp/bigdata-component-cache/gradle/caches
+          /tmp/bigdata-component-cache/gradle/wrapper
+        key: ${{ inputs.key }}

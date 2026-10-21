@@ -2,6 +2,11 @@ name: Build Hadoop
 
 on:
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: Rebuild even when the exact tested RPM repository is current
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -9,8 +14,11 @@ on:
     paths:
       - ".github/workflows/build-hadoop.yml"
       - "scripts/ci/build-hadoop-rpm-openeuler-container.sh"
+      - "scripts/ci/retry-maven-downloads.sh"
+      - "scripts/ci/configure-maven-policy.py"
+      - "scripts/ci/run-with-deadline.py"
+      - ".github/actions/*-build-dependencies/**"
       - "scripts/ci/test-hadoop-rpm-openeuler-container.sh"
-      - "docs/version-matrix.md"
 
 permissions:
   contents: read
@@ -20,7 +28,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  repo_check:
+    if: inputs.force_build != true
+    uses: ./.github/workflows/check-component-repo.yml
+    with:
+      component: hadoop
+      version: '3.4.3'
+
   build:
+    needs: repo_check
+    if: ${{ always() && (inputs.force_build == true || (needs.repo_check.result == 'success' && needs.repo_check.outputs.already_current != 'true')) }}
     name: Hadoop 3.4.3 RPM on openEuler
     runs-on: ubuntu-latest
     timeout-minutes: 240
@@ -29,6 +46,8 @@ jobs:
       BIGTOP_REF: branch-3.6
       WORK_ROOT: /tmp/bigdata-hadoop-build
       OPENEULER_IMAGE: openeuler/openeuler:22.03-lts-sp4
+      MAVEN_MIRROR_URL: ${{ vars.MAVEN_MIRROR_URL }}
+      MAVEN_NETWORK_MODE: ${{ vars.MAVEN_NETWORK_MODE || 'online' }}
 
     steps:
       - name: Checkout
@@ -46,20 +65,39 @@ jobs:
       - name: Pull openEuler image
         run: docker pull "${OPENEULER_IMAGE}"
 
+      - name: Restore dependency downloads
+        id: dependencies
+        uses: ./.github/actions/restore-build-dependencies
+        with:
+          component: hadoop
+          version: '3.4.3'
+          jdk: '8'
+
       - name: Build Hadoop RPMs
+        id: build
+        timeout-minutes: 220
         shell: bash
         run: |
           set -euo pipefail
           rm -rf "${WORK_ROOT}"
           mkdir -p "${WORK_ROOT}"
-          docker run --rm \
+          docker run --rm --init \
+            -e MAVEN_MIRROR_URL -e MAVEN_NETWORK_MODE \
             --name bigdata-hadoop-build \
             -e BIGTOP_REF="${BIGTOP_REF}" \
             -e WORK_ROOT=/work \
             -v "${GITHUB_WORKSPACE}:/workspace:ro" \
             -v "${WORK_ROOT}:/work" \
+            -v /tmp/bigdata-component-cache/m2:/root/.m2 \
+            -v /tmp/bigdata-component-cache/gradle:/root/.gradle \
             "${OPENEULER_IMAGE}" \
             bash /workspace/scripts/ci/build-hadoop-rpm-openeuler-container.sh
+
+      - name: Save newly downloaded dependencies
+        if: ${{ always() && steps.dependencies.outcome == 'success' && (steps.build.outcome == 'success' || steps.build.outcome == 'failure') }}
+        uses: ./.github/actions/save-build-dependencies
+        with:
+          key: ${{ steps.dependencies.outputs.key }}
 
       - name: Publish summary
         if: always()

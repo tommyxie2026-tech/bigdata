@@ -14,11 +14,10 @@ mkdir -p "${ARTIFACTS}/rpms" "${ARTIFACTS}/logs" "${ARTIFACTS}/evidence"
 [[ "${EXPECTED_SOURCE_IDENTITY}" =~ ^[0-9a-f]{40}$ ]]
 [[ "${COMPONENT_RUNTIME_PACKAGES}" == trino-server-rpm ]]
 grep -qi openEuler /etc/os-release
-dnf -y install ca-certificates curl git gzip make openssl rpm-build rpmdevtools shadow-utils sudo tar unzip which openEuler-rpm-config
+dnf -y install python3 ca-certificates curl git gzip make openssl rpm-build rpmdevtools shadow-utils sudo tar unzip which openEuler-rpm-config
 source /workspace/scripts/ci/install-pinned-java-runtime.sh
 java -version
 javac -version
-export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.rto=60000 -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Dmaven.wagon.httpconnectionManager.ttlSeconds=60"
 rm -rf "${SOURCE_DIR}"
 git init "${SOURCE_DIR}"
 git -C "${SOURCE_DIR}" remote add origin https://github.com/trinodb/trino-packages.git

@@ -22,7 +22,7 @@ mkdir -p "${ARTIFACTS}/rpms" "${ARTIFACTS}/logs" "${ARTIFACTS}/evidence"
 [[ "${COMPONENT_RUNTIME_PACKAGES}" == "bigdata-paimon-spark bigdata-paimon-flink" ]]
 grep -qi openEuler /etc/os-release
 
-dnf -y install ca-certificates curl git java-11-openjdk-devel maven rpm-build tar
+dnf -y install python3 ca-certificates curl git java-11-openjdk-devel maven rpm-build tar
 javac_path="$(rpm -ql java-11-openjdk-devel | awk '/\/bin\/javac$/ && !found { print; found=1 } END { if (!found) exit 1 }')"
 [[ -n "${javac_path}" && -x "${javac_path}" ]] || { echo "JDK 11 javac not found in java-11-openjdk-devel." >&2; exit 1; }
 JAVA_HOME="$(dirname "$(dirname "${javac_path}")")"

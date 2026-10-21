@@ -1,0 +1,75 @@
+name: Dependency Policy
+on:
+  pull_request:
+    paths:
+      - '.github/actions/*-build-dependencies/**'
+      - '.github/workflows/dependency-policy.yml'
+      - '.github/workflows/build-one-component.yml'
+      - '.github/workflows/build-hadoop.yml'
+      - '.github/workflows/build-component.yml'
+      - 'scripts/ci/*maven*'
+      - 'scripts/ci/*dependency-policy*'
+      - 'scripts/ci/run-with-deadline.py'
+      - 'scripts/ci/fixtures/maven-offline/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/actions/*-build-dependencies/**'
+      - '.github/workflows/dependency-policy.yml'
+      - 'scripts/ci/*maven*'
+      - 'scripts/ci/*dependency-policy*'
+      - 'scripts/ci/run-with-deadline.py'
+      - 'scripts/ci/fixtures/maven-offline/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dependency-policy-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  offline:
+    name: openEuler cached offline rebuild
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise dependency deadlines and failure classification
+        run: python3 scripts/ci/test-build-dependency-policy.py
+      - name: Compile with network disabled after preparation
+        timeout-minutes: 25
+        run: bash scripts/ci/test-dependency-policy-openeuler.sh
+  cache:
+    name: Dependency cache round trip
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore previous dependency snapshot
+        id: dependencies
+        uses: ./.github/actions/restore-build-dependencies
+        with:
+          component: policy-probe
+          version: '1'
+          jdk: '8'
+          source_identity: fixture
+      - name: Simulate a new download and an uncached settings file
+        run: |
+          printf '%s' "${GITHUB_RUN_ID}" > /tmp/bigdata-component-cache/m2/repository/cache-probe.txt
+          echo 'must-not-be-cached' > /tmp/bigdata-component-cache/m2/settings.xml
+      - name: Save updated dependency snapshot
+        uses: ./.github/actions/save-build-dependencies
+        with:
+          key: ${{ steps.dependencies.outputs.key }}
+      - name: Remove local downloads before restoring
+        run: rm -rf /tmp/bigdata-component-cache
+      - name: Restore the new snapshot
+        uses: ./.github/actions/restore-build-dependencies
+        with:
+          component: policy-probe
+          version: '1'
+          jdk: '8'
+          source_identity: fixture
+      - name: Check snapshot content and credential exclusion
+        run: |
+          test "$(cat /tmp/bigdata-component-cache/m2/repository/cache-probe.txt)" = "${GITHUB_RUN_ID}"
+          test ! -e /tmp/bigdata-component-cache/m2/settings.xml

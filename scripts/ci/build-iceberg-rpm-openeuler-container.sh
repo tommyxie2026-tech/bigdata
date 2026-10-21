@@ -19,7 +19,7 @@ mkdir -p "${ARTIFACTS}/rpms" "${ARTIFACTS}/logs" "${ARTIFACTS}/evidence"
 [[ "${EXPECTED_SOURCE_IDENTITY}" =~ ^[0-9a-f]{40}$ ]]
 [[ "${COMPONENT_RUNTIME_PACKAGES}" == "bigdata-iceberg-spark bigdata-iceberg-flink" ]]
 grep -qi openEuler /etc/os-release
-dnf -y install ca-certificates curl git java-17-openjdk-devel make openssl rpm-build rpmdevtools tar
+dnf -y install python3 ca-certificates curl git java-17-openjdk-devel make openssl rpm-build rpmdevtools tar
 java -version
 javac -version
 rm -rf "${SOURCE_DIR}"

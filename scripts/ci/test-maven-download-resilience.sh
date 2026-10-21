@@ -66,11 +66,11 @@ EOF
     fail "Maven core prefetch missing"
   grep -q -- '-Dartifact=org.powermock:powermock-api-mockito:1.7.4' "${root}/calls" ||
     fail "PowerMock Mockito API prefetch missing"
-  [[ "$(wc -l < "${root}/calls" | tr -d ' ')" -eq 6 ]] || fail "unexpected prefetch command count"
+  [[ "$(wc -l < "${root}/calls" | tr -d ' ')" -eq 7 ]] || fail "unexpected prefetch command count"
 }
 
 test_component_build_bounds_and_prefetches_maven() {
-  grep -q -- '-Dmaven.wagon.rto=60000' "${BUILD_SCRIPT}" ||
+  grep -q -- '-Dmaven.wagon.rto=60000' "${RETRY_SCRIPT}" ||
     fail "component build does not bound Maven read timeouts"
   grep -q 'prefetch-hadoop-maven-artifacts.sh' "${BUILD_SCRIPT}" ||
     fail "component build does not prefetch known Hadoop dependencies"
