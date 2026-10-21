@@ -1,0 +1,52 @@
+name: Ambari Metrics Python 3 Monitor
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ambari-metrics-monitor.yml'
+      - 'scripts/ambari-metrics/*monitor*'
+      - 'scripts/ambari-metrics/verify_monitor_payload.py'
+      - 'scripts/ambari-metrics/contract.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ambari-metrics-monitor.yml'
+      - 'scripts/ambari-metrics/*monitor*'
+      - 'scripts/ambari-metrics/verify_monitor_payload.py'
+      - 'scripts/ambari-metrics/contract.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ambari-metrics-monitor-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  monitor:
+    name: Real host metrics and Monitor restart in openEuler
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/checkout@v4
+        with:
+          repository: apache/ambari-metrics
+          ref: ce919386e963841ea37f032c5ba6ed9c48298dd8
+          path: metrics-source
+          persist-credentials: false
+      - name: Verify source and port actual Monitor, then collect real host metrics
+        timeout-minutes: 13
+        run: |
+          set -euo pipefail
+          test "$(git -C metrics-source rev-parse HEAD)" = ce919386e963841ea37f032c5ba6ed9c48298dd8
+          mkdir -p /tmp/metrics-monitor-work
+          timeout --kill-after=20 720 docker run --rm --init \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$GITHUB_WORKSPACE/metrics-source:/source:ro" \
+            -v /tmp/metrics-monitor-work:/work openeuler/openeuler:22.03-lts-sp4 \
+            bash /workspace/scripts/ambari-metrics/test-monitor-container.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ambari-metrics-monitor-python3-host-evidence
+          path: /tmp/metrics-monitor-work
+          retention-days: 30
