@@ -56,7 +56,7 @@ services:
       - '${PROXY_CERT_DIR:?Provide TLS certificate directory}:/certificates:ro'
     ports:
       - '127.0.0.1:8443:8443'
-    networks: [internal]
+    networks: [internal, frontend]
 volumes:
   maven-data:
   npm-data:
@@ -65,5 +65,7 @@ networks:
   internal:
     internal: true
     name: '${COMPOSE_PROJECT_NAME:-dependency-proxy}-internal'
+  frontend:
+    name: '${COMPOSE_PROJECT_NAME:-dependency-proxy}-frontend'
   egress:
     name: '${COMPOSE_PROJECT_NAME:-dependency-proxy}-egress'

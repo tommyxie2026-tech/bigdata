@@ -16,6 +16,7 @@ class ProxyProfileTests(unittest.TestCase):
         profile=yaml.safe_load((ROOT/'compose.yaml').read_text())
         self.assertEqual(set(profile['services']),{'maven','npm','pypi','tls'})
         self.assertTrue(profile['networks']['internal']['internal'])
+        self.assertEqual(profile['services']['tls']['networks'],['internal','frontend'])
         for name in ['maven','npm','pypi']:
             server=profile['services'][name]
             self.assertNotIn('ports',server)
