@@ -14,19 +14,35 @@ grep -qx 'status: PASS' "$input/evidence/evidence.md"
 work=/work/package
 mkdir -p "$work" /work/downloads /work/output/rpms /work/output/evidence
 fetch() {
-  local filename=$1 checksum=$2 url=$3
+  local filename=$1 checksum=$2 url
+  shift 2
   if [[ -f "/work/downloads/$filename" ]] && echo "$checksum  /work/downloads/$filename" | sha512sum -c -; then return; fi
-  curl --fail --location --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 360 \
-    --retry 2 --retry-max-time 600 --output "/work/downloads/$filename.partial" "$url"
-  echo "$checksum  /work/downloads/$filename.partial" | sha512sum -c -
-  mv "/work/downloads/$filename.partial" "/work/downloads/$filename"
+  for url in "$@"; do
+    # Keep the verified release identity while resuming progress across transports.
+    # curl's internal --retry truncates back to the starting offset; try URLs explicitly.
+    if curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' \
+      --connect-timeout 10 --max-time 240 --continue-at - \
+      --output "/work/downloads/$filename.partial" "$url"; then
+      if echo "$checksum  /work/downloads/$filename.partial" | sha512sum -c -; then
+        mv "/work/downloads/$filename.partial" "/work/downloads/$filename"
+        return
+      fi
+      # A complete mismatched file is not resumable and never enters the trusted cache.
+      rm -f "/work/downloads/$filename.partial"
+    fi
+  done
+  echo "No transport completed the checksum-pinned distribution: $filename" >&2
+  return 1
 }
+
 fetch hbase-2.4.13-bin.tar.gz \
   944208a875da7da345d1918ac012f512a6e32032c4b6702b22c6ff251c4bb2787695b6b3b7018034fad0e6cbb2dd2a7454d961c8b270539a0df64a1d5591390d \
-  https://archive.apache.org/dist/hbase/2.4.13/hbase-2.4.13-bin.tar.gz
+  https://archive.apache.org/dist/hbase/2.4.13/hbase-2.4.13-bin.tar.gz \
+  https://repo.huaweicloud.com/apache/hbase/2.4.13/hbase-2.4.13-bin.tar.gz
 fetch phoenix-hbase-2.4-5.1.2-bin.tar.gz \
   9a671abf73a5c56f1adb173ef8a0dca33cbe15f219e7dc55d92a6f136a8e3549593d2f14bd185f221e1238554d13f86b75253e7e05e53f699fe4c7e1fe854c48 \
-  https://downloads.apache.org/phoenix/phoenix-5.1.2/phoenix-hbase-2.4-5.1.2-bin.tar.gz
+  https://downloads.apache.org/phoenix/phoenix-5.1.2/phoenix-hbase-2.4-5.1.2-bin.tar.gz \
+  https://archive.apache.org/dist/phoenix/phoenix-5.1.2/phoenix-hbase-2.4-5.1.2-bin.tar.gz
 mkdir -p "$work/extracted"
 tar -xzf /work/downloads/hbase-2.4.13-bin.tar.gz -C "$work/extracted"
 tar -xzf /work/downloads/phoenix-hbase-2.4-5.1.2-bin.tar.gz -C "$work/extracted"

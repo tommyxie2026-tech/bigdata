@@ -10,7 +10,9 @@ It does not rebuild Collector Java or replace the Collector with a fixture.
 Collector embeds upstream-compatible HBase 2.4.13 and Phoenix 5.1.2.
 Their distributions are fetched only on CI, with SHA-512 values pinned from
 the official Apache release checksum files. Distribution archives are cached;
-each restored archive is checked again before extraction. The Monitor port
+each restored archive is checked again before extraction. HBase can resume from
+the Apache archive to a transport mirror with the same pinned Apache SHA-512;
+complete mismatches are discarded. No mirror-supplied digest is trusted. The Monitor port
 records original and converted Python hashes, uses system Python 3/psutil,
 and generates runtime JSON from the upstream commented configuration.
 
