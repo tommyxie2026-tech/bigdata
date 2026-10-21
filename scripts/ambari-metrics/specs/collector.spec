@@ -1,3 +1,6 @@
+# Repackage validated upstream binaries; no native compilation or debug sources.
+%global debug_package %{nil}
+
 Name: ambari-metrics-collector
 Version: 3.0.0
 Release: 1.oe2203sp4
