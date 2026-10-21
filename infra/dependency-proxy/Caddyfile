@@ -1,0 +1,13 @@
+{
+    admin off
+    auto_https off
+}
+:8443 {
+    tls /certificates/tls.crt /certificates/tls.key
+    reverse_proxy nexus:8081 {
+        transport http {
+            dial_timeout 5s
+            response_header_timeout 30s
+        }
+    }
+}

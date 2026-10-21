@@ -1,0 +1,31 @@
+services:
+  nexus:
+    image: sonatype/nexus3:3.97.1-alpine@sha256:ffed04698ded3565ca3b40f4abd063d59b63c2fbeb134170e095bc1197931cd5
+    init: true
+    restart: unless-stopped
+    environment:
+      INSTALL4J_ADD_VM_PARAMS: '-Xms1024m -Xmx1536m -XX:MaxDirectMemorySize=1024m -Djava.util.prefs.userRoot=/nexus-data/javaprefs'
+    volumes:
+      - nexus-data:/nexus-data
+    ports:
+      - '127.0.0.1:8081:8081'
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', '--silent', '--connect-timeout', '2', '--max-time', '5', 'http://127.0.0.1:8081/service/rest/v1/status']
+      interval: 10s
+      timeout: 6s
+      start_period: 120s
+      retries: 30
+    stop_grace_period: 120s
+  tls:
+    image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    restart: unless-stopped
+    depends_on:
+      nexus:
+        condition: service_healthy
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - '${PROXY_CERT_DIR:?Provide TLS certificate directory}:/certificates:ro'
+    ports:
+      - '127.0.0.1:8443:8443'
+volumes:
+  nexus-data:

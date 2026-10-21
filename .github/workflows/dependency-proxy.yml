@@ -1,0 +1,72 @@
+name: Dependency proxy cache
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/dependency-proxy.yml'
+      - 'infra/dependency-proxy/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/dependency-proxy.yml'
+      - 'infra/dependency-proxy/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dependency-proxy-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PROXY_CERT_DIR: /tmp/proxy-certificates
+      PROXY_PASSWORD_FILE: /tmp/proxy-admin-password
+      PROXY_CA_FILE: /tmp/proxy-certificates/tls.crt
+      PROXY_EVIDENCE_ROOT: /tmp/proxy-evidence
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate deployment and configuration contracts
+        run: |
+          python3 -m pip install --disable-pip-version-check PyYAML==6.0.3
+          python3 infra/dependency-proxy/test_proxy.py
+          docker compose -f infra/dependency-proxy/compose.yaml config --quiet
+      - name: Create disposable TLS identity and start pinned proxy
+        timeout-minutes: 15
+        working-directory: infra/dependency-proxy
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$PROXY_CERT_DIR"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout "$PROXY_CERT_DIR/tls.key" -out "$PROXY_CERT_DIR/tls.crt" \
+            -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' 2>/dev/null
+          docker compose up -d
+          for _ in $(seq 1 180); do
+            if curl --fail --silent --connect-timeout 2 --max-time 5 http://127.0.0.1:8081/service/rest/v1/status >/dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail --silent --connect-timeout 2 --max-time 5 http://127.0.0.1:8081/service/rest/v1/status >/dev/null
+          umask 077
+          docker compose exec -T nexus cat /nexus-data/admin.password > /tmp/proxy-initial-password
+          python3 configure.py --password-file /tmp/proxy-initial-password \
+            --rotate-admin-to "$PROXY_PASSWORD_FILE" --allow-anonymous
+      - name: Prove cold cache, blocked-upstream warm fetch and restart persistence
+        timeout-minutes: 8
+        run: bash infra/dependency-proxy/verify-cache.sh
+      - name: Collect server logs and stop disposable instance
+        if: always()
+        working-directory: infra/dependency-proxy
+        run: |
+          mkdir -p "$PROXY_EVIDENCE_ROOT"
+          docker compose logs --no-color > "$PROXY_EVIDENCE_ROOT/proxy.log" 2>&1 || true
+          docker compose down --volumes || true
+          rm -f /tmp/proxy-initial-password "$PROXY_PASSWORD_FILE"
+          rm -rf "$PROXY_CERT_DIR"
+          # Keep checksum/evidence, not the downloaded demonstration JARs.
+          rm -f "$PROXY_EVIDENCE_ROOT"/*.jar
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-proxy-cache-evidence
+          path: /tmp/proxy-evidence
+          retention-days: 30
