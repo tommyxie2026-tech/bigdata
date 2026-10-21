@@ -11,7 +11,8 @@ report_failure() {
 trap report_failure ERR
 expected=ce919386e963841ea37f032c5ba6ed9c48298dd8
 timeout 600 dnf -y --setopt=timeout=30 --setopt=retries=2 install java-1.8.0-openjdk-devel maven python3 findutils git
-[[ "$(git -c safe.directory=/source -C /source rev-parse HEAD)" == "$expected" ]]
+git config --global --add safe.directory /source
+[[ "$(git -C /source rev-parse HEAD)" == "$expected" ]]
 javac_path="$(rpm -ql java-1.8.0-openjdk-devel | awk '/[/]bin[/]javac$/ && !found {print;found=1}')"
 [[ -n "$javac_path" && -x "$javac_path" ]]
 JAVA_HOME="$(dirname "$(dirname "$javac_path")")"
