@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import queue
+import socket
 import subprocess
 import sys
 import threading
@@ -43,7 +44,7 @@ def main():
     conf=Path('/etc/ambari-metrics-monitor/conf');conf.mkdir(parents=True,exist_ok=True)
     (conf/'metric_groups.conf').write_text(metric_groups_json((args.config_source/'metric_groups.conf').read_text()))
     config=configparser.RawConfigParser();config.read(args.config_source/'metric_monitor.ini')
-    for section,key,value in [('default','metrics_servers','127.0.0.1'),('emitter','send_interval','12'),
+    for section,key,value in [('default','metrics_servers','127.0.0.1'),('default','hostname',socket.getfqdn().lower()),('emitter','send_interval','12'),
         ('emitter','kinit_cmd',''),('emitter','klist_cmd',''),('collector','collector_sleep_interval','1'),
         ('collector','port',str(server.server_port))]:
         config.set(section,key,value)
