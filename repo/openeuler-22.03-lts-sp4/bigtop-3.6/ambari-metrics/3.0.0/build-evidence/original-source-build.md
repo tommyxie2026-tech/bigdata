@@ -1,0 +1,11 @@
+stage: compile
+component: ambari-metrics
+version: 3.0.0
+source_identity: ce919386e963841ea37f032c5ba6ed9c48298dd8
+build_run_id: 39637960371
+jdk: 8
+collector_entrypoint: PASS
+monitor_source: PRESERVED_UNPORTED
+rpm_build: NOT_RUN
+installation_and_collection: NOT_RUN
+status: PASS

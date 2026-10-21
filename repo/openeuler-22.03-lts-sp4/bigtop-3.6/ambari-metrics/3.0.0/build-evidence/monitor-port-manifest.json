@@ -1,0 +1,79 @@
+{
+  "source_identity": "ce919386e963841ea37f032c5ba6ed9c48298dd8",
+  "converter": "fissix==24.4.24",
+  "system_dependency": "python3-psutil",
+  "files": {
+    "main.py": {
+      "source_sha256": "4fb4ed852c70c17114b7f119f51c3495edb23d5ed9f09f7eabce1875f9b424c2",
+      "ported_sha256": "4d6036aea5fbb00da8b914af3cfd45ce77015495f371f4612c6b0b6a68aba9fe"
+    },
+    "__init__.py": {
+      "source_sha256": "a4522eb4aea6b98f8eb20159660760742c6be467ecc4f5d7cbb8e102fea10377",
+      "ported_sha256": "403e28257c24ac2d2081d9c808a7c61ee1a12eb29a63efa0cb9168183926ad81"
+    },
+    "core/__init__.py": {
+      "source_sha256": "678cd528ae673dd6f320cb08b858e26583107d14ff9376dccdbd19d16b028c71",
+      "ported_sha256": "e8d54d6fca5bcd94f7bfc4f7108be2d3f3dd37af6408a6e97bebe41fd9b06ed9"
+    },
+    "core/aggregator.py": {
+      "source_sha256": "15f3fab53292f1ade4a5f67907696106a89ce5f19fc800573ce60d021ae56b96",
+      "ported_sha256": "c604d6c8ef1fe36662413ae7636ddc7680afcc964fa59c8c15180e6548b101ba"
+    },
+    "core/application_metric_map.py": {
+      "source_sha256": "b0c1a78fea825942deacc5a3a4ffa95171d0e16a630b9cb5e541ba9aa3fbd4ed",
+      "ported_sha256": "145e333278fcd9f44b5e8a4d0dbd935a0b897cd37d56b31bd17332c63120250f"
+    },
+    "core/blacklisted_set.py": {
+      "source_sha256": "366c7d4548ee2a220aefdefdfa184d2a23433529c19149ccf3f832121b76edd5",
+      "ported_sha256": "11dc0972400cfe365b8f7e7e9ae22931c670a97fbe825bd34fe454a71dec5a0d"
+    },
+    "core/config_reader.py": {
+      "source_sha256": "2438baac53ec472ac27ef6f591b709f65666d3c054499bbc49468807b8c6db3d",
+      "ported_sha256": "9d8ffad5cfe0d15a3589907f5d95b4e2654527d8374ecdbe47f4167b9a146163"
+    },
+    "core/controller.py": {
+      "source_sha256": "7751491db6756ca14bb65e159142345e12406aaad254a6a25e9020bb8b2ebea6",
+      "ported_sha256": "52f5e158ec5ad9a757afaf28c9859de1a0d1ab9e81fd1daae659c21f088f7b61"
+    },
+    "core/emitter.py": {
+      "source_sha256": "aed1eaa05ff4f257a17ae18d18a615f5e681a11ae41977a01026cc34de16526a",
+      "ported_sha256": "63c05d27eeceb36c117670287b4bbaa792e0236b9312f8a0d83003f8b39ecef6"
+    },
+    "core/event_definition.py": {
+      "source_sha256": "8e63cdf0b8ee91422248f1076a04b791b86202f34d59ce7992e8d6d7e382a63b",
+      "ported_sha256": "460c70bc785ccc5ced3715defd61c3bfb1a4c2dc560c8b201b6937678f760144"
+    },
+    "core/host_info.py": {
+      "source_sha256": "609684befbdb7a2bf264a1d85581f4f25911079391689e4e86f7b9934bccab09",
+      "ported_sha256": "071576138adfb38d8f092e76f57c1fdb70b295979d5b50d166f47e0da72214b5"
+    },
+    "core/instance_type_provider.py": {
+      "source_sha256": "887fe2c264bbc2fe54fdecd799ddd36e8fbca3379a9b3a749b55ae86e2b3542c",
+      "ported_sha256": "4475aeff7cb3a03ec75914441f1d32f8930211642374910c4d488413a58e38c7"
+    },
+    "core/krberr.py": {
+      "source_sha256": "f456707872e1f6dfc02ef8388570b6b709dc7ebda3d8a513bdf5de7d95394f4c",
+      "ported_sha256": "2bee52b253280e1c734dcf16ef8d12a83e182febeec97940c913a25005583415"
+    },
+    "core/metering.py": {
+      "source_sha256": "927c4f297f8ce51ead848fc1f19a642fb01e7bd5e8d932d858d3128516344647",
+      "ported_sha256": "b8e768e426f5ee3846899fa7bc7ed676361e1a41d48697cd96a90bda08a76f23"
+    },
+    "core/metric_collector.py": {
+      "source_sha256": "480ee6a2716de0c264634732ce9611ba08c9a1f945c335b43e512601300efa62",
+      "ported_sha256": "84cd30c28a2a71ac2bb7654e137ec17b14203ea6fffd65d0b3435da2f6314064"
+    },
+    "core/security.py": {
+      "source_sha256": "5acd070522a46c080fdebddc70b7c45407dda70e3d67b3fc93c271cc30d346ef",
+      "ported_sha256": "494cca337a71301a4c1767abd26f7cc0810da2acf2c8452f72100b914b2bf9b1"
+    },
+    "core/spnego_kerberos_auth.py": {
+      "source_sha256": "c05b1cf6a3c669a1466f1407a7a160b81c4071aa674f718ec16aa92431d0d396",
+      "ported_sha256": "d7f5553b4906d9166cfd748728f777e240cb6e109a8fe9f10b8fadb58d2f5866"
+    },
+    "core/stop_handler.py": {
+      "source_sha256": "41157176aa340ce6ff78b05a4b7717a574a2d91fee517c05992d0e7504cb51d7",
+      "ported_sha256": "c57720beaffe38324700b693b23650a6771dedd44ffc2a9b1a908089fbbe97db"
+    }
+  }
+}

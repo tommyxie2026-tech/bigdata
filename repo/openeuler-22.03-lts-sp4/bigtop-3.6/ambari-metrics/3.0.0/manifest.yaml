@@ -1,0 +1,19 @@
+schema: bigdata.rpm-repo/v2
+component: ambari-metrics
+version: 3.0.0
+bigtop_version: 3.6.0
+artifact_type: management-plane-rpm
+test_profile: real-host-cpu-memory-collector-restart-persistence
+jdk: 8
+jdk_package: java-1.8.0-openjdk-devel
+build_run_id: 39653729447
+test_run_id: 39653729447
+tested_artifact_run_id: 39653729447
+promotion_workflow_commit: 74fc023f5f2fd97dd70767aa358350beb147c7cb
+source_identity: ce919386e963841ea37f032c5ba6ed9c48298dd8
+compatibility_identity: 84b6a1fc99d6bf3fa67b378ccb17e5f1875f3cfeb3bdfe6c8958eb645342194c
+compatibility_identity_format: metrics-packaging-inputs-json/v1
+os: openEuler 22.03 LTS SP4
+rpm_count: 2
+test_status: PASS
+repository_layout: split-runtime/v2

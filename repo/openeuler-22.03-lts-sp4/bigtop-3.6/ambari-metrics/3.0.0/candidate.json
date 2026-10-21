@@ -1,0 +1,30 @@
+{
+  "schema": "bigdata.metrics-candidate/v1",
+  "component": "ambari-metrics",
+  "version": "3.0.0",
+  "source_identity": "ce919386e963841ea37f032c5ba6ed9c48298dd8",
+  "compatibility_identity": "84b6a1fc99d6bf3fa67b378ccb17e5f1875f3cfeb3bdfe6c8958eb645342194c",
+  "packaging_inputs": {
+    "scripts/ambari-metrics/package-rpms.sh": "d4d9f021c4516a65782b0251156940c8a699f0fa68a464a8d09941934fd9a37e",
+    "scripts/ambari-metrics/prepare-rpm-config.py": "c110f82b254b07c6bf351f231157301bf32e28215399a8332e973658060cf47d",
+    "scripts/ambari-metrics/runtime.sh": "e605dfc946e095a39f593404c911074620180989c6b23fea1f4e9464371bc16e",
+    "scripts/ambari-metrics/port_monitor.py": "92dc5e82b390b3c05b3875b3ee2515e1f3728209d3fb46c5a92651789a34667a",
+    "scripts/ambari-metrics/contract.json": "936bf9de0a508d13ecbede8444ad514ac046937ab0c7b571c0aa67cc1929f06d",
+    "scripts/ambari-metrics/specs/collector.spec": "5d842276a9a18a4548ac9e194b0328099b89eb9573d450c73bf8930cd5d4a3d7",
+    "scripts/ambari-metrics/specs/monitor.spec": "881abcab7a5c1c5b5da06617fe7c91dc9365c588aed75c5910d1f64583fe54b9",
+    "scripts/ambari-metrics/wait_collector.py": "9e31f26a7ccb354ddaa1a837038c4a3cd74c25e7db2e3cd51a8588f8973158d4",
+    "scripts/ambari-metrics/units/ambari-metrics-collector.service": "16c4ba904a82a71339599c7c93c50c74685b0eb7f7f9a32c9fe2f557f5c42747",
+    "scripts/ambari-metrics/units/ambari-metrics-hbase.service": "ac3ac9a85281fcf9a3b369715856b14e0b5f4e55bd463a32cc2330d38138e5cd",
+    "scripts/ambari-metrics/units/ambari-metrics-monitor.service": "4820acde9d8162cfb89602508022cb8ddcafb90e1f77ef70acd00b3943284253"
+  },
+  "build_run_id": 39653729447,
+  "test_run_id": 39653729447,
+  "producer_head": "4309affd4a1b131cfdcf55418a77bdfd0d9f1700",
+  "tested_head": "4309affd4a1b131cfdcf55418a77bdfd0d9f1700",
+  "rpm_sha256": {
+    "ambari-metrics-collector-3.0.0-1.oe2203sp4.x86_64.rpm": "4fbb8f691b96b26ad9c307775cfef1d14d9c03bc9220594c948cc774faab25c9",
+    "ambari-metrics-monitor-3.0.0-1.oe2203sp4.noarch.rpm": "2ef16d996d1c1def3e7913aa3f765bed588d0a314b665a708b2be4313ddbbd0b"
+  },
+  "actual_acceptance": "PASS",
+  "publication": "NOT_RUN"
+}
