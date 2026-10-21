@@ -1,0 +1,23 @@
+{
+  "artifact_name": "ambari-metrics-3.0.0-rpm-installation-evidence",
+  "files": {
+    "acceptance.json": "6cf60b6588765a381ac30699ac536ad2b2790fb2f10160e109ce1b6a29e2e657",
+    "collector-runtime-logs/ambari-metrics-collector.log": "a70d07283445170e0794865a151e99bf687fae50b30726a101c8bf1fe3e104fb",
+    "initial-collector.log": "cbcd149963f29224df504d6f9dd240fc7bae9d527f14fac7bbca41c3a0ea7d21",
+    "initial-hbase.log": "07c12c0de44a199aeafe08e403f67408658d49c9fc516669516f06ba6b78c7f5",
+    "initial-monitor.log": "1c0f54486a2410ce5786d1fefe82349b12da6bebb4edeb360d5d86a196732e20",
+    "initial-query.json": "d8d221572394ef969e9bb2b4ddfa003c80022f5419fa2a59229e8435639b78d7",
+    "installed-packages.txt": "887b7d11e411ac58fa76c1601a8e109b4c9528574b69c06c10c01425db3539d8",
+    "monitor-runtime-logs/ambari-metrics-monitor.log": "b76b00120a019b54e0c35c98a899e4bbdbbcc39456286024455e94ed2d162a76",
+    "package.md": "8c0c455e5bb0bff6094354879f3037c82f81e6688d48bae053de7750c2426cb0",
+    "restarted-collector.log": "1d1c2c36fa24e114ead26c3b501e7aa7699bbf7bfef7564d29053868881f6271",
+    "restarted-hbase.log": "a474df7b31de651577ee545aa490783e2c7211e09c7ce241bd332d7c82e4daeb",
+    "restarted-monitor.log": "1c0f54486a2410ce5786d1fefe82349b12da6bebb4edeb360d5d86a196732e20",
+    "restarted-query.json": "5ecd965a1fa7cf9c8ebd1b66a8887367d01d1c0081cc956318da8ac17867ea4a",
+    "rpm-verification.txt": "9f4ee2e1bc4d6666eceb63473c65d3fb6cb3680e4d2172ead84377d23f702a9a",
+    "unexpected-rpm-changes.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "unit-verification.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "repository": "tommyxie2026-tech/bigdata",
+  "test_run_id": 39653729447
+}

@@ -1,0 +1,22 @@
+{
+  "component": "ambari-metrics",
+  "version": "3.0.0",
+  "source_identity": "ce919386e963841ea37f032c5ba6ed9c48298dd8",
+  "clean_openEuler_rpm_install": "PASS",
+  "actual_host_collection": "PASS",
+  "collector_timestamp_query": "PASS",
+  "restart_historical_values": "PASS",
+  "fresh_metrics_after_restart": "PASS",
+  "service_processes": [
+    {
+      "hbase": 280,
+      "collector": 281,
+      "monitor": 1472
+    },
+    {
+      "hbase": 1702,
+      "collector": 1703,
+      "monitor": 2281
+    }
+  ]
+}
