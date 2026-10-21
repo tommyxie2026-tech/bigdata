@@ -22,6 +22,12 @@ class TimingTests(unittest.TestCase):
         self.assertEqual(result['original_build_run_id'],'10')
         self.assertEqual(result['reused_test_run_id'],'20')
         self.assertEqual(result['run_status'],'in_progress')
+    def test_skipped_or_live_jobs_have_no_runtime_even_with_api_timestamps(self):
+        for status, conclusion in [('completed', 'skipped'), ('in_progress', None)]:
+            job={'status':status,'conclusion':conclusion,
+                 'started_at':'2026-10-21T15:01:00Z','completed_at':'2026-10-21T15:01:00Z'}
+            self.assertIsNone(timing_report({},[job],component='hudi')['jobs'][0]['duration_seconds'])
+
     def test_missing_or_reversed_times_are_unknown(self):
         run={'id':1,'created_at':'2026-10-21T15:01:00Z','run_started_at':'2026-10-21T15:00:00Z'}
         self.assertIsNone(timing_report(run,[],component='x')['run_queue_seconds'])

@@ -29,7 +29,8 @@ def timing_report(run, jobs, *, component, build_run_id='', test_run_id=''):
             'reused_test_run_id':test_run_id or None,
             'jobs':[{'id':job.get('id'), 'name':job.get('name'),
                      'status':job.get('status'), 'conclusion':job.get('conclusion'),
-                     'duration_seconds':elapsed(job.get('started_at'),job.get('completed_at'))}
+                     'duration_seconds':(elapsed(job.get('started_at'),job.get('completed_at'))
+                        if job.get('status') == 'completed' and job.get('conclusion') != 'skipped' else None)}
                     for job in jobs]}
 
 
