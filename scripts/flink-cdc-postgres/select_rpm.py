@@ -91,6 +91,14 @@ def choose_build(current, repository, current_run_id, published):
         if tree.get("truncated"):
             raise ValueError("Cannot verify incomplete input tree")
         original = {e["path"]: e["sha"] for e in tree["tree"] if e["path"] in INPUTS}
+        if published and run.get("head_repository", {}).get("full_name") == repository:
+            if input_identity(original) != published["build_input_identity"]:
+                raise ValueError("Published RPM build identity does not match its original input tree")
+            if all(original.get(name) and current.get(name) for name in PAYLOAD_INPUTS) and any(
+                    original[name] != current[name] for name in PAYLOAD_INPUTS):
+                # A real recipe/contract change must reach PR Build/Test. The
+                # unchanged-version checksum gate still requires release review.
+                return "", input_identity(current)
         artifacts = api("actions/runs/" + str(run["id"]) + "/artifacts?per_page=100")["artifacts"]
         if reusable(run, jobs, artifacts, original, current, repository):
             identity = input_identity(original)

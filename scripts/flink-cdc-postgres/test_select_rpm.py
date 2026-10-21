@@ -38,11 +38,17 @@ class ReuseTests(unittest.TestCase):
         self.assertEqual(identity, input_identity(f["original"]))
         self.assertNotEqual(identity, input_identity(f["current"]))
     def test_unprovable_published_build_does_not_fall_back_to_recompilation(self):
-        for values in ({"expired":True},{"changed":True}):
+        for values in ({"expired":True},):
             f, replies, published=self.choose_fixture(**values)
             with patch("select_rpm.api", side_effect=lambda path: replies[path]):
                 with self.assertRaises(ValueError):
                     choose_build(f["current"], "owner/repo", "20", published)
+    def test_real_payload_change_reaches_a_new_pr_build(self):
+        f, replies, published=self.choose_fixture(changed=True)
+        with patch("select_rpm.api", side_effect=lambda path: replies[path]):
+            selected, identity=choose_build(f["current"], "owner/repo", "20", published)
+        self.assertEqual(selected, "")
+        self.assertEqual(identity, input_identity(f["current"]))
     def test_published_build_identity_mismatch_is_rejected(self):
         f, replies, published=self.choose_fixture()
         published["build_input_identity"]="wrong"
