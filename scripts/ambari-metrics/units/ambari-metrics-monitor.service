@@ -1,0 +1,19 @@
+[Unit]
+Description=Ambari Metrics host Monitor
+After=network.target ambari-metrics-collector.service
+
+[Service]
+User=ams
+Group=ams
+Type=simple
+StateDirectory=ambari-metrics-monitor
+LogsDirectory=ambari-metrics-monitor
+RuntimeDirectory=ambari-metrics-monitor
+WorkingDirectory=/usr/lib/ambari-metrics-monitor
+ExecStart=/usr/bin/python3 /usr/lib/ambari-metrics-monitor/main.py
+TimeoutStopSec=20
+KillMode=control-group
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
