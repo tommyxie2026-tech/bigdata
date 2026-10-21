@@ -1,0 +1,19 @@
+schema: bigdata.rpm-repo/v2
+component: hadoop-aws-sdk
+version: 2.35.4
+bigtop_version: 3.6.0
+artifact_type: optional-dependency-rpm
+test_profile: hadoop-s3a-https-multipart-restart
+jdk: 8
+jdk_package: java-1.8.0-openjdk-devel
+build_run_id: 39616625470
+test_run_id: 39621962743
+tested_artifact_run_id: 39621962743
+promotion_workflow_commit: b0e0688b4365828c6e1117b1fdffd33438ddad4e
+source_identity: db4b55f24ad1b4e70f17eb1717a4de76a8dadc5a27d764be7c44ff67b2c1c677
+compatibility_identity: cb52b3aaca64bb2de5990a2cfd0a95ae32c388c42429cf876ee87373f0539626
+compatibility_identity_format: hadoop-aws-sdk-contract-json/v1
+os: openEuler 22.03 LTS SP4
+rpm_count: 1
+test_status: PASS
+repository_layout: split-runtime/v2

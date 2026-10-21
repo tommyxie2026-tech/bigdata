@@ -1,0 +1,44 @@
+{
+  "status": "PASS",
+  "build_run_id": "39616625470",
+  "test_run_id": "39621962743",
+  "test_head_sha": "b0e0688b4365828c6e1117b1fdffd33438ddad4e",
+  "s3a": {
+    "status": "PASS",
+    "checks": {
+      "initial.tls_verified": "PASS",
+      "initial.crud_exact": "PASS",
+      "initial.list_exact": "PASS",
+      "initial.seek": "PASS",
+      "initial.readonly": "PASS",
+      "initial.denied_write": "PASS",
+      "initial.retained": "PASS",
+      "restored.restart_exact": "PASS",
+      "restored.readonly": "PASS",
+      "restored.denied_delete": "PASS",
+      "restored.cleanup": "PASS",
+      "sdk_cleanup": "PASS",
+      "s3a_multipart": "PASS"
+    }
+  },
+  "api": {
+    "status": "PASS",
+    "checks": {
+      "initial.tls_verified": "PASS",
+      "initial.list_exact": "PASS",
+      "initial.readonly_denied": "PASS",
+      "initial.bad_key_denied": "PASS",
+      "initial.bad_secret_denied": "PASS",
+      "initial.anonymous_denied": "PASS",
+      "initial.untrusted_tls_denied": "PASS",
+      "initial.crud": "PASS",
+      "initial.multipart_complete": "PASS",
+      "initial.multipart_abort": "PASS",
+      "initial.retained_object": "PASS",
+      "restored.tls_verified": "PASS",
+      "restored.restart_read": "PASS",
+      "restored.permissions_retained": "PASS",
+      "restored.cleanup": "PASS"
+    }
+  }
+}
