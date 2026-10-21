@@ -1,36 +1,55 @@
-# Dedicated dependency proxy
+# Dedicated open-source dependency caches
 
-This profile provides Nexus Maven Central, npm and PyPI proxies with persistent storage and a TLS entry point. Images are pinned to immutable registry digests. Nexus's administrative HTTP port and the TLS port bind only to loopback. Expose the TLS endpoint through an authorized ingress or tunnel when a deployment host is available; this profile does not change a host firewall or a repository's mirror settings.
+The user-approved replacement for Nexus consists of Reposilite 3.6.3 for Maven,
+Verdaccio 6.10.6 for npm, and devpi-server 6.20.3 for PyPI behind Caddy TLS.
+It needs no Nexus EULA/onboarding action. Published images are pinned by digest;
+the devpi image uses a pinned Python base and server version. Build the image
+once for the deployment and retain its resulting digest before promotion.
 
-Provide Docker Compose, approximately 4 GB available RAM plus disk capacity for the dependency cache, and a `PROXY_CERT_DIR` containing a managed `tls.crt` and `tls.key` readable by the TLS container. Certificate names must match the public endpoint. Do not disable TLS verification. The CI workflow creates a disposable localhost certificate and explicitly trusts it only for the test.
+Each service owns a persistent named volume. Maven explicitly stores mirrored
+bytes and prioritizes cached content (`STRICT`); npm stores package metadata and
+tarballs; devpi stores the PyPI mirror and downloaded files. Public dependency
+reads are allowed. The TLS gateway permits only GET/HEAD, npm registration and
+publication are disabled, devpi administration is restricted to root with a
+random inaccessible initial password, and no backend port is published.
+This profile is for public dependency caching, not private artifact publication.
 
-The pinned Nexus 3.97 Community Edition also requires its upstream telemetry onboarding acknowledgement and ongoing telemetry connectivity. Before production deployment, the operator must review and complete those vendor requirements; this profile does not acknowledge them automatically. See the [official telemetry policy](https://help.sonatype.com/en/nexus-repository-telemetry.html). A blocked-outbound repository test does not disable the server’s separate telemetry service.
+Provide Docker Compose and a managed certificate directory (`PROXY_CERT_DIR`)
+containing `tls.crt` and `tls.key`. Set `PROXY_PUBLIC_ORIGIN` to the externally
+reachable HTTPS origin so generated npm/PyPI links remain inside the proxy.
+The TLS listener binds only to host loopback port 8443. Connect it through an
+authorized ingress/tunnel; do not disable certificate verification or expose
+backend administration to make it reachable.
 
-Start the profile from this directory with `docker compose up -d`. The `nexus-data` volume holds configuration, metadata and cached bytes across restarts. For a new instance, privately capture the generated password:
+Start using `docker compose up -d --build` in this directory. Clients use:
 
-```bash
-umask 077
-docker compose exec -T nexus cat /nexus-data/admin.password > initial-password
-python3 configure.py --password-file initial-password \
-  --rotate-admin-to .secrets/admin-password
-```
-
-Create `.secrets` with mode 0700 before using it. The new password file must not already exist; it is written with mode 0600 before the rotation request so interrupted requests do not lose it. Retain the original private file until rotation and authenticated configuration succeed, then delete the original. Existing deployments use their current administrative password file instead. Never commit password/certificate files or put credentials in mirror URLs.
-
-Configuration creates only dedicated `ci-maven`, `ci-npm`, `ci-pypi` proxy repositories and refuses name collisions with another format/type. Re-running updates their declared settings. Public anonymous reads are opt-in (`--allow-anonymous`) for an instance dedicated exclusively to public dependencies. For private access, keep anonymous access disabled and provision read-only credentials through the normal secret-management process; do not use the administrative account in builds.
-
-Client endpoints after the real TLS origin is assigned:
-
-| Client | Path |
+| Client | Endpoint relative to the HTTPS origin |
 | --- | --- |
-| Maven | `/repository/ci-maven/` |
-| npm | `/repository/ci-npm/` |
-| pip | `/repository/ci-pypi/simple/` |
+| Maven | `/maven/ci-maven/` |
+| npm | `/npm/` |
+| pip | `/pypi/root/pypi/+simple/` |
 
-Set `MAVEN_MIRROR_URL` to the verified HTTPS Maven endpoint only after deployment validation. Existing Maven policy supports credentials under server ID `ci-dependency-mirror` in private settings. Do not cache settings files. npm/pip client configuration and a full component's offline dependency closure still need separate validation before those builds are switched over.
+Only set repository `MAVEN_MIRROR_URL`, npm or pip mirror configuration after
+validating the actual deployed endpoint. No production server/address has been
+provided yet, and this PR does not claim a real deployment or full component
+offline build. Existing CI remains online until its complete dependency closure
+is proven against that service.
 
-`dependency-proxy.yml` exercises a disposable instance: configure public proxies, rotate the initial admin password, retrieve a cold Maven artifact through TLS, compare it with the HTTPS upstream, block proxy outbound connections, verify cached retrieval and missing-artifact failure, restart Nexus and verify cached bytes again. Evidence retains SHA256 checksums and logs. `verify-cache.sh` deliberately blocks the dedicated repositories and must only be used against the disposable test instance. It does not prove a full component build or production availability.
+The disposable CI test obtains Maven JUnit, npm is-number and a PyPI six wheel
+through verified TLS, compares exact bytes to their official upstreams and
+validates npm/PyPI integrity metadata. It physically removes the egress network
+from all three servers and checks Docker's actual attached network state.
+Cached bytes must remain identical. An uncached Maven version must fail with an
+HTTP error while the server stays healthy. All three services then restart on
+the same volumes without egress; their cached bytes must still match.
 
-Do not run `docker compose down --volumes` on a deployed cache unless intentionally discarding it; CI does this only for its temporary instance. Real deployment, mirror activation and representative cold/warm/offline component builds remain pending an authorized host/address.
+Only `COMPOSE_PROJECT_NAME` ending in `-ci` with `PROXY_DISPOSABLE=1` may run
+`verify-cache.sh`. It deliberately disconnects upstream networking and sets the
+disposable devpi volume to offline mode. Never run it against production, and
+never use `docker compose down --volumes` on a deployed cache you want to keep.
+The CI fixture uses a disposable localhost CA; real deployments use managed TLS.
 
-API definitions follow the [official Nexus REST reference](https://help.sonatype.com/en/api-reference.html). Upstream proxy origins are the official HTTPS Maven Central, npm and PyPI services. Image digests were verified from registry metadata; upgrades must be separately pinned and tested.
+Implementation references: [Reposilite mirrors](https://reposilite.com/guide/mirrors),
+[Verdaccio Docker](https://verdaccio.org/docs/docker/),
+[Verdaccio configuration](https://verdaccio.org/docs/configuration/), and
+[devpi server guide](https://devpi.net/docs/devpi/devpi/stable/+doc/quickstart-server.html).

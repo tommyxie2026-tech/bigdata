@@ -1,0 +1,12 @@
+{
+  "maven": {
+    "repositories": [{
+      "id": "ci-maven", "visibility": "PUBLIC", "redeployment": false,
+      "storagePolicy": "STRICT", "metadataMaxAge": 3600, "resolutionCacheMaxEntries": 2048,
+      "proxied": [{
+        "reference": "https://repo.maven.apache.org/maven2/", "store": true,
+        "connectTimeout": 3, "readTimeout": 15
+      }]
+    }]
+  }
+}

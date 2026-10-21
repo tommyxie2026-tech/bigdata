@@ -4,10 +4,36 @@
 }
 :8443 {
     tls /certificates/tls.crt /certificates/tls.key
-    reverse_proxy nexus:8081 {
-        transport http {
-            dial_timeout 5s
-            response_header_timeout 30s
+    @mutations {
+        not method GET HEAD
+    }
+    route {
+        respond @mutations 405
+        handle_path /maven/* {
+            reverse_proxy maven:8080 {
+                transport http {
+                    dial_timeout 3s
+                    response_header_timeout 25s
+                }
+            }
         }
+        handle_path /npm/* {
+            reverse_proxy npm:4873 {
+                transport http {
+                    dial_timeout 3s
+                    response_header_timeout 25s
+                }
+            }
+        }
+        handle_path /pypi/* {
+            reverse_proxy pypi:3141 {
+                header_up X-Outside-Url {$PROXY_PUBLIC_ORIGIN}/pypi
+                transport http {
+                    dial_timeout 3s
+                    response_header_timeout 25s
+                }
+            }
+        }
+        respond 404
     }
 }
