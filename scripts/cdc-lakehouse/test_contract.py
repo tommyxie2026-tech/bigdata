@@ -13,7 +13,10 @@ class LakehouseContract(unittest.TestCase):
         path=ROOT/'scripts/cdc-lakehouse/PaimonTarget.java'
         self.assertTrue(path.exists(),'real Paimon target helper missing')
         source=path.read_text()
-        for marker in ['EnvironmentSettings.inBatchMode()',"'connector'='paimon'",'INSERT INTO lake_rows SELECT','rows.collect()','actual.equals(expected)','Duplicate key']:
+        self.assertIn('CREATE CATALOG lakehouse',source)
+        self.assertIn('CREATE TABLE IF NOT EXISTS lakehouse.default.lake_rows',source)
+        self.assertNotIn('CREATE TEMPORARY TABLE lake_rows',source)
+        for marker in ['EnvironmentSettings.inBatchMode()',"'type'='paimon'",'INSERT INTO lakehouse.default.lake_rows SELECT','rows.collect()','actual.equals(expected)','Duplicate key']:
             self.assertIn(marker,source)
     def test_independent_workflow_runs_both_without_build_or_publication(self):
         path=ROOT/'.github/workflows/cdc-paimon.yml'

@@ -18,28 +18,26 @@ public final class PaimonTarget {
         return target.equals("paimon");
     }
     private static void define(TableEnvironment table) {
-        table.executeSql("CREATE TEMPORARY TABLE lake_rows (id INT, name STRING, "
-            + "PRIMARY KEY(id) NOT ENFORCED) WITH ('connector'='paimon',"
-            + "'path'='file:///var/lib/flink/cdc-paimon','bucket'='1')");
+        table.executeSql("CREATE CATALOG lakehouse WITH ('type'='paimon',"
+            + "'warehouse'='file:///var/lib/flink/cdc-paimon')");
+        table.executeSql("CREATE TABLE IF NOT EXISTS lakehouse.default.lake_rows (id INT, name STRING, "
+            + "PRIMARY KEY(id) NOT ENFORCED) WITH ('bucket'='1')");
     }
     public static void submit(StreamTableEnvironment table, String source) {
         if (!source.equals("mysql_source") && !source.equals("postgres_source"))
             throw new IllegalArgumentException("Unexpected source table");
         define(table);
-        table.executeSql("INSERT INTO lake_rows SELECT id, name FROM " + source);
+        table.executeSql("INSERT INTO lakehouse.default.lake_rows SELECT id, name FROM " + source);
     }
     public static void assertRows(Map<Integer,String> expected) throws Exception {
         long deadline = System.nanoTime() + 120_000_000_000L;
         Map<Integer,String> actual = new TreeMap<>();
         do {
-            java.io.File snapshots = new java.io.File("/var/lib/flink/cdc-paimon/snapshot");
-            String[] committed = snapshots.list((dir, name) -> name.startsWith("snapshot-"));
-            if (committed == null || committed.length == 0) { Thread.sleep(1000); continue; }
             TableEnvironment reader = TableEnvironment.create(EnvironmentSettings.inBatchMode());
             reader.getConfig().getConfiguration().setString("execution.target", "local");
             reader.getConfig().getConfiguration().setInteger("parallelism.default", 1);
             define(reader);
-            TableResult rows = reader.executeSql("SELECT id, name FROM lake_rows");
+            TableResult rows = reader.executeSql("SELECT id, name FROM lakehouse.default.lake_rows");
             actual.clear();
             try (CloseableIterator<Row> iterator = rows.collect()) {
                 while (iterator.hasNext()) {
