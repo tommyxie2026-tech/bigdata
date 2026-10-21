@@ -19,6 +19,10 @@ case "${CDC_TARGET:-jdbc}" in
     export HADOOP_CLASSPATH
     HADOOP_CLASSPATH="$(hadoop classpath)"
     test -n "$HADOOP_CLASSPATH"
+    if [[ "${CDC_WAREHOUSE:-}" == s3a://* ]]; then
+      # shellcheck source=scripts/cdc-lakehouse/prepare-s3.sh
+source /workspace/scripts/cdc-lakehouse/prepare-s3.sh
+    fi
     install -d -o flink -g flink /var/lib/flink/cdc-paimon
     ;;
   *) echo "Unsupported CDC_TARGET: $CDC_TARGET" >&2; exit 1 ;;
