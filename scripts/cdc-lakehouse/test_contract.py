@@ -6,9 +6,9 @@ class LakehouseContract(unittest.TestCase):
     def test_both_connectors_use_real_paimon_sink_and_exact_reader(self):
         for component,klass in [('mysql','MysqlSmoke'),('postgres','PostgresSmoke')]:
             source=(ROOT/f'scripts/flink-cdc-{component}/harness/src/main/java/bigdata/ci/{klass}.java').read_text()
-            self.assertIn('PaimonTarget.enabled()',source)
-            self.assertIn('PaimonTarget.assertRows(expected)',source)
-            self.assertIn(f'PaimonTarget.submit(table, "{component}_source")',source)
+            self.assertIn('LakehouseTarget.enabled()',source)
+            self.assertIn('LakehouseTarget.assertRows(expected)',source)
+            self.assertIn(f'LakehouseTarget.submit(table, "{component}_source")',source)
     def test_paimon_uses_committed_batch_read_and_checkpoint_sink(self):
         path=ROOT/'scripts/cdc-lakehouse/PaimonTarget.java'
         self.assertTrue(path.exists(),'real Paimon target helper missing')

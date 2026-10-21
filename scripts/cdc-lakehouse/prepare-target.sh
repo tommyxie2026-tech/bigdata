@@ -21,7 +21,25 @@ case "${CDC_TARGET:-jdbc}" in
     test -n "$HADOOP_CLASSPATH"
     install -d -o flink -g flink /var/lib/flink/cdc-paimon
     ;;
+  hudi)
+    hudi_repo=/dependencies/hudi/1.2.1
+    grep -qx 'source_identity: a9185b7c4e83422132c25f2efdf282c5bc6af2c7' "$hudi_repo/manifest.yaml"
+    grep -qx 'compatibility_identity: d03b23fa91a87ade2945d677446583554f2376827ed589c71ae05136004b6f03' "$hudi_repo/manifest.yaml"
+    grep -qx 'test_status: PASS' "$hudi_repo/manifest.yaml"
+    (cd "$hudi_repo" && sha256sum -c SHA256SUMS)
+    printf '[cdc-hudi]\nname=Published Hudi\nbaseurl=file://%s\nenabled=1\ngpgcheck=0\n' "$hudi_repo" > /etc/yum.repos.d/cdc-hudi.repo
+    dnf -y --disablerepo='*' --enablerepo=OS,everything,cdc-flink,cdc-hadoop,cdc-common,cdc-hudi install bigdata-hudi-flink hadoop-client
+    test -s /usr/lib/flink/lib/hudi-flink1.20-bundle-1.2.1.jar
+    rpm -q bigdata-hudi-flink > /evidence/hudi-package.txt
+    export HADOOP_CLASSPATH
+    HADOOP_CLASSPATH="$(hadoop classpath)"
+    test -n "$HADOOP_CLASSPATH"
+    ;;
   *) echo "Unsupported CDC_TARGET: $CDC_TARGET" >&2; exit 1 ;;
 esac
 cp /workspace/scripts/cdc-lakehouse/PaimonTarget.java /tmp/cdc-harness/src/main/java/bigdata/ci/
 cp /workspace/scripts/cdc-lakehouse/WarehouseLocation.java /tmp/cdc-harness/src/main/java/bigdata/ci/
+
+for helper in LakehouseTarget HudiTarget; do
+  cp "/workspace/scripts/cdc-lakehouse/$helper.java" /tmp/cdc-harness/src/main/java/bigdata/ci/
+done
