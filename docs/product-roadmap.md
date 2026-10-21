@@ -1,5 +1,7 @@
 # Bigdata Platform 产品路线图
 
+> 2026-10-11：本文件保留早期分层产品规划。当前 openEuler/RPM 发行基线、后续版本排序、AI 场景与验收门槛统一见 [下一代数据与 AI 平台 Roadmap](next-generation-platform-roadmap.md)。下文 Ubuntu/DEB 等描述不再作为当前默认交付要求；历史阶段编号不直接等同于新版本计划。
+
 ## 1. 文档目标
 
 本文档用于从产品视角重新规划 Bigdata Platform 的演进路径，明确项目不是单纯的大数据发行版，也不是一开始就建设完整数据平台，而是采用分层演进模式：

@@ -1,5 +1,7 @@
 # BIGDATA Roadmap v1.0
 
+> 2026-10-11：本文件保留原 1.0/2.0/3.0 定位与历史 Review 记录。跨版本迭代计划统一见 [下一代数据与 AI 平台 Roadmap](../docs/next-generation-platform-roadmap.md)，其中保留 Reference Distribution、Composable Platform、Hybrid Data Platform 的演进关系，并增加湖仓、实时、治理与 AI 场景的版本 Gate。
+
 ## 1. 目标
 
 本文档定义 BIGDATA 的长期路线图，用于明确 BIGDATA-1.0、BIGDATA-2.0、BIGDATA-3.0 的阶段定位，避免将长期平台能力错误放入 BIGDATA-1.0 RC1。

@@ -1,5 +1,7 @@
 # BIGDATA-1.0 Milestones v1.0
 
+> 2026-10-11：本文件保留早期里程碑定义与当时状态，表中的 Active/Blocked 不代表当前执行状态。RC1 已发布；生产 GA 仍须区分制品、安装、业务与恢复证据。最新阶段目标、退出条件和 90 天 Backlog 见 [下一代数据与 AI 平台 Roadmap](../docs/next-generation-platform-roadmap.md)。旧 DEB/apt 条目由当前 openEuler/RPM 基线取代。
+
 ## 1. 目标
 
 本文档定义 BIGDATA-1.0 从规划到 RC1 的里程碑、入口条件、交付物、退出条件和 Gate 决策。
