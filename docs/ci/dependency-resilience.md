@@ -79,3 +79,36 @@ in the relevant container, then run that component with both offline resolution
 and container networking disabled. Record that component's success before using
 an offline default. Continue to reuse the existing RPM for ordinary regression
 and release work while validating readiness separately.
+
+## Component-scoped test reuse and timing evidence
+
+The lifecycle treats an exact verified published repository as sufficient on
+main; an explicit PR Build/Test requirement still forces the actual PR test.
+Passing a historical build run ID alone no longer repeats a functional test on
+main when that exact published package has just been validated. This is a
+verified-repository fast path, not a new functional-test result.
+
+When publication is still required, successful PR Test artifacts can be reused
+if the merged PR is trusted and the component input closure matches. Exact
+whole-tree equality remains sufficient, but unrelated documentation and isolated
+fixture edits no longer prohibit reuse. The closure contains the component's
+catalog configuration, transitive dependencies and their RPM repositories,
+shared runtime/build/test scripts, packaging and relevant workflow definitions.
+File modes are included. An incomplete tree, unknown dependency or cycle rejects
+reuse. Shared CI code is intentionally included conservatively.
+
+Component-specific Hudi/Paimon/Hue workflows are eligible as well as Build
+Components. The latest required CI and latest component run must pass. A skipped
+Build is accepted only when the configured original run has an actual successful
+Build job; the Test itself must actually succeed, and both nonexpired Test
+Evidence and Tested RPM artifacts must exist. Release still verifies the
+component source, compatibility, original provenance and package checksums.
+Expired/missing evidence, fork runs and failed/skipped Tests use normal lifecycle.
+
+Each lifecycle gate uploads a small `*-ci-timings` JSON observation containing
+run queue time, actual job runtimes, states and original build/reused test IDs.
+Live/skipped jobs retain unknown durations and their actual states. These reports
+are observations, not final run verdicts, and reporting failure cannot turn a
+passing functional gate into a failure. Build artifacts additionally contain
+`evidence/dependency-cache.json` with the actual restored snapshot key or a cold
+cache observation; neither means that compilation or tests passed.

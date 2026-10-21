@@ -151,6 +151,25 @@ jobs:
         with:
           key: ${{ steps.dependencies.outputs.key }}
 
+      - name: Record dependency cache observation
+        if: always()
+        env:
+          RESTORE_OUTCOME: ${{ steps.dependencies.outcome }}
+          MATCHED_CACHE_KEY: ${{ steps.dependencies.outputs.matched_key }}
+        run: |
+          sudo mkdir -p "${WORK_ROOT}/artifacts/evidence"
+          sudo chown "$(id -u):$(id -g)" "${WORK_ROOT}/artifacts/evidence"
+          python3 - <<'PYCODE'
+          import json, os
+          from pathlib import Path
+          outcome = os.environ['RESTORE_OUTCOME']
+          data = {'schema': 'bigdata.dependency-cache-observation/v1',
+                  'restore_outcome': outcome,
+                  'restored': bool(os.environ['MATCHED_CACHE_KEY']) if outcome == 'success' else None,
+                  'matched_key': os.environ['MATCHED_CACHE_KEY'] or None}
+          (Path(os.environ['WORK_ROOT']) / 'artifacts/evidence/dependency-cache.json').write_text(json.dumps(data, indent=2)+'\n')
+          PYCODE
+
       - name: Publish summary
         if: always()
         run: |

@@ -64,6 +64,7 @@ jobs:
 
   pr_test_reuse:
     name: Reuse verified merged PR test artifacts for ${{ inputs.component }}
+    timeout-minutes: 5
     needs: repo_check
     if: >-
       always() &&
@@ -82,7 +83,10 @@ jobs:
       - name: Checkout merged workflow code
         uses: actions/checkout@v4
 
-      - name: Find a successful same-tree PR Build/Test run
+      - name: Install component input parser
+        run: python3 -m pip install --disable-pip-version-check PyYAML==6.0.3
+
+      - name: Find successful component-scoped PR tests
         id: lookup
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -115,7 +119,13 @@ jobs:
   test:
     name: Test ${{ inputs.component }} ${{ inputs.version }}
     needs: [repo_check, build, pr_test_reuse]
-    if: ${{ always() && needs.repo_check.result == 'success' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.rpm_build_run_id != '')) }}
+    if: >-
+      always() && needs.repo_check.result == 'success' &&
+      needs.pr_test_reuse.outputs.test_run_id == '' &&
+      (needs.build.result == 'success' ||
+       (needs.build.result == 'skipped' && inputs.rpm_build_run_id != '' &&
+        (needs.repo_check.outputs.already_current != 'true' ||
+         (inputs.require_pr_build_test && github.event_name == 'pull_request'))))
     uses: ./.github/workflows/test-components.yml
     with:
       component: ${{ inputs.component }}
@@ -151,6 +161,7 @@ jobs:
       source_identity: ${{ inputs.source_identity }}
 
   gate:
+    timeout-minutes: 5
     name: Complete ${{ inputs.component }} stage
     needs: [repo_check, pr_test_reuse, build, test, release]
     if: always()
@@ -199,3 +210,29 @@ jobs:
             echo "Component stage failed: check=${CHECK_RESULT}, fast_path=${ALREADY_CURRENT}, build=${BUILD_RESULT}, test=${TEST_RESULT}, release=${RELEASE_RESULT}" >&2
             exit 1
           fi
+
+      - name: Checkout timing reporter
+        if: always()
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Record observed CI timings and reuse provenance
+        timeout-minutes: 2
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COMPONENT: ${{ inputs.component }}
+          RPM_BUILD_RUN_ID: ${{ inputs.rpm_build_run_id }}
+          PR_TEST_RUN_ID: ${{ needs.pr_test_reuse.outputs.test_run_id }}
+        run: python3 scripts/ci/ci_timing_report.py --component "${COMPONENT}" --output timing/evidence.json
+
+      - name: Upload observed CI timing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.component }}-${{ inputs.version }}-ci-timings
+          path: timing/evidence.json
+          if-no-files-found: warn
+          retention-days: 30
