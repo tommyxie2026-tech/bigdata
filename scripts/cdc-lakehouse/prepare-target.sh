@@ -24,3 +24,4 @@ case "${CDC_TARGET:-jdbc}" in
   *) echo "Unsupported CDC_TARGET: $CDC_TARGET" >&2; exit 1 ;;
 esac
 cp /workspace/scripts/cdc-lakehouse/PaimonTarget.java /tmp/cdc-harness/src/main/java/bigdata/ci/
+cp /workspace/scripts/cdc-lakehouse/WarehouseLocation.java /tmp/cdc-harness/src/main/java/bigdata/ci/

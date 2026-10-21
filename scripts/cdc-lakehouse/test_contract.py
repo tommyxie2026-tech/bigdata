@@ -38,6 +38,19 @@ class LakehouseContract(unittest.TestCase):
         self.assertIn('MAVEN_RETRY_TOTAL_SECONDS:-600',prepare)
         mysql=(ROOT/'scripts/flink-cdc-mysql/test.sh').read_text()
         self.assertIn('retry-maven-downloads.sh /evidence/jdbc-driver-download.log',mysql)
+    def test_remote_hdfs_uses_isolated_storage_and_rechecks_after_restart(self):
+        path=ROOT/'.github/workflows/cdc-paimon-hdfs.yml'
+        self.assertTrue(path.exists())
+        workflow=path.read_text()
+        self.assertIn('--name cdc-storage',workflow)
+        self.assertIn('--name cdc-client',workflow)
+        self.assertIn('docker restart --time 30 cdc-storage',workflow)
+        self.assertIn('WarehouseLocationTest',workflow)
+        self.assertIn('assert-hdfs-restarted.sh',workflow)
+        helper=(ROOT/'scripts/cdc-lakehouse/PaimonTarget.java').read_text()
+        self.assertIn('WarehouseLocation.configured()',helper)
+        server=(ROOT/'scripts/cdc-lakehouse/hdfs-server.sh').read_text()
+        self.assertIn('name/current/VERSION',server)
     def test_existing_recovery_test_enables_target_before_harness_compile(self):
         for name in ['mysql','postgres']:
             source=(ROOT/f'scripts/flink-cdc-{name}/test.sh').read_text()

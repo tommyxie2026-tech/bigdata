@@ -1,0 +1,219 @@
+name: CDC Paimon remote HDFS recovery
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/cdc-paimon-hdfs.yml'
+      - 'scripts/cdc-lakehouse/**'
+      - 'scripts/flink-cdc-mysql/**'
+      - 'scripts/flink-cdc-postgres/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cdc-paimon-hdfs.yml'
+      - 'scripts/cdc-lakehouse/**'
+      - 'scripts/flink-cdc-mysql/**'
+      - 'scripts/flink-cdc-postgres/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: cdc-paimon-hdfs-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  GIT_LFS_SKIP_SMUDGE: '1'
+jobs:
+  test:
+    name: ${{ matrix.connector }} CDC to remote HDFS Paimon recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        connector: [mysql, postgres]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Contract tests
+        run: |
+          python3 -m pip install --disable-pip-version-check PyYAML==6.0.3
+          python3 scripts/cdc-lakehouse/test_contract.py
+          javac --release 11 -d /tmp/cdc-uri-test scripts/cdc-lakehouse/WarehouseLocation{,Test}.java
+          java -cp /tmp/cdc-uri-test bigdata.ci.WarehouseLocationTest
+      - name: Checkout published dependency metadata
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: dependency-repository
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink/1.20.1/
+            repo/openeuler-22.03-lts-sp4/bigtop-3.6/hadoop/3.4.3/
+            repo/openeuler-22.03-lts-sp4/bigtop-3.6/common/3.6.0/
+            repo/openeuler-22.03-lts-sp4/bigtop-3.6/paimon/2.1.0/
+            repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink-cdc-${{ matrix.connector }}/3.4.0/
+      - name: Verify canonical connector build
+        id: original
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONNECTOR: ${{ matrix.connector }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, pathlib, yaml
+          name = 'flink-cdc-' + os.environ['CONNECTOR']
+          manifest = yaml.safe_load(pathlib.Path('dependency-repository/repo/openeuler-22.03-lts-sp4/bigtop-3.6', name, '3.4.0/manifest.yaml').read_text())
+          assert manifest['component'] == name and str(manifest['version']) == '3.4.0'
+          assert manifest['test_status'] == 'PASS'
+          assert manifest['source_identity'] == '06581fc73b84b1da45fccf93441d96a118d9bfc1'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('run=' + str(int(manifest['build_run_id'])) + '\n')
+              output.write('identity=' + manifest.get('build_input_identity', '') + '\n')
+          PY
+          run_id=$(awk -F= '$1 == "run" {print $2}' "$GITHUB_OUTPUT")
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?filter=latest&per_page=100" \
+            --jq ".jobs[] | select(.name == \"Build RPM flink-cdc-$CONNECTOR 3.4.0\" and .status == \"completed\" and .conclusion == \"success\") | .id" | grep -Eq '^[0-9]+$'
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" \
+            --jq '.head_repository.full_name' | grep -Fx "$GITHUB_REPOSITORY"
+      - uses: actions/download-artifact@v4
+        with:
+          name: flink-cdc-${{ matrix.connector }}-3.4.0-rpm
+          run-id: ${{ steps.original.outputs.run }}
+          github-token: ${{ github.token }}
+          path: connector-rpm
+      - name: Fetch engine and Paimon RPMs on CI runner only
+        env:
+          CONNECTOR: ${{ matrix.connector }}
+        run: |
+          set -euo pipefail
+          prefix=repo/openeuler-22.03-lts-sp4/bigtop-3.6
+          git -C dependency-repository lfs pull \
+            --include="$prefix/flink/1.20.1/**,$prefix/hadoop/3.4.3/**,$prefix/common/3.6.0/**,$prefix/paimon/2.1.0/**" --exclude=''
+          published="$GITHUB_WORKSPACE/dependency-repository/$prefix/flink-cdc-$CONNECTOR/3.4.0"
+          (cd connector-rpm/rpms && sha256sum -c "$published/SHA256SUMS")
+          for component in flink/1.20.1 hadoop/3.4.3 common/3.6.0 paimon/2.1.0; do
+            (cd "dependency-repository/$prefix/$component" && sha256sum -c SHA256SUMS)
+          done
+      - name: Restore shared harness repository
+        id: harness-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/cdc-paimon-maven/repository
+          key: cdc-paimon-m2-flink1201-jdk11-v2-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.connector }}
+          restore-keys: cdc-paimon-m2-flink1201-jdk11-v2-
+      - name: Seed from successful legacy connector cache
+        if: steps.harness-cache.outputs.cache-matched-key == ''
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/cdc-paimon-maven
+          key: cdc-paimon-${{ matrix.connector }}-flink1201-jdk11-v1
+          restore-keys: cdc-paimon-
+      - name: Clear failed transfer markers
+        run: |
+          mkdir -p /tmp/cdc-paimon-maven/repository
+          find /tmp/cdc-paimon-maven/repository -type f -name '*.lastUpdated' -delete
+      - name: Start pinned source database
+        env:
+          CONNECTOR: ${{ matrix.connector }}
+        run: |
+          set -euo pipefail
+          if [[ "$CONNECTOR" == mysql ]]; then
+            docker run -d --name cdc-source -p 3306:3306 \
+              -e MYSQL_ROOT_PASSWORD=cdc-fixture -e MYSQL_ROOT_HOST=% mysql:8.0.36 \
+              --server-id=223344 --log-bin=mysql-bin --binlog-format=ROW --binlog-row-image=FULL
+            for _ in $(seq 1 60); do
+              if timeout 5 docker exec cdc-source mysql -uroot -pcdc-fixture -NBe 'SELECT 1' 2>/dev/null | grep -qx 1; then exit 0; fi
+              sleep 2
+            done
+          else
+            docker run -d --name cdc-source -p 5432:5432 -e POSTGRES_PASSWORD=cdc-fixture \
+              postgres:14.15@sha256:2a453914efff6156786247b2399e6f9f18d7fc37e1ca5574a23aba172cf37d3e \
+              -c wal_level=logical -c max_replication_slots=4 -c max_wal_senders=4
+            for _ in $(seq 1 60); do
+              if timeout 5 docker exec cdc-source pg_isready -U postgres; then exit 0; fi
+              sleep 2
+            done
+          fi
+          docker logs cdc-source
+          exit 1
+      - name: Start separate HDFS storage service from published RPMs
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/cdc-hdfs-evidence
+          docker run -d --init --name cdc-storage --network host \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" \
+            -v "$GITHUB_WORKSPACE/dependency-repository/repo/openeuler-22.03-lts-sp4/bigtop-3.6:/dependencies:ro" \
+            -v /tmp/cdc-hdfs-evidence:/evidence \
+            openeuler/openeuler:22.03-lts-sp4 bash /workspace/scripts/cdc-lakehouse/hdfs-server.sh
+          for _ in $(seq 1 240); do
+            [[ -f /tmp/cdc-hdfs-evidence/hdfs-ready ]] && exit 0
+            [[ "$(docker inspect cdc-storage --format '{{.State.Running}}')" == true ]] || break
+            sleep 2
+          done
+          docker logs cdc-storage
+          exit 1
+      - name: Clean openEuler install and exact lakehouse recovery
+        env:
+          CONNECTOR: ${{ matrix.connector }}
+          CDC_TARGET: paimon
+          CDC_WAREHOUSE: hdfs://127.0.0.1:9000/warehouse/${{ matrix.connector }}-${{ github.run_id }}
+          BUILD_RUN_ID: ${{ steps.original.outputs.run }}
+          BUILD_INPUT_IDENTITY: ${{ steps.original.outputs.identity }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/cdc-paimon-evidence /tmp/cdc-paimon-maven
+          docker run -d --init --name cdc-client --network host \
+            -e CDC_TARGET -e CDC_WAREHOUSE -e CONNECTOR -e BUILD_RUN_ID -e BUILD_INPUT_IDENTITY -e TEST_RUN_ID="$GITHUB_RUN_ID" \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$GITHUB_WORKSPACE/connector-rpm:/rpm:ro" \
+            -v "$GITHUB_WORKSPACE/dependency-repository/repo/openeuler-22.03-lts-sp4/bigtop-3.6:/dependencies:ro" \
+            -v /tmp/cdc-paimon-evidence:/evidence -v /tmp/cdc-paimon-maven:/root/.m2 \
+            openeuler/openeuler:22.03-lts-sp4 sleep infinity
+          docker exec cdc-client bash /workspace/scripts/cdc-lakehouse/test-hdfs-client.sh
+          grep -qx 'target: paimon' /tmp/cdc-paimon-evidence/evidence.md
+          for phase in snapshot changes restored-rows; do
+            grep -q '^paimon: PASS exact_rows=' "/tmp/cdc-paimon-evidence/$phase.txt"
+          done
+      - name: Restart HDFS and verify exact final rows from a fresh client JVM
+        run: |
+          set -euo pipefail
+          before_start=$(docker inspect cdc-storage --format '{{.State.StartedAt}}')
+          docker exec cdc-storage rm -f /evidence/hdfs-ready
+          docker restart --time 30 cdc-storage
+          for _ in $(seq 1 120); do
+            [[ -f /tmp/cdc-hdfs-evidence/hdfs-ready ]] && break
+            sleep 2
+          done
+          test -f /tmp/cdc-hdfs-evidence/hdfs-ready
+          after_start=$(docker inspect cdc-storage --format '{{.State.StartedAt}}')
+          [[ "$before_start" != "$after_start" ]]
+          docker exec -e STORAGE_STARTED_BEFORE="$before_start" -e STORAGE_STARTED_AFTER="$after_start" cdc-client bash /workspace/scripts/cdc-lakehouse/assert-hdfs-restarted.sh
+      - name: Prepare dependency cache ownership
+        if: always()
+        run: |
+          if [[ -d /tmp/cdc-paimon-maven/repository ]]; then
+            sudo chown -R "$(id -u):$(id -g)" /tmp/cdc-paimon-maven/repository
+            find /tmp/cdc-paimon-maven/repository -type f -name '*.lastUpdated' -delete
+          fi
+      - name: Preserve downloaded harness dependencies
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/cdc-paimon-maven/repository
+          key: cdc-paimon-m2-flink1201-jdk11-v2-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.connector }}
+      - name: Collect source logs
+        if: always()
+        run: |
+          mkdir -p /tmp/cdc-paimon-evidence /tmp/cdc-hdfs-evidence
+          docker logs cdc-source > /tmp/cdc-paimon-evidence/source.log 2>&1 || true
+          docker logs cdc-storage > /tmp/cdc-hdfs-evidence/service.log 2>&1 || true
+          docker rm -f cdc-source cdc-storage cdc-client || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cdc-${{ matrix.connector }}-paimon-hdfs-recovery-evidence
+          path: |
+            /tmp/cdc-paimon-evidence
+            /tmp/cdc-hdfs-evidence
+          retention-days: 30
