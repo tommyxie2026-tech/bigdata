@@ -114,7 +114,10 @@ jobs:
           [[ "$PACKAGE_RUN" =~ ^[0-9]+$ ]]
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN/jobs?filter=latest&per_page=100" \
             --jq '.jobs[] | select(.name == "Package optional SDK RPM" and .conclusion == "success") | .id' | grep -Eq '^[0-9]+$'
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN" --jq .path | grep -Fx '.github/workflows/hadoop-s3a.yml'
           sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN" --jq .head_sha)"
+          gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/hadoop-s3a.yml?ref=$sha" --jq .content | base64 -d > /tmp/sdk-source-workflow.yml
+          python3 scripts/s3a/provenance.py /tmp/sdk-source-workflow.yml .github/workflows/hadoop-s3a.yml
           for file in scripts/s3a/package-sdk.sh scripts/s3a/sdk-contract.json; do
             gh api "repos/$GITHUB_REPOSITORY/contents/$file?ref=$sha" --jq .content | base64 -d | cmp - "$file"
           done
