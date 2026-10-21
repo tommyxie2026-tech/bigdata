@@ -9,11 +9,15 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 mkdir -p "$PROXY_EVIDENCE_ROOT"
 base=https://localhost:8443
 artifact=junit/junit/4.13.2/junit-4.13.2.jar
-fetch() { curl --fail --silent --show-error --connect-timeout 3 --max-time 60 --cacert "$PROXY_CA_FILE" "$@"; }
+fetch() { curl --fail-with-body --silent --show-error --connect-timeout 3 --max-time 60 --cacert "$PROXY_CA_FILE" "$@"; }
 echo "Fetching HTTPS upstream reference"
 curl --fail --silent --show-error --connect-timeout 3 --max-time 60 --dump-header "$PROXY_EVIDENCE_ROOT/upstream-headers.txt" "https://repo.maven.apache.org/maven2/$artifact" -o "$PROXY_EVIDENCE_ROOT/upstream.jar"
 echo "Fetching cold proxy artifact through TLS"
-fetch --dump-header "$PROXY_EVIDENCE_ROOT/cold-headers.txt" "$base/repository/ci-maven/$artifact" -o "$PROXY_EVIDENCE_ROOT/cold.jar"
+if ! fetch --dump-header "$PROXY_EVIDENCE_ROOT/cold-headers.txt" "$base/repository/ci-maven/$artifact" -o "$PROXY_EVIDENCE_ROOT/cold.jar"; then
+  head -c 4096 "$PROXY_EVIDENCE_ROOT/cold.jar" > "$PROXY_EVIDENCE_ROOT/cold-error.txt"
+  cat "$PROXY_EVIDENCE_ROOT/cold-error.txt" >&2
+  exit 1
+fi
 cmp "$PROXY_EVIDENCE_ROOT/upstream.jar" "$PROXY_EVIDENCE_ROOT/cold.jar"
 python3 configure.py --password-file "$PROXY_PASSWORD_FILE" --block-outbound --allow-anonymous
 fetch "$base/repository/ci-maven/$artifact" -o "$PROXY_EVIDENCE_ROOT/warm-blocked.jar"
