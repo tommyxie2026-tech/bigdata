@@ -21,6 +21,24 @@ class MetricsSourceContract(unittest.TestCase):
         self.assertIn('cp LICENSE.txt /work/output/',source)
         self.assertNotIn('cp LICENSE NOTICE',source)
         self.assertIn('git config --global --add safe.directory /source',source)
+    def test_source_workflow_tracks_only_effective_source_inputs(self):
+        import fnmatch
+        config=yaml.load((ROOT/'.github/workflows/ambari-metrics.yml').read_text(),Loader=yaml.BaseLoader)
+        inputs=['scripts/ambari-metrics/build-source.sh','scripts/ambari-metrics/contract.json',
+                'scripts/ambari-metrics/test_contract.py','scripts/ci/retry-maven-downloads.sh',
+                'scripts/ci/configure-maven-policy.py','scripts/ci/run-with-deadline.py',
+                '.github/actions/restore-build-dependencies/action.yml',
+                '.github/actions/save-build-dependencies/action.yml']
+        unrelated=['scripts/ambari-metrics/specs/collector.spec',
+                   'scripts/ambari-metrics/package-rpms.sh','scripts/ambari-metrics/port_monitor.py',
+                   'scripts/ambari-metrics/test_monitor_payload.py']
+        for event in ['pull_request','push']:
+            patterns=config['on'][event]['paths']
+            for path in inputs:
+                self.assertTrue(any(fnmatch.fnmatchcase(path,p) for p in patterns),(event,path))
+            for path in unrelated:
+                self.assertFalse(any(fnmatch.fnmatchcase(path,p) for p in patterns),(event,path))
+
     def test_workflow_restores_and_saves_downloads_on_failure(self):
         path=ROOT/'.github/workflows/ambari-metrics.yml'
         self.assertTrue(path.exists(),'independent Metrics CI missing')

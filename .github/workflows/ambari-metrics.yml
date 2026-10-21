@@ -3,12 +3,26 @@ on:
   pull_request:
     paths:
       - '.github/workflows/ambari-metrics.yml'
-      - 'scripts/ambari-metrics/**'
+      - 'scripts/ambari-metrics/build-source.sh'
+      - 'scripts/ambari-metrics/contract.json'
+      - 'scripts/ambari-metrics/test_contract.py'
+      - 'scripts/ci/retry-maven-downloads.sh'
+      - 'scripts/ci/configure-maven-policy.py'
+      - 'scripts/ci/run-with-deadline.py'
+      - '.github/actions/restore-build-dependencies/action.yml'
+      - '.github/actions/save-build-dependencies/action.yml'
   push:
     branches: [main]
     paths:
       - '.github/workflows/ambari-metrics.yml'
-      - 'scripts/ambari-metrics/**'
+      - 'scripts/ambari-metrics/build-source.sh'
+      - 'scripts/ambari-metrics/contract.json'
+      - 'scripts/ambari-metrics/test_contract.py'
+      - 'scripts/ci/retry-maven-downloads.sh'
+      - 'scripts/ci/configure-maven-policy.py'
+      - 'scripts/ci/run-with-deadline.py'
+      - '.github/actions/restore-build-dependencies/action.yml'
+      - '.github/actions/save-build-dependencies/action.yml'
   workflow_dispatch:
 permissions:
   contents: read
