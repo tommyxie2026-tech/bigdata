@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  SDK_REUSE_RUN: ''
+  SDK_REUSE_RUN: '39616625470'
 
 jobs:
   select:
@@ -245,6 +245,18 @@ jobs:
               required.update(phase+"."+k for k in checks)
           write_report(evidence/"summary.json",combined,required)
           PY
+      - name: Require actual SDK install and both integration reports
+        env:
+          SDK_PACKAGE_RUN: ${{ needs.select.outputs.sdk_run }}
+        run: python3 scripts/s3a/release.py "$EVIDENCE"
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: hadoop-aws-sdk-2.35.4-tested-rpm
+          path: sdk-rpm
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
       - name: Preserve fixture logs and remove container
         if: always()
         run: |
@@ -258,3 +270,64 @@ jobs:
           path: ${{ env.EVIDENCE }}
           if-no-files-found: error
           retention-days: 30
+
+  candidate:
+    name: Release Candidate optional Hadoop SDK
+    needs: api
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' && needs.api.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hadoop-aws-sdk-2.35.4-tested-rpm
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: hadoop-3.4.3-s3a-evidence
+          path: test-evidence
+      - name: Verify tested candidate digest and evidence
+        run: |
+          set -euo pipefail
+          (cd candidate && sha256sum -c evidence/SHA256SUMS)
+          cp test-evidence/release-evidence.json candidate/test-evidence.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hadoop-aws-sdk-2.35.4-release-candidate
+          path: candidate
+          compression-level: 0
+          retention-days: 30
+  promote:
+    name: Open tested optional SDK repository PR
+    needs: [select, api, candidate]
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      needs.api.result == 'success' && needs.candidate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: repository
+          lfs: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: hadoop-aws-sdk-2.35.4-tested-rpm
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: hadoop-3.4.3-s3a-evidence
+          path: test-evidence
+      - name: Stage optional RPM checksums metadata and open review PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ needs.select.outputs.sdk_run }}
+        run: bash scripts/s3a/promote-sdk.sh

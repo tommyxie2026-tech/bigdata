@@ -29,8 +29,7 @@ without that store must fail with a certificate-path validation error.
 - Delete the S3A prefix; original fixture cleanup then verifies the entire bucket
   is empty. A strict summary requires every phase assertion and multipart proof.
 
-Every service/network wait and Java invocation has a deadline. Workflow ceiling:
-20 minutes. Failure uploads server and JVM logs, checksum/package/dependency
+Every service/network wait and Java invocation has a deadline. Integration job ceiling: 20 minutes; optional binary packaging has its own 15-minute ceiling. Failure uploads server and JVM logs, checksum/package/dependency
 records and partial results, excluding the private TLS key and trust store.
 
 This establishes one S3A filesystem profile against one pinned S3 implementation.
@@ -43,3 +42,7 @@ Primary sources:
 - https://github.com/apache/hadoop/blob/rel/release-3.4.3/hadoop-tools/hadoop-aws/pom.xml
 
 Packaging reuse: the manual `sdk_package_run_id` input verifies that the referenced packaging job actually succeeded and its package script/contract exactly match current inputs. It then verifies artifact and package-input checksums. Test-only edits do not require repackaging; skipped packaging is reuse, never a new build PASS.
+
+Publication: only a successful mainline integration can create the SDK release candidate and open a repository promotion PR. The candidate includes the exact tested optional RPM, checksums, pinned binary contract and both strict integration reports. Publication remains subject to review/merge; no PR is automatically merged.
+
+Java 8 TLS: use the officially supported `fs.s3a.ssl.channel.mode=default_jsse_with_gcm`. The default S3A Java 8 cipher filter removes GCM and has no common cipher with the fixture server. Enabling normal JSSE GCM preserves both CA and hostname verification; no weak server cipher or insecure trust bypass is enabled. See https://hadoop.apache.org/docs/r3.4.3/hadoop-aws/tools/hadoop-aws/performance.html#Tuning_SSL_Performance.

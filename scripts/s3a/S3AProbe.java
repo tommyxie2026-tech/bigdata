@@ -19,6 +19,8 @@ public final class S3AProbe {
     c.set("fs.s3a.endpoint.region","us-east-1");
     c.setBoolean("fs.s3a.path.style.access",true);
     c.setBoolean("fs.s3a.connection.ssl.enabled",true);
+    // Hadoop's Java 8 default removes GCM; the modern Go TLS server requires it.
+    c.set("fs.s3a.ssl.channel.mode","default_jsse_with_gcm");
     c.set("fs.s3a.aws.credentials.provider","org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
     c.set("fs.s3a.access.key",reader?"fixture-reader":"fixture-admin");
     c.set("fs.s3a.secret.key",reader?"fixture-reader-secret":"fixture-admin-secret");
