@@ -20,14 +20,15 @@ public final class PaimonTarget {
     private static void define(TableEnvironment table) {
         table.executeSql("CREATE CATALOG lakehouse WITH ('type'='paimon',"
             + "'warehouse'='file:///var/lib/flink/cdc-paimon')");
-        table.executeSql("CREATE TABLE IF NOT EXISTS lakehouse.default.lake_rows (id INT, name STRING, "
+        table.executeSql("CREATE DATABASE IF NOT EXISTS lakehouse.cdc_ci");
+        table.executeSql("CREATE TABLE IF NOT EXISTS lakehouse.cdc_ci.lake_rows (id INT, name STRING, "
             + "PRIMARY KEY(id) NOT ENFORCED) WITH ('bucket'='1')");
     }
     public static void submit(StreamTableEnvironment table, String source) {
         if (!source.equals("mysql_source") && !source.equals("postgres_source"))
             throw new IllegalArgumentException("Unexpected source table");
         define(table);
-        table.executeSql("INSERT INTO lakehouse.default.lake_rows SELECT id, name FROM " + source);
+        table.executeSql("INSERT INTO lakehouse.cdc_ci.lake_rows SELECT id, name FROM " + source);
     }
     public static void assertRows(Map<Integer,String> expected) throws Exception {
         long deadline = System.nanoTime() + 120_000_000_000L;
@@ -37,7 +38,7 @@ public final class PaimonTarget {
             reader.getConfig().getConfiguration().setString("execution.target", "local");
             reader.getConfig().getConfiguration().setInteger("parallelism.default", 1);
             define(reader);
-            TableResult rows = reader.executeSql("SELECT id, name FROM lakehouse.default.lake_rows");
+            TableResult rows = reader.executeSql("SELECT id, name FROM lakehouse.cdc_ci.lake_rows");
             actual.clear();
             try (CloseableIterator<Row> iterator = rows.collect()) {
                 while (iterator.hasNext()) {
