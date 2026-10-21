@@ -53,6 +53,9 @@ def main():
                 process = subprocess.Popen(['runuser', '-u', 'ams', '--', *command],
                     stdout=stream, stderr=subprocess.STDOUT, start_new_session=True)
                 processes.append((name, process))
+                if name == 'collector':
+                    # Mirror ExecStartPost: do not let a cold Monitor blacklist a warming Collector.
+                    subprocess.run(['/usr/libexec/ambari-metrics/runtime','wait-collector'],check=True,timeout=190)
             identities.append({name: p.pid for name, p in processes})
             command = [sys.executable, str(Path(__file__).with_name('verify_collector.py')),
                 '--start-ms', str(started_ms), '--output', str(evidence/(phase + '-query.json')),

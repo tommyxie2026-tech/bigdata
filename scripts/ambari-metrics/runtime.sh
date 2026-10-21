@@ -7,6 +7,7 @@ JAVA_HOME=$(dirname "$(dirname "$java_bin")")
 export HBASE_LOG_DIR=/var/log/ams-hbase HBASE_PID_DIR=/var/run/ams-hbase HBASE_HEAPSIZE=768
 case "${1:?service required}" in
   hbase) exec /usr/lib/ams-hbase/bin/hbase --config /etc/ams-hbase/conf master start ;;
+  wait-collector) exec /usr/bin/python3 /usr/libexec/ambari-metrics/wait_collector.py ;;
   collector)
     exec "$java_bin" -Xms256m -Xmx768m -Djava.net.preferIPv4Stack=true \
       -Dams.log.dir=/var/log/ambari-metrics-collector \

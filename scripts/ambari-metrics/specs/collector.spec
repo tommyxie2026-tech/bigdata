@@ -9,7 +9,7 @@ License: Apache-2.0
 URL: https://github.com/apache/ambari-metrics
 Source0: collector.tar.gz
 BuildArch: x86_64
-Requires: java-1.8.0-openjdk-headless, bash, procps-ng, systemd
+Requires: java-1.8.0-openjdk-headless, bash, procps-ng, systemd, python3
 Requires(pre): shadow-utils
 AutoReqProv: no
 

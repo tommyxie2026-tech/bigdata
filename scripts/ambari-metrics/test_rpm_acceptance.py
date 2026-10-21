@@ -54,6 +54,40 @@ class CollectorAcceptanceTests(unittest.TestCase):
             self.assertEqual(values['keep.me'],'kept')
             self.assertNotIn('hbase.table.sanity.checks',values)
 
+    def load_script(self,name):
+        spec=importlib.util.spec_from_file_location('runtime_test',Path(__file__).with_name(name))
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        return module
+
+    def test_collector_readiness_waits_through_warmup_and_is_bounded(self):
+        import io
+        from unittest.mock import patch
+        module=self.load_script('wait_collector.py')
+        with patch.object(module.time,'monotonic',side_effect=[0,0,1]), \
+             patch.object(module.time,'time',return_value=200.0), \
+             patch.object(module.time,'sleep') as sleep, \
+             patch.object(module.urllib.request,'urlopen',side_effect=[OSError('warming'),io.BytesIO(b'{"metrics":[]}')]) as request:
+            module.wait_ready(5)
+            self.assertEqual(request.call_count,2)
+            sleep.assert_called_once_with(2)
+            self.assertEqual(request.call_args.kwargs['timeout'],5)
+            query=module.urllib.parse.parse_qs(module.urllib.parse.urlsplit(request.call_args.args[0]).query)
+            self.assertEqual(query['startTime'],['140000'])
+            self.assertEqual(query['endTime'],['200000'])
+        with patch.object(module.time,'monotonic',side_effect=[0,0,6]), \
+             patch.object(module.time,'sleep'), \
+             patch.object(module.urllib.request,'urlopen',return_value=io.BytesIO(b'{"wrong":[]}')):
+            with self.assertRaises(RuntimeError):module.wait_ready(5)
+
+    def test_new_recipe_input_invalidates_reuse_but_api_failure_does_not_rebuild(self):
+        import subprocess
+        from unittest.mock import Mock
+        module=self.load_script('select-rpm.py')
+        missing=Mock(side_effect=subprocess.CalledProcessError(1,['gh'],stderr=b'gh: Not Found (HTTP 404)'))
+        self.assertIsNone(module.original_file(missing,'new-recipe'))
+        broken=Mock(side_effect=subprocess.CalledProcessError(1,['gh'],stderr=b'gh: Bad Gateway (HTTP 502)'))
+        with self.assertRaises(subprocess.CalledProcessError):module.original_file(broken,'old-recipe')
+
 
 if __name__ == '__main__':
     unittest.main()
