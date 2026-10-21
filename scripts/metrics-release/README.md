@@ -23,7 +23,10 @@ The candidate retains original build/test IDs, immutable upstream source,
 packaging identity, package digests and original evidence. Promotion copies these
 payloads to the split RPM repository, generates and verifies checksum/primary
 metadata, requires Git LFS for RPMs and opens a separate review PR. It never merges
-that PR. Existing versions are rejected rather than overwritten; a changed
+that PR. Raw upstream diagnostic logs remain in the original CI evidence artifact;
+the repository retains the three validated query/acceptance JSON files and an
+index of all original evidence file checksums without rewriting log contents.
+Existing versions are rejected rather than overwritten; a changed
 published payload requires a reviewed release revision.
 
 Local parser/workflow tests do not prove a working Collector. Delivery remains
