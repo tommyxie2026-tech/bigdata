@@ -79,6 +79,14 @@ jobs:
       - name: Release evidence audit contracts
         run: python3 scripts/ci/test-release-evidence-audit.py
 
+      - name: Component input scope contracts
+        run: |
+          python3 scripts/ci/test-component-reuse-scope.py
+          python3 scripts/ci/test-component-test-selection.py
+
+      - name: CI timing report contracts
+        run: python3 scripts/ci/test-ci-timing-report.py
+
       - name: Merged PR tested artifact reuse contracts
         run: python3 scripts/ci/test-reuse-merged-pr-test-artifacts.py
 

@@ -17,6 +17,9 @@ outputs:
   key:
     description: New immutable snapshot key
     value: ${{ steps.key.outputs.key }}
+  matched_key:
+    description: Snapshot actually restored (empty on a cold cache)
+    value: ${{ steps.downloads.outputs.cache-matched-key }}
 runs:
   using: composite
   steps:
@@ -32,6 +35,7 @@ runs:
         printf 'key=%s-%s-%s-%s\n' "${CACHE_SCOPE}" "${mirror_scope}" "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
         mkdir -p /tmp/bigdata-component-cache/m2/repository /tmp/bigdata-component-cache/gradle/{caches,wrapper}
     - uses: actions/cache/restore@v4
+      id: downloads
       with:
         path: |
           /tmp/bigdata-component-cache/m2/repository

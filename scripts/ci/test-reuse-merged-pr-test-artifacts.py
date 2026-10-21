@@ -32,6 +32,7 @@ def run(name: str, run_id: int, *, conclusion: str = "success") -> dict:
         "name": name,
         "id": run_id,
         "event": "pull_request",
+        "path": ".github/workflows/build-components.yml" if name == "Build Components" else ".github/workflows/ci-pr.yml",
         "status": "completed",
         "conclusion": conclusion,
         "head_sha": HEAD,
@@ -80,6 +81,34 @@ class MergedPrArtifactReuseTests(unittest.TestCase):
                 head_tree_sha="d" * 40,
             )
         )
+
+    def test_unrelated_tree_change_is_allowed_only_with_equal_component_inputs(self) -> None:
+        self.assertTrue(merged_pr_matches_tree(
+            pr(), repository=REPO, merge_sha="b"*40, merge_tree_sha="c"*40,
+            head_tree_sha="d"*40, component_inputs_match=True))
+        self.assertFalse(merged_pr_matches_tree(
+            pr(), repository=REPO, merge_sha="b"*40, merge_tree_sha="c"*40,
+            head_tree_sha="d"*40, component_inputs_match=False))
+
+    def test_latest_failed_required_ci_cannot_reuse_older_success(self) -> None:
+        selected = select_reusable_test_run(
+            runs=[run("Build Components", RUN_ID)],
+            ci_runs=[run("CI PR", 9), run("CI PR", 10, conclusion="failure")],
+            jobs_by_run={RUN_ID:jobs()}, artifacts_by_run={RUN_ID:ARTIFACTS},
+            repository=REPO, head_sha=HEAD, component=COMPONENT, version=VERSION)
+        self.assertIsNone(selected)
+
+    def test_component_workflow_can_reuse_real_test_with_proven_original_build(self) -> None:
+        component_run=run("Flink Integration", RUN_ID)
+        component_run["path"]=".github/workflows/flink.yml"
+        for proven, expected in [(False,None),(True,RUN_ID)]:
+            selected=select_reusable_test_run(
+                runs=[component_run],ci_runs=[run("CI PR",9)],
+                jobs_by_run={RUN_ID:jobs(build="skipped")},artifacts_by_run={RUN_ID:ARTIFACTS},
+                repository=REPO,head_sha=HEAD,component=COMPONENT,version=VERSION,
+                allowed_workflows={"Flink Integration":".github/workflows/flink.yml"},
+                reused_build_proven=proven)
+            self.assertEqual(selected,expected)
 
     def test_fork_and_unmerged_prs_are_never_eligible(self) -> None:
         fork = pr()
