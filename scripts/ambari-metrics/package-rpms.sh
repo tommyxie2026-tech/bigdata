@@ -26,7 +26,7 @@ fetch hbase-2.4.13-bin.tar.gz \
   https://archive.apache.org/dist/hbase/2.4.13/hbase-2.4.13-bin.tar.gz
 fetch phoenix-hbase-2.4-5.1.2-bin.tar.gz \
   9a671abf73a5c56f1adb173ef8a0dca33cbe15f219e7dc55d92a6f136a8e3549593d2f14bd185f221e1238554d13f86b75253e7e05e53f699fe4c7e1fe854c48 \
-  https://s3.amazonaws.com/repo.bigtop.apache.org/bigtop-stack-binary/3.2.0/centos-7/x86_64/phoenix-hbase-2.4-5.1.2-bin.tar.gz
+  https://downloads.apache.org/phoenix/phoenix-5.1.2/phoenix-hbase-2.4-5.1.2-bin.tar.gz
 mkdir -p "$work/extracted"
 tar -xzf /work/downloads/hbase-2.4.13-bin.tar.gz -C "$work/extracted"
 tar -xzf /work/downloads/phoenix-hbase-2.4-5.1.2-bin.tar.gz -C "$work/extracted"

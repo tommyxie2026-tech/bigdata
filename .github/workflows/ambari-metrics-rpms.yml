@@ -45,10 +45,13 @@ jobs:
           github-token: ${{ github.token }}
           path: source-output
       - name: Restore checksum-pinned embedded distributions
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
-          path: /tmp/metrics-package/downloads
-          key: metrics-embedded-hbase2413-phoenix512-sha512-v1
+          path: |
+            /tmp/metrics-package/downloads/hbase-2.4.13-bin.tar.gz
+            /tmp/metrics-package/downloads/phoenix-hbase-2.4-5.1.2-bin.tar.gz
+          key: metrics-embedded-apache-sha512-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: metrics-embedded-apache-sha512-v2-
       - name: Assemble RPM payloads in openEuler
         run: |
           set -euo pipefail
@@ -58,6 +61,14 @@ jobs:
             -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$GITHUB_WORKSPACE/source-output:/input:ro" \
             -v /tmp/metrics-package:/work \
             openeuler/openeuler:22.03-lts-sp4 bash /workspace/scripts/ambari-metrics/package-rpms.sh
+      - name: Preserve only validated distribution downloads
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            /tmp/metrics-package/downloads/hbase-2.4.13-bin.tar.gz
+            /tmp/metrics-package/downloads/phoenix-hbase-2.4-5.1.2-bin.tar.gz
+          key: metrics-embedded-apache-sha512-v2-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
