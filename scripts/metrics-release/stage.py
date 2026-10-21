@@ -36,7 +36,17 @@ def stage(candidate,target):
     target.mkdir(parents=True)
     for name in checksums:shutil.copy2(candidate/'rpms'/name,target/name)
     (target/'SHA256SUMS').write_text(''.join(d+'  ./'+n+'\n' for n,d in sorted(checksums.items())))
-    shutil.copytree(evidence,target/'test-evidence')
+    # Raw upstream logs are immutable diagnostics, not source-controlled text.
+    # Retain them in the original Actions artifact and index their exact bytes.
+    published=target/'test-evidence';published.mkdir()
+    for name in ['acceptance.json','initial-query.json','restarted-query.json']:
+        shutil.copy2(evidence/name,published/name)
+    files={str(path.relative_to(evidence)):hashlib.sha256(path.read_bytes()).hexdigest()
+           for path in sorted(evidence.rglob('*')) if path.is_file()}
+    reference={'repository':os.environ.get('GITHUB_REPOSITORY','tommyxie2026-tech/bigdata'),
+        'artifact_name':'ambari-metrics-3.0.0-rpm-installation-evidence',
+        'test_run_id':value['test_run_id'],'files':files}
+    (published/'artifact-index.json').write_text(json.dumps(reference,indent=2,sort_keys=True)+'\n')
     shutil.copytree(candidate/'build-evidence',target/'build-evidence')
     shutil.copy2(candidate/'evidence/candidate.json',target/'candidate.json')
     fields={'schema':'bigdata.rpm-repo/v2','component':'ambari-metrics','version':'3.0.0',
