@@ -175,7 +175,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${CHECK_RESULT}" == success && "${ALREADY_CURRENT}" == true && \
-                "${REQUIRE_PR_BUILD_TEST}" != true && \
+                ( "${REQUIRE_PR_BUILD_TEST}" != true || "${EVENT_NAME}" != pull_request ) && \
                 "${BUILD_RESULT}" == skipped && "${TEST_RESULT}" == skipped && \
                 "${RELEASE_RESULT}" == skipped ]]; then
             echo 'stage_passed=true' >> "${GITHUB_OUTPUT}"

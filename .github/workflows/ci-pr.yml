@@ -58,6 +58,9 @@ jobs:
       - name: Maven download resilience contracts
         run: bash scripts/ci/test-maven-download-resilience.sh
 
+      - name: Mainline and PR lifecycle gate regression
+        run: python3 scripts/ci/test-component-lifecycle-gate.py
+
       - name: Component RPM repository fast-path contracts
         run: python3 scripts/ci/test-component-repo-fast-path.py
 
