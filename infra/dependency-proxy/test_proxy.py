@@ -36,6 +36,7 @@ class ProxyProfileTests(unittest.TestCase):
         self.assertLess(caddy.index('respond @mutations'),caddy.index('handle_path'))
         npm=yaml.safe_load((ROOT/'verdaccio.yaml').read_text())
         self.assertEqual(npm['auth']['htpasswd']['max_users'],-1)
+        self.assertEqual(npm['url_prefix'],'/npm/')
         for package in npm['packages'].values():self.assertEqual(package['publish'],[])
         self.assertIn('--restrict-modify=root',(ROOT/'devpi-entrypoint.sh').read_text())
     def test_offline_proof_checks_actual_network_isolation(self):

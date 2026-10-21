@@ -28,7 +28,7 @@ def get(url, proxy=False):
 def proxy_url(value,origin):
     url=urllib.parse.urljoin(origin,value)
     parsed=urllib.parse.urlsplit(url)
-    assert parsed.scheme=='https' and parsed.netloc=='localhost:8443' and parsed.path.startswith(('/npm/','/pypi/'))
+    assert parsed.scheme=='https' and parsed.netloc=='localhost:8443' and parsed.path.startswith(('/npm/','/pypi/')), 'Package URL escapes configured proxy prefix: '+url
     return url.split('#')[0]
 def main():
     p=argparse.ArgumentParser();p.add_argument('phase',choices=['cold','warm','restarted']);p.add_argument('--evidence',type=Path,required=True);a=p.parse_args()
