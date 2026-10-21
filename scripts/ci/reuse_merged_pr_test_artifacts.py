@@ -247,6 +247,7 @@ def find_reusable_test_run(
     merge_sha: str,
     component: str,
     version: str,
+    provenance: dict[str, str] | None = None,
 ) -> tuple[int | None, str]:
     associated = _pages(
         token,
@@ -322,6 +323,9 @@ def find_reusable_test_run(
             reused_build_proven=original_build_proven,
         )
         if reusable is not None:
+            if provenance is not None:
+                built_here = _successful_jobs_for_component(jobs_by_run[reusable], component, version)
+                provenance["build_run_id"] = str(reusable) if built_here else head_build_id
             return reusable, (f"Reusing actual PR Test artifacts from run {reusable}; "
                               f"component_inputs={head_fingerprint}, original_build_run={head_build_id or 'same-run'}.")
 
@@ -337,6 +341,7 @@ def main() -> int:
     output = Path(os.environ["GITHUB_OUTPUT"])
     summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
 
+    provenance: dict[str, str] = {}
     reusable_run: int | None = None
     message = "Missing API context; running normal lifecycle."
     try:
@@ -347,6 +352,7 @@ def main() -> int:
                 merge_sha=merge_sha,
                 component=component,
                 version=version,
+                provenance=provenance,
             )
     except (OSError, ValueError, KeyError, urllib.error.URLError, json.JSONDecodeError) as error:
         # Optimization failures must never bypass the normal CI path.
@@ -354,6 +360,7 @@ def main() -> int:
 
     with output.open("a", encoding="utf-8") as stream:
         stream.write(f"test_run_id={reusable_run or ''}\n")
+        stream.write("build_run_id=" + (provenance.get("build_run_id", "") if reusable_run else "") + "\n")
     with summary.open("a", encoding="utf-8") as stream:
         stream.write(message + "\n")
     print(message)

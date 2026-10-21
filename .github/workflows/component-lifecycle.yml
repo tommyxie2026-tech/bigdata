@@ -79,6 +79,7 @@ jobs:
       pull-requests: read
     outputs:
       test_run_id: ${{ steps.lookup.outputs.test_run_id }}
+      build_run_id: ${{ steps.lookup.outputs.build_run_id }}
     steps:
       - name: Checkout merged workflow code
         uses: actions/checkout@v4
@@ -226,6 +227,12 @@ jobs:
           COMPONENT: ${{ inputs.component }}
           RPM_BUILD_RUN_ID: ${{ inputs.rpm_build_run_id }}
           PR_TEST_RUN_ID: ${{ needs.pr_test_reuse.outputs.test_run_id }}
+          PR_BUILD_RUN_ID: ${{ needs.pr_test_reuse.outputs.build_run_id }}
+          REPO_ALREADY_CURRENT: ${{ needs.repo_check.outputs.already_current }}
+          REPO_BUILD_RUN_ID: ${{ needs.repo_check.outputs.build_run_id }}
+          REPO_TEST_RUN_ID: ${{ needs.repo_check.outputs.test_run_id }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          TEST_RESULT: ${{ needs.test.result }}
         run: python3 scripts/ci/ci_timing_report.py --component "${COMPONENT}" --output timing/evidence.json
 
       - name: Upload observed CI timing evidence

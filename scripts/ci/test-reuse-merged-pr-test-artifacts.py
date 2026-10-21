@@ -62,6 +62,30 @@ ARTIFACTS = {
 
 
 class MergedPrArtifactReuseTests(unittest.TestCase):
+    def test_lookup_exports_the_actual_original_build_separately(self) -> None:
+        from unittest.mock import patch
+        import reuse_merged_pr_test_artifacts as module
+        for original,build_status in [('', 'success'),('789', 'skipped'),('789', 'success')]:
+            provenance={}
+            def pages(token,path,collection):
+                if collection=='pull_requests':return [{'number':1}]
+                if collection=='workflow_runs':
+                    component_run=run('Flink Integration',RUN_ID+1)
+                    component_run['path']='.github/workflows/flink.yml'
+                    return [run('CI PR',9),run('Build Components',RUN_ID),component_run]
+                if collection=='jobs':return jobs(build=build_status)
+                if collection=='artifacts':return [{'name':name,'expired':False} for name in ARTIFACTS]
+                raise AssertionError(collection)
+            with patch.object(module,'_pages',side_effect=pages), \
+                 patch.object(module,'_api_get',return_value=pr()), \
+                 patch.object(module,'_commit_tree',return_value='c'*40), \
+                 patch.object(module,'_revision_scope',return_value=('fingerprint',{'Build Components':'.github/workflows/build-components.yml','Flink Integration':'.github/workflows/flink.yml'},original)), \
+                 patch.object(module,'_verified_original_build',return_value=bool(original)):
+                selected,_=module.find_reusable_test_run(token='fixture',repository=REPO,
+                    merge_sha='b'*40,component=COMPONENT,version=VERSION,provenance=provenance)
+            self.assertEqual(selected,RUN_ID)
+            self.assertEqual(provenance['build_run_id'],str(RUN_ID) if build_status=='success' else original)
+
     def test_only_exact_merged_pr_tree_is_eligible(self) -> None:
         self.assertTrue(
             merged_pr_matches_tree(
