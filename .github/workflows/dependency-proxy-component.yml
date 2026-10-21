@@ -1,0 +1,155 @@
+name: Dependency proxy full component cycle
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/dependency-proxy-component.yml'
+      - 'infra/dependency-proxy/compose.yaml'
+      - 'infra/dependency-proxy/Caddyfile'
+      - 'infra/dependency-proxy/reposilite.json'
+      - 'infra/dependency-proxy/verdaccio.yaml'
+      - 'infra/dependency-proxy/devpi.Dockerfile'
+      - 'infra/dependency-proxy/devpi-entrypoint.sh'
+      - 'infra/dependency-proxy/probe.py'
+      - 'infra/dependency-proxy/verify-cache.sh'
+      - 'infra/dependency-proxy/test_proxy.py'
+      - 'infra/dependency-proxy/build-component-cycle.sh'
+      - 'infra/dependency-proxy/component.Dockerfile'
+      - 'scripts/ci/configure-maven-policy.py'
+      - 'scripts/ci/retry-maven-downloads.sh'
+      - 'scripts/ci/run-with-deadline.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/dependency-proxy-component.yml'
+      - 'infra/dependency-proxy/compose.yaml'
+      - 'infra/dependency-proxy/Caddyfile'
+      - 'infra/dependency-proxy/reposilite.json'
+      - 'infra/dependency-proxy/verdaccio.yaml'
+      - 'infra/dependency-proxy/devpi.Dockerfile'
+      - 'infra/dependency-proxy/devpi-entrypoint.sh'
+      - 'infra/dependency-proxy/probe.py'
+      - 'infra/dependency-proxy/verify-cache.sh'
+      - 'infra/dependency-proxy/test_proxy.py'
+      - 'infra/dependency-proxy/build-component-cycle.sh'
+      - 'infra/dependency-proxy/component.Dockerfile'
+      - 'scripts/ci/configure-maven-policy.py'
+      - 'scripts/ci/retry-maven-downloads.sh'
+      - 'scripts/ci/run-with-deadline.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dependency-proxy-component-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    env:
+      PROXY_CERT_DIR: /tmp/proxy-certificates
+      COMPOSE_PROJECT_NAME: dependency-proxy-component-ci
+      PROXY_DISPOSABLE: '1'
+      PROXY_CA_FILE: /tmp/proxy-certificates/tls.crt
+      PROXY_EVIDENCE_ROOT: /tmp/proxy-evidence
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate deployment and configuration contracts
+        run: |
+          python3 -m pip install --disable-pip-version-check PyYAML==6.0.3
+          python3 infra/dependency-proxy/test_proxy.py
+          docker compose -f infra/dependency-proxy/compose.yaml config --quiet
+      - name: Create disposable TLS identity and start pinned proxy
+        timeout-minutes: 15
+        working-directory: infra/dependency-proxy
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$PROXY_CERT_DIR"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout "$PROXY_CERT_DIR/tls.key" -out "$PROXY_CERT_DIR/tls.crt" \
+            -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,DNS:tls,IP:127.0.0.1' 2>/dev/null
+          docker compose up -d --build
+          for _ in $(seq 1 120); do
+            if curl --fail --silent --connect-timeout 2 --max-time 5 --cacert "$PROXY_CA_FILE" https://localhost:8443/pypi/+status >/dev/null && \
+               curl --fail --silent --connect-timeout 2 --max-time 5 --cacert "$PROXY_CA_FILE" https://localhost:8443/npm/-/ping >/dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail --silent --connect-timeout 2 --max-time 5 --cacert "$PROXY_CA_FILE" https://localhost:8443/pypi/+status >/dev/null
+          curl --fail --silent --connect-timeout 2 --max-time 5 --cacert "$PROXY_CA_FILE" https://localhost:8443/npm/-/ping >/dev/null
+      - name: Checkout immutable real component source
+        uses: actions/checkout@v4
+        with:
+          repository: apache/flink-cdc
+          ref: 06581fc73b84b1da45fccf93441d96a118d9bfc1
+          path: component-source
+          persist-credentials: false
+      - name: Prepare reusable openEuler JDK 11 build toolchain
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          timeout --kill-after=20 660 docker build -t proxy-component-toolchain -f infra/dependency-proxy/component.Dockerfile .
+          docker inspect proxy-component-toolchain --format '{{.Id}}' > /tmp/proxy-toolchain-id
+      - name: Cold full component compile with empty client repository
+        timeout-minutes: 27
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/proxy-component/cold /tmp/proxy-component/m2-cold
+          test -z "$(find /tmp/proxy-component/m2-cold -type f -print -quit)"
+          timeout --kill-after=20 1560 docker run --rm --init --network "$COMPOSE_PROJECT_NAME-internal" \
+            -e PHASE=cold -e BUILD_TOOLCHAIN_ID="$(cat /tmp/proxy-toolchain-id)" \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$GITHUB_WORKSPACE/component-source:/source:ro" \
+            -v "$PROXY_CA_FILE:/ca/tls.crt:ro" -v /tmp/proxy-component/cold:/work -v /tmp/proxy-component/m2-cold:/root/.m2 \
+            proxy-component-toolchain bash /workspace/infra/dependency-proxy/build-component-cycle.sh
+      - name: Prove cold cache, blocked-upstream warm fetch and restart persistence
+        timeout-minutes: 10
+        run: bash infra/dependency-proxy/verify-cache.sh
+      - name: Warm rebuild with empty client repository and isolated upstream servers
+        timeout-minutes: 17
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/proxy-component/warm /tmp/proxy-component/m2-warm
+          test -z "$(find /tmp/proxy-component/m2-warm -type f -print -quit)"
+          timeout --kill-after=20 960 docker run --rm --init --network "$COMPOSE_PROJECT_NAME-internal" \
+            -e PHASE=warm -e BUILD_TOOLCHAIN_ID="$(cat /tmp/proxy-toolchain-id)" \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$GITHUB_WORKSPACE/component-source:/source:ro" \
+            -v "$PROXY_CA_FILE:/ca/tls.crt:ro" -v /tmp/proxy-component/warm:/work -v /tmp/proxy-component/m2-warm:/root/.m2 \
+            proxy-component-toolchain bash /workspace/infra/dependency-proxy/build-component-cycle.sh
+          cmp /tmp/proxy-component/cold/evidence/dependency-bytes.sha256 /tmp/proxy-component/warm/evidence/dependency-bytes.sha256
+      - name: Offline rebuild in a network-disabled fresh container
+        timeout-minutes: 17
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/proxy-component/offline
+          timeout --kill-after=20 960 docker run --rm --init --network none \
+            -e PHASE=offline -e BUILD_TOOLCHAIN_ID="$(cat /tmp/proxy-toolchain-id)" \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$GITHUB_WORKSPACE/component-source:/source:ro" \
+            -v "$PROXY_CA_FILE:/ca/tls.crt:ro" -v /tmp/proxy-component/offline:/work -v /tmp/proxy-component/m2-warm:/root/.m2 \
+            proxy-component-toolchain bash /workspace/infra/dependency-proxy/build-component-cycle.sh
+          cmp /tmp/proxy-component/warm/evidence/dependency-bytes.sha256 /tmp/proxy-component/offline/evidence/dependency-bytes.sha256
+      - name: Collect server logs and stop disposable instance
+        if: always()
+        working-directory: infra/dependency-proxy
+        run: |
+          mkdir -p "$PROXY_EVIDENCE_ROOT"
+          docker compose ps --all > "$PROXY_EVIDENCE_ROOT/containers.txt" 2>&1 || true
+          docker compose logs --no-color > "$PROXY_EVIDENCE_ROOT/proxy.log" 2>&1 || true
+          docker compose down --volumes || true
+          rm -rf "$PROXY_CERT_DIR"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-proxy-cache-evidence
+          path: /tmp/proxy-evidence
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-proxy-component-cycle-summary
+          path: |
+            /tmp/proxy-component/*/evidence/cycle-evidence.json
+            /tmp/proxy-component/*/evidence/toolchain.txt
+            /tmp/proxy-component/*/evidence/compiled-jar.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-proxy-component-cycle-logs
+          path: /tmp/proxy-component/*/evidence
