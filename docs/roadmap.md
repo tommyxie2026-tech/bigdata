@@ -18,6 +18,30 @@ Phase 5: 容器平台与云原生演进
 Phase 6: 组件市场化与组合交付体系
 ```
 
+### 2.1 当前实现状态（2026-10-22，Asia/Tokyo）
+
+核验主干：`0f84fa2c60852e73fa8994007076c1e36f844c96`。**本轮组件构建、RPM 发布、CI 改造和指定恢复链路已交付；整个 Phase 0—6 路线图没有全部完成，剩余工作不只是部署和测试。**设计文档、模板、单节点 smoke 与已实现的集成能力应分别记录。
+
+| 范围 | 已实现 / 已有证据 | 尚余部署和验收 | 尚余开发或选型 |
+|---|---|---|---|
+| 本轮五步组件交付 | 主干 CI 修复、来源/耗时记录、代理 CI、双 CDC 湖仓恢复、Metrics/SDK RPM 发布 | 代理正式部署与实际 CI 接入 | 本轮限定范围内无新增组件打包缺口；代理目标尚未提供 |
+| Phase 1—2 发行与管理底座 | 当前版本 RPM、构建/晋级流程、Blueprint/Runbook 和参数模板；Metrics 独立运行验收 | 七节点安装、HA/failover、恢复与版本冻结评审 | 完整 Blueprint、Ambari 服务管理适配、监控告警及运维自动化仍需对照目标补齐；不能因模板存在即判定完成 |
+| Phase 3 实时湖仓 | CDC MySQL/PostgreSQL 直达 Paimon、Hudi、Iceberg；HDFS 恢复及 Paimon/HTTPS S3；引擎与格式 RPM 已发布 | 实际集群和实际存储端点的稳定性、容量、故障窗口 | Kafka 中转业务作业、共享 Catalog/Trino 接入、生产对象存储选型/适配、安全和质量/延迟能力仍需实施 |
+| Phase 4 虚拟机多环境 | 设计目标已定义 | 多环境部署验证 | 环境规格、镜像/初始化、配置隔离与交付自动化未据本轮完成 |
+| Phase 5 云原生 | 混合管理边界已规划 | Kubernetes 部署、升级、恢复验证 | Operator 适配、资源/网络/持久化与平台集成仍为后续开发 |
+| Phase 6 组合交付 | Profile 和扩展规范已设计 | 组合交付验收 | 可执行 Profile、组件依赖/兼容校验及交付编排仍需实现 |
+| 产品平台层（独立产品视角） | Hue 作为已交付 SQL UI；现有方案文档 | 产品层集成测试 | 调度、数据源管理、治理/权限、多租户、质量和数据服务 API 仍待选型/开发，详见 [产品路线图](product-roadmap.md) |
+
+“尚余开发”描述的是目标能力未闭环，不表示所有相关文件均不存在；设计/模板不能替代可执行适配。Kerberos、Ranger、Prometheus/JMX 也是新增集成工作，不应全部归入“测试”。Knox、Atlas、Delta Lake 等可选项须业务立项后独立交付，不强行扩大本轮范围。
+
+### 2.2 本轮交付证据与边界
+
+- [完整主干组件 CI](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39689437161) success；#107/#108/#120 的门禁、复用及来源记录已合并。实际测试与仓库复用分别记录，版本/打包输入未变不重编 RPM。
+- #110/#115 代理配置与完整组件冷/热/离线构建已合并，[主干验证](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39689622642) PASS；265/47/39 秒分别为该运行的编译耗时，不是所有组件性能承诺。正式服务和 CI 生产镜像地址尚未接入。
+- #109/#114/#117/#118/#119 已合并：[本地 Paimon](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39689554165)、[Paimon/HDFS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39689554220)、[Paimon/HTTPS S3](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39689554168)、[Hudi/HDFS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39689554558)、[Iceberg/HDFS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39689554289) 双 source 恢复专项 PASS；不代表 schema 演进、所有故障窗口 exactly-once 或 Kafka 中转链全部实现。
+- #113/#116/#121/#122/#123 已合并；[原始 Metrics 安装/重启](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39653729447) 和 [主干候选/晋级](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39691186873) PASS，两份 RPM 已发布。Ambari 集群内配置、展示和告警集成单列。
+- #106 已合并，S3A SDK 2.35.4 RPM 已发布；客户端验收不等于某生产对象存储已选型/交付。
+
 ## 3. Phase 0：平台规划与设计收敛
 
 ### 3.1 阶段目标
@@ -189,6 +213,7 @@ Phase 6: 组件市场化与组合交付体系
 - CDC Connector
 - Iceberg，主线表格式
 - Hudi，可选 Profile
+- Paimon，可选扩展 Profile
 - Hive Metastore
 - Trino 或 Spark SQL
 - S3 兼容对象存储
@@ -201,7 +226,7 @@ Phase 6: 组件市场化与组合交付体系
 - 定义 Kafka Topic 规划
 - 定义 Flink 作业部署模型
 - 定义 Iceberg 表格式主线方案
-- 定义 Hudi 可选 Profile
+- 定义 Hudi / Paimon 可选 Profile
 - 定义 S3 兼容对象存储接入方案
 - 定义湖仓分层模型
 - 定义实时与离线任务协同方式
@@ -215,7 +240,7 @@ Phase 6: 组件市场化与组合交付体系
 | CDC Agent | 数据源、变更捕获、同步链路 |
 | Kafka Agent | Topic 规划、分区、副本、保留策略 |
 | Flink Agent | 任务模型、Checkpoint、状态后端、部署模式 |
-| Lakehouse Agent | Iceberg/Hudi 选型、表设计、元数据管理 |
+| Lakehouse Agent | Iceberg/Hudi/Paimon 选型、表设计、元数据管理 |
 | Storage Agent | S3 兼容对象存储与 HDFS 协同 |
 | Query Agent | Trino/Spark SQL 查询服务设计 |
 | Quality Agent | 实时质量、延迟、补偿和一致性设计 |
@@ -232,14 +257,12 @@ Phase 6: 组件市场化与组合交付体系
 
 目标：形成组件可插拔、能力可组合、交付可编排的平台体系。
 
-## 10. 当前优先级建议
+## 10. 当前优先级与进入下一阶段的条件
 
-当前应进入 Phase 1 详细设计，优先补齐：
+1. **正式部署依赖代理**：提供 SSH 目标与 HTTPS 域名，配置备份、重启恢复和 CI 接入；复用已通过的部署配置及构建输入。
+2. **管理面集成开发**：以已发布 RPM 为输入，补齐 Ambari 七节点 Blueprint、Agent、服务生命周期、Metrics 采集/展示/告警的实际适配，再执行 HA 验收。
+3. **业务链与元数据集成**：分别交付 Kafka→Flink→湖仓的可运行作业，以及 Hive Metastore、Spark/Flink/Trino 的共享 Catalog 配置与适配；按支持能力补 Hudi/Iceberg 的 S3 场景。
+4. **安全与观测**：先 Kerberos 认证与拒绝路径，再做一个 Ranger 插件和审计；补 Prometheus/JMX 指标、告警和恢复联动。每项有实现、配置及实际验收，不能只加空测试。
+5. **后续产品迭代**：调度/治理/数据服务、VM 多环境、Operators、可执行组合 Profile 按范围和需求独立立项；不以本轮包交付完成来关闭这些阶段。
 
-1. `docs/phase1-ha-design.md`
-2. `docs/bigtop-build-design.md`
-3. `docs/hbase-design.md`
-4. `docs/version-matrix.md`
-5. `docs/phase1-acceptance-criteria.md`
-
-待上述设计稳定后，再进入工程模板与验证环境阶段。
+当前组件版本、阶段归属与实施清单分别见 [版本矩阵](version-matrix.md)、[组件矩阵](component-matrix.md)、[组件 CI 补齐计划](component-ci-backlog.md)。[本轮五步执行计划](superpowers/plans/2026-10-22-component-five-step-delivery.md) 仍保留代理正式部署为未完成项。
