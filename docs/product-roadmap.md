@@ -1,5 +1,9 @@
 # Bigdata Platform 产品路线图
 
+> 当前状态更新：2026-10-22（Asia/Tokyo），证据主干 `0f84fa2c60852e73fa8994007076c1e36f844c96`。当前实现是 openEuler 22.03 LTS SP4 / RPM 仓库；下文产品分层不等于各层已经交付。本轮组件包与指定恢复测试已交付，完整数据平台能力尚未完成。
+>
+> 阶段编号口径：本文沿用四层**产品视角**；[工程路线图](roadmap.md) 使用 Phase 0—6。本文 Phase 2“Data Platform”是独立产品能力层，不是工程 Phase 2“部署与运维”；本文 Phase 4 云原生大体对应工程 Phase 5，不能混用完成率。
+
 ## 1. 文档目标
 
 本文档用于从产品视角重新规划 Bigdata Platform 的演进路径，明确项目不是单纯的大数据发行版，也不是一开始就建设完整数据平台，而是采用分层演进模式：
@@ -58,7 +62,7 @@ Bigdata Platform 的长期目标是一套可私有化交付、可扩展、可运
 
 - 组件版本矩阵
 - Bigtop 构建体系
-- DEB / apt 包仓库
+- openEuler RPM / DNF 包仓库（当前实现）
 - Ambari 管理面
 - 3M3W1G HA 集群验证
 - Runbook
@@ -84,7 +88,7 @@ HBase
 | 交付物 | 说明 |
 |---|---|
 | Version Matrix | 候选版本、回退版本、升级路径 |
-| Bigtop Repo | Ubuntu 22.04 apt 仓库 |
+| Bigtop Repo | openEuler 22.03 LTS SP4 RPM 仓库及校验和/元数据 |
 | Ambari Blueprint | 3M3W1G HA 拓扑 |
 | Runbook | 安装、重启、恢复、巡检 |
 | Smoke Test | HDFS/YARN/Hive/Spark/HBase 验证 |
@@ -162,6 +166,7 @@ CDC -> Kafka -> Flink -> Iceberg -> S3/HDFS -> Trino/Spark SQL
 - Trino
 - S3 Compatible Object Storage
 - Hive Metastore / Catalog
+- Paimon，已交付的可选扩展 Profile
 
 ### 6.3 能力模块
 
@@ -169,7 +174,7 @@ CDC -> Kafka -> Flink -> Iceberg -> S3/HDFS -> Trino/Spark SQL
 |---|---|
 | Realtime Ingestion | CDC、日志、消息接入 |
 | Stream Processing | Flink 作业、状态、Checkpoint |
-| Lakehouse Table | Iceberg / Hudi 表管理 |
+| Lakehouse Table | Iceberg / Hudi / Paimon 表管理 |
 | Query Engine | Trino / Spark SQL 查询 |
 | Data Freshness | 延迟、Lag、时效性监控 |
 | Data Quality | 实时质量、补偿、重放 |
@@ -189,7 +194,7 @@ CDC -> Kafka -> Flink -> Iceberg -> S3/HDFS -> Trino/Spark SQL
 | Flink | Flink Kubernetes Operator |
 | Kafka | Kafka Operator |
 | Trino | Kubernetes 部署 |
-| Iceberg / Hudi | Object Storage + Catalog |
+| Iceberg / Hudi / Paimon | Object Storage + Catalog |
 | Prometheus / Grafana | 云原生观测 |
 
 ### 7.3 混合管理模式
@@ -215,31 +220,22 @@ Kubernetes 管云原生计算与查询服务
 | 湖仓表格式 | 否 | 设计 | 是 | 是 |
 | 容器平台 | 否 | 否 | 设计 | 是 |
 
-## 9. 当前执行建议
+## 9. 当前产品能力交付状态
 
-当前应保持 Phase 1 主线，完成 Distribution Layer 验证闭环：
+| 产品层 | 当前实物成果 | 尚未完成的非测试工作 |
+|---|---|---|
+| Distribution | Ambari/核心生态 RPM 与仓库、CI 与发布证据；Metrics Collector/Monitor 3.0.0 已发布 | 七节点管理适配、监控告警联动与运维自动化需补齐；代理正式部署/接入待目标 |
+| Data Platform | 已发布 Hue SQL UI；产品模块及选型问题已有设计 | 调度/编排、数据源管理、统一元数据/血缘、权限、多租户、质量与数据服务仍需选型/开发；Hue 不代表完整 Data Studio 或统一控制台 |
+| Lakehouse | Kafka/Flink/三种表格式/Trino 包；双 CDC 湖仓直连与远端恢复专项通过 | Kafka 中转链业务作业、共享 Catalog/查询服务集成、生产对象存储适配、数据新鲜度/质量/重放能力仍需实现 |
+| Cloud Native | 传统管理面与 K8s 的边界已设计 | Operators、环境/资源模型、持久化/网络配置与混合管理仍为后续实施 |
 
-```text
-P1-012 Bigtop 构建验证
-P1-013 Ambari 管理适配
-P1-014 JDK 兼容性评估
-P1-015 3M3W1G 集群与 HA 验证
-P1-016 版本冻结评审
-```
+因此，**排除部署和测试后，仍不能说已经完成全部计划迭代**。本轮交付闭环与长期产品路线需分开评价；可选能力按明确业务需求立项，不要求一次性实现全部候选组件。
 
-Phase 2 只做产品规划，不进入工程实现。
+## 10. 下一轮实施建议
 
-## 10. 下一步任务建议
-
-建议新增 Phase 2 规划任务：
-
-```text
-P2-001 定义 Data Platform Layer 产品能力边界
-P2-002 设计统一控制台能力地图
-P2-003 评估调度系统选型
-P2-004 评估元数据治理选型
-P2-005 评估权限治理选型
-```
+- 先按 [工程路线图当前优先级](roadmap.md#10-当前优先级与进入下一阶段的条件) 完成代理接入、Ambari 管理适配、真实业务链和安全观测。
+- 平台层保留独立选型任务：调度（例如 DolphinScheduler/Airflow）、元数据治理（例如 Atlas/DataHub）、权限（例如 Ranger）、统一控制台和多租户边界；这些名称是候选，不是已锁定版本或已完成服务。
+- 分别定义每个模块的输入、可执行产物和验收条件后再进入开发。不会因为某个模块出现在路线图中就声称已实现，也不会为新增测试重复编译既有 RPM。
 
 ## 11. 核心原则
 

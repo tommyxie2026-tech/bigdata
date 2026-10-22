@@ -2,6 +2,8 @@
 
 > 2026-10-11 基线说明：本文保留历史设计讨论。当前 openEuler/RPM 版本、七节点配置、Runbook 与验收入口以 [Phase 1 交付设计](phase1-delivery-design.md) 为准；旧 Ubuntu/DEB 和候选版本指令不可用于当前 RC1 部署。
 
+> 当前状态更新：2026-10-22（Asia/Tokyo），主干 `0f84fa2c60852e73fa8994007076c1e36f844c96`。本轮组件包与专项 CI 交付已完成；整个平台路线图仍有集成开发和后续阶段功能，不能概括为“只剩部署、测试”。版本与证据以 [当前版本矩阵](version-matrix.md) 为准。
+
 ## 1. 文档目标
 
 本文档用于定义 Bigdata Platform 的组件范围、阶段归属、管理方式、交付优先级和组合策略。
@@ -41,6 +43,8 @@ SQL 层：Hive / Trino / Spark SQL
 | 组件 | 类型 | Phase 1 传统数仓 | Phase 3 实时数据湖 | Phase 5 云原生 | 管理方式 | 优先级 |
 |---|---|---|---|---|---|---|
 | Ambari | 管理面 | 必选 | 保留传统集群管理 | 与 K8s 协同 | Ambari Server | P0 |
+| Ambari Metrics | 指标采集 | 必选，独立 RPM 已发布 | 复用管理观测 | 集成另验 | Ambari / 独立服务 | P0 |
+| Kerberos | 身份认证 | 系统包安全集成待实现 | 安全前提 | 集成另定 | 系统服务 | P1 |
 | Bigtop | 构建发行 | 必选，真实构建 | 继续维护版本/包 | 可扩展/替换 | Build/Repo | P0 |
 | ZooKeeper | 协调服务 | 必选 | 必选 | 可 Operator 化 | Ambari / K8s | P0 |
 | HDFS | 分布式存储 | 必选，HA | 可选 | 部分保留 | Ambari | P0 |
@@ -65,42 +69,42 @@ SQL 层：Hive / Trino / Spark SQL
 | Kubernetes | 运行平台 | 不要求 | 规划 | 必选 | K8s | P1 |
 | Prometheus | 观测 | 可选 | 推荐 | 必选 | K8s/独立 | P2 |
 
-### 4.1 Phase 3 实时数据湖组件交付状态
+### 4.1 当前交付与专项验证状态
 
-状态口径：**已发布/冒烟通过**只表示对应 RPM 与所列 smoke 证据存在；**回归失败/进行中**表示当前主线的实际专项测试状态；**未接入/待选型**表示尚无可验证的版本化交付。RPM fast path 或 skipped job 不视为新构建或测试通过。
+“已发布”需有 RPM、checksum、manifest、repodata；“专项 PASS”仅覆盖所列实际链路。复用、skipped/cancelled 不表示新构建或测试成功；fixture 不等于生产产品交付。
 
-| 组件 | Phase 3 角色 | 当前版本 / 方案 | 交付与验证状态 | 后续动作 |
-|---|---|---:|---|---|
-| Kafka | 消息接入 | 3.4.1 | RPM 已发布；KRaft smoke PASS | 补齐与 CDC/Flink 的端到端链路验证 |
-| Flink | 流计算 | 1.20.1 | RPM 已发布；local-job smoke PASS | 补齐 Kafka/CDC 与湖仓表格式端到端验证 |
-| Flink CDC MySQL | 数据接入 | 3.4.0 | [RPM 已发布](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink-cdc-mysql/3.4.0/manifest.yaml)；[#100](https://github.com/tommyxie2026-tech/bigdata/pull/100) 已合并；[主线 Test / RC / 发布作业 PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39106575363) | 独立推进 PostgreSQL source，之后补湖仓联调 |
-| Flink CDC PostgreSQL | 数据接入 | 3.4.0 | [RPM 已发布](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/flink-cdc-postgres/3.4.0/manifest.yaml)；[#101](https://github.com/tommyxie2026-tech/bigdata/pull/101)、[#102](https://github.com/tommyxie2026-tech/bigdata/pull/102) 已合并；[主线 WAL / savepoint / RC PASS](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39139306230) | 复用原始 RPM；补湖仓与远端存储联调 |
-| Iceberg | 主线湖仓表格式 | 1.12.0 | integration RPM 已发布，仓库 manifest PASS | 补齐和 Kafka/Flink、对象存储的组合验收 |
-| Hudi | 可选湖仓 Profile | 1.2.1 | integration RPM 已发布；后续主线回归 PASS；manifest 引用 run 聚合 cancelled、实际 Test/Release success | 分层证据审计已通过；补 CDC upsert 与湖仓恢复验收 |
-| Paimon | 可选湖仓扩展 Profile | 2.1.0 | integration RPM 已发布；主线安装、更新与 Spark/Flink 双向互读 PASS；[发布清单](../repo/openeuler-22.03-lts-sp4/bigtop-3.6/paimon/2.1.0/manifest.yaml) | 补齐 CDC、checkpoint 恢复与远端存储组合验收 |
-| Hive Metastore | 湖仓元数据 | 随 Hive 4.0.1 | Hive RPM 已发布；Phase 3 多引擎元数据协同未单独验收 | 验证 Trino、Spark、Flink 对同一 catalog 的读写与 schema 一致性 |
-| Trino | 交互式查询 | 483 | RPM 已发布；single-node smoke PASS | 补齐 Iceberg/Hudi/Paimon catalog 端到端查询验证 |
-| S3 兼容对象存储 | 湖仓存储 | 未选型 | 无目标实现/版本及仓库 RPM；未进入构建测试 | 选定 MinIO、OBS 或其他实现，并定义身份认证、TLS、bucket policy 与兼容性验收 |
-| HDFS | 兼容存储后端 | 3.4.3 | RPM 已发布；Phase 1 包装证据 PASS | 作为对象存储未就绪时的替代后端，补齐湖仓格式读写验证 |
-| Delta Lake | 可选湖仓格式 | 未定 | 路线图仅列为可选；未纳入当前交付矩阵 | 仅在有明确场景需求后选型和立项 |
-
-Hue 是辅助查询 UI；`4.11.0-2.oe2203sp4` 已发布，[主线安装、Gunicorn 启动与 Hue→Trino 查询通过](https://github.com/tommyxie2026-tech/bigdata/actions/runs/39086875001)，[RPM 晋级 #96](https://github.com/tommyxie2026-tech/bigdata/pull/96) 已合并。其源码是钉住的开发快照；当前测试采用临时 SQLite，不代表生产元数据库或 HA 验收。完整版本与证据见 [当前版本矩阵](version-matrix.md)。
-
-### 4.2 下一轮 CI 工作顺序
-
-以下是补齐交付能力的建议顺序，不改变 Phase 1 已确认范围；组件与版本未通过选型前，不默认加入平台必装组合。
-
-| 顺序 | 工作 | 分类 | 首个验收目标 |
+| 组件 / 能力 | 当前版本 / 方案 | 已完成 | 仍需完成 |
 |---|---|---|---|
-| 0 | 发布证据溯源校验 | [#97](https://github.com/tommyxie2026-tech/bigdata/pull/97) 已合并，7 个既有 v2 组件审计 PASS | 核验仓库 checksum/repodata、实际 jobs 和轻量 evidence；不下载大 RPM artifact 做逐字节比较 |
-| 1 | Flink CDC：先 MySQL source，后 PostgreSQL source | 新增 connector 构建/测试/发布，P1 | 全量快照 + INSERT/UPDATE/DELETE + checkpoint 重启恢复，验证下游最终行集合 |
-| 2 | S3 兼容存储适配与 fixture | 新增集成 CI，P1；存储实现另行选型 | Spark/Flink/Trino 对同一远端表的读写、凭据与失败恢复 |
-| 3 | Hive Metastore / HiveServer2、Kafka→Flink→湖仓、HDFS/S3 湖仓组合 | 已发布组件集成 CI，P1 | 不重编现有 RPM，验证真实服务端口、数据变化及跨进程恢复 |
-| 4 | Ambari Metrics、Kerberos | 新增服务或系统包集成 CI，P1 | 先确认源码/包和依赖，再验证指标查询、认证成功及拒绝路径 |
-| 5 | Ranger、Prometheus/JMX exporters | 新增治理/观测 CI，P2 | 最小权限允许/拒绝及审计；抓取指标和故障告警 |
-| 6 | Knox、Atlas、Delta Lake、Kubernetes Operators | 按业务触发，P3/后续阶段 | 各自依赖与兼容性确认后，独立 PR 分批交付 |
+| Kafka / Flink | 3.4.1 / 1.20.1 | RPM 已发布，独立 smoke PASS | Kafka→Flink→湖仓业务作业、运行与恢复配置及专项验收 |
+| MySQL / PostgreSQL CDC | 均为 3.4.0 | RPM 已发布；双 source 到真实 Paimon/Hudi/Iceberg sink 的恢复专项已通过 | schema 演进与复杂故障窗口；不是所有场景 exactly-once 的证明 |
+| Paimon | 2.1.0 | 本地/HDFS/HTTPS S3 双 CDC 恢复 PASS | 生产 Catalog/集群接入与业务场景 |
+| Hudi | 1.2.1 | 双 CDC→Hudi/HDFS 精确行集与保存点恢复 PASS | S3 链路及生产 Catalog 集成 |
+| Iceberg | 1.12.0 | 双 CDC→Iceberg/HDFS、JDK 17、存储重启后独立读取 PASS | S3 链路、共享 Catalog 与查询引擎集成 |
+| HDFS | Hadoop 3.4.3 | RPM 已发布；三种湖仓格式远端读写/恢复专项 PASS | 七节点集群、HA 与容量验证 |
+| HTTPS S3 fixture | SeaweedFS 4.48，镜像 digest 固定 | API/S3A、权限拒绝、multipart、持久化与 Paimon 恢复 PASS | 测试后端；不构成生产对象存储选型或服务发行 |
+| Hadoop S3A SDK | 2.35.4 | 可选客户端 RPM 与仓库元数据已发布（#106） | 在实际存储端点上验证兼容性 |
+| S3 兼容生产存储 | 尚未选型 | 已有测试端点与客户端集成证据 | 产品选型、服务交付/适配及运行配置仍需实现 |
+| Hive Metastore / HiveServer2 | 随 Hive 4.0.1 | Hive RPM 已发布 | Spark/Flink/Trino 共享元数据与 schema 的集成配置/适配 |
+| Trino | 483 | RPM 与单节点查询 smoke 已交付 | 各湖仓 Catalog 的实际查询集成 |
+| Hue | 4.11.0-2.oe2203sp4 | RPM、Gunicorn 与 Hue→Trino 查询 PASS | 生产元数据库、认证/TLS 接入及 HA |
+| Ambari Metrics | 3.0.0-1.oe2203sp4 | Collector/Monitor RPM 已发布（#123）；真实指标与重启持久化 PASS | Ambari 集群管理、展示和告警集成 |
+| 依赖代理 | Reposilite / Verdaccio / devpi / Caddy | 配置及 CI 已合并；完整组件冷/热/离线构建 PASS | 正式主机、域名、备份与 CI 生产接入待部署验证 |
+| Kerberos / Ranger | Kerberos 复用系统包；Ranger 待选型 | 安全设计边界已记录 | principal/keytab、认证/授权、插件、审计等集成仍需开发 |
+| Prometheus / JMX exporters | 待锁定交付组合 | 观测设计已记录 | 采集配置、Dashboard、告警和故障恢复联动仍需实现 |
+| Delta Lake / Knox / Atlas / Operators | 远期可选 | 路线图占位 | 尚未立项交付，不计为本轮未交付包，也不能计作已完成 |
 
-详细范围、依赖、测试方法和发布门槛见 [组件 CI 补齐计划](component-ci-backlog.md)。
+逐项运行证据见 [版本矩阵](version-matrix.md) 与 [组件 CI 补齐计划](component-ci-backlog.md)。Hue 版本来自钉住开发快照，当前 SQLite smoke 不等于生产元数据库验收。
+
+### 4.2 下一阶段工作与分类
+
+| 顺序 | 工作 | 类型 | 交付边界 |
+|---|---|---|---|
+| 1 | 依赖代理正式部署和接入 | 部署 / 运维验证 | 需要主机与 HTTPS 域名；复用现有配置，不重新构建组件 RPM |
+| 2 | Ambari 集群管理、Metrics 展示及告警、七节点 Blueprint | 集成开发 + 部署验证 | 单节点模板和独立 RPM 不等于七节点管理适配完成 |
+| 3 | Kafka→Flink→湖仓、共享 Hive Metastore、Trino Catalog | 集成开发 + 专项测试 | 当前 CDC 直连湖仓结果不能替代消息链和多引擎服务集成 |
+| 4 | Kerberos、单个 Ranger 插件、Prometheus/JMX 告警 | 安全 / 观测开发 + 验收 | 选型、服务/插件配置与拒绝路径分别交付 |
+| 5 | 生产对象存储与 Hue 生产元数据库/认证 | 选型 / 适配开发 + 部署测试 | CI fixture 与 SQLite smoke 不代表这些集成已完成 |
+| 后续 | 产品层开发、VM 多环境、Kubernetes Operators、组合交付 | 后续迭代，按需立项 | 阶段映射及非测试开发项见 [路线图](roadmap.md) 和 [产品路线图](product-roadmap.md) |
 
 ## 5. 第一阶段核心组合
 
@@ -154,7 +158,7 @@ realtime-lakehouse:
   S3 Compatible Object Storage or HDFS
 ```
 
-Hudi 作为可选 Profile，用于偏 CDC upsert 的实时湖仓场景。
+Hudi 与 Paimon 作为已交付的可选 Profile，按 CDC/upsert、引擎及 Catalog 需求组合；Iceberg 仍为既定主线。
 
 ## 7. 云原生组合
 
@@ -220,4 +224,5 @@ cloud-native-data:
 - [ ] 补充 Profile 交付模板
 
 - [x] 加入 manifest 引用的 run/attempt/job 分层审计（#97，7 个既有 v2 组件；独立 CDC 契约另行核验）
-- [ ] 按 [CI 补齐计划](component-ci-backlog.md) 推进 CDC、S3 与现有组件集成测试
+- [x] 完成本轮双 CDC 湖仓/HDFS 恢复、Paimon/HTTPS S3 与 Metrics/SDK 发布
+- [ ] 按 [CI 补齐计划](component-ci-backlog.md) 推进剩余集成开发、安全与部署验收（本轮完成不代表平台全阶段完成）
