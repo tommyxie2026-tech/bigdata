@@ -10,7 +10,7 @@
 
 建议优先验证的现代组合是：**Spark 4.1.3 / Scala 2.13、Flink 2.2.1、Flink CDC 3.7.0、Iceberg 1.12.0、Trino 484、Kafka 4.3.1、Polaris 1.8.0**。Superset 6.1.0 作为 SQL/BI 界面候选。这里选择的是有官方适配入口的交集，而非把各项目最大版本号直接拼在一起。[S04][S06][S07][S09][S10][S15][S16]
 
-当前组件并非全部停留在三年前：Hadoop 3.4.3、Iceberg 1.12.0、Hudi 1.2.1、Paimon 2.1.0 都有近期上游发行。突出问题是 Kafka 3.4.1 较旧、Hue 使用开发快照，以及运行时、连接器和元数据的组合约束。升级应同时减少维护面，而不是再增加一套全量组件。
+当前组件并非全部停留在三年前：Hadoop 3.4.3、Iceberg 1.12.0、Hudi 1.2.1、Paimon 2.1.0 都有近期上游发行。突出问题是 Kafka 3.4.1 较旧、Hue 使用开发快照，以及运行时、连接器和元数据的组合约束。升级应同时减少维护面，而不是再增加一套全量组件。**Hadoop 安全基座不因传统栈可选而延后：需要 Hadoop 的配置以 3.5.0 / JDK 17 为优先升级候选，3.4.3 仅保留迁移对照与有时限回退。**
 
 “最新稳定”分为三层：上游正式发行、官方列出的适配范围、本平台真实回归。前两层只能支持候选选择，最后一层通过后才能冻结生产版本。
 
@@ -24,7 +24,7 @@
 | Bigtop | 3.6.0 | 3.6.0 | 保留 RPM 构建能力；现代组件独立配方，不受 BOM 统一版本限制 | S02 |
 | Bigtop common | 3.6.0 | 随 Bigtop，不是独立上游产品版本 | 仅被依赖的 RPM 安装 | S02 |
 | ZooKeeper | 3.8.4 | current 3.9.6；官方 stable 3.8.7，均为 2026-09-15 | 传统配置优先验证 3.8.7；现代 Kafka 不再依赖它 | S03 |
-| Hadoop / HDFS / YARN | 3.4.3 | 3.5.0，2026-04-02；3.4.3 为 2026-02-24 | 保留 3.4.3 兼容配置；3.5.0 单独验证；现代 S3 路径不强制安装 HDFS/YARN | S05 |
+| Hadoop / HDFS / YARN | 3.4.3 | 3.5.0，2026-04-02；3.4.3 为 2026-02-24 | 优先评估升级 3.5.0 / JDK 17；3.4.3 仅作迁移对照与有时限回退；现代 S3 路径仍审计内嵌客户端 | S05 |
 | Hive / Metastore | 4.0.1 | 4.2.1，2026-08-24 | 现代 Iceberg 路径转 REST Catalog；传统 Hive 4.2.1 单独评估 JDK 21 与配套 Hadoop | S08 |
 | Tez | 0.10.5 | 0.10.5，2025-05-30 | 已是最新；随 Hive 执行配置可选，退出现代默认栈 | S11 |
 | Spark | 3.5.8 | 4.2.0，2026-07-14；另有 4.1.3、3.5.9 | 现代候选 4.1.3；传统补丁候选 3.5.9；暂不选缺少湖仓运行时配套的 4.2.0 | S04 |
@@ -48,6 +48,52 @@
 - Spark 4 转 Scala 2.13，现有 Scala 2.12 runtime 不可复用。Spark 4.2 支持的运行时和 Python 最低版本也不代表旧脚本兼容；新基线需选择仍受维护的 Python 分支，不能只满足最低版本。[S04]
 - Flink 2.x 优先按 Java 17 验证；Trino 484 需要 Java 25。各服务分别绑定运行时，JDK 补丁和 checksum 实施时重新锁定。[S07][S09]
 - 当前 openEuler 22.03 LTS SP4 的 RPM 交付不能外推为新运行时可安装。OS、glibc、Python 和 JDK 仓库支持另设验收；不把“最新创新版”误当长期支持版。[S20]
+
+## 2A. Hadoop 3.4.3 → 3.5.0 安全升级专项
+
+### 评估结论
+
+**建议推进 3.5.0 的独立验证，优先级高于仅维持 3.4.3 的兼容优化。** 截至 2026-10-23，官方最新稳定版为 3.5.0，发布日期 2026-04-02。升级目标同时覆盖 Hadoop 服务端、客户端与实际交付依赖；不把现代 S3 架构视为可以忽略 Spark/Flink 等进程内 Hadoop JAR 的理由。[S05][S21]
+
+3.5.0 的官方说明明确包含第三方依赖 CVE 修复，但也承认有依赖尚未升级到最新。因此本评估支持升级方向，**尚未证明当前 RPM 的漏洞数量、所有可利用路径或升级后的剩余风险已清零**。需要对实际安装包出具扫描与适用性结论，不能只比较版本号。[S21]
+
+### 安全证据与判定边界
+
+| 风险层 | 已核验证据 / 当前结论 | 升级验收要求 |
+|---|---|---|
+| Hadoop 自身公告 | CVE-2025-27821 影响 3.2.0–3.4.1，修复于 3.4.2；不能计为 3.4.3 未修复漏洞 | 按每个 CVE 官方影响范围、源码补丁与实际二进制核验，记录适用或不适用依据 |
+| 历史本地提权 | CVE-2023-26031 影响 3.3.1–3.3.4，修复于 3.3.5 | 审计实际 container-executor 的来源、RPATH、所有权与权限，不照搬旧版本扫描结论 |
+| 第三方 Java 依赖 | 3.5.0 官方明确升级多项依赖以处理 CVE，同时说明有兼容原因未全部更新 | 对 3.4.3 与候选 3.5.0 的实际 RPM 生成 SBOM，比较嵌套/ shaded JAR、版本与加载路径 |
+| JDK / native / OS | Hadoop 版本号不覆盖 JDK、libcrypto、压缩库及系统包风险 | 对实际 JDK 17 补丁、原生库与 OS 包分别扫描，保留厂商回补证据 |
+| 配置与暴露面 | 软件更新不会自动启用认证、加密和正确授权 | 验证 Kerberos、HTTP SPNEGO/TLS、代理用户 ACL、服务权限、凭据与接口暴露范围 |
+
+前两项仅是说明正确归因的方法，不是完整漏洞清单；依据为官方 [Hadoop CVE 列表](https://hadoop.apache.org/cve_list.html)。未取得现有部署扫描报告前，不编造“尚有多少高危”。依赖漏洞需要记录 CVE、包坐标、实际路径、修复版本、运行/测试作用域、可达性与处理决定；误报也必须有证据，不能直接过滤。[S22]
+
+### 升级对生态的实际影响
+
+| 边界 | 3.5.0 变更 / 风险 | 处理方式 |
+|---|---|---|
+| Java 与打包 | 服务端要求 Java 17；客户端支持 17/21。当前 catalog 默认 JDK 8 不能直接沿用 | 单独修改 Hadoop 构建、systemd、Ambari 服务环境、native 构建；不全局替换其他组件 JDK |
+| HDFS / HA | RPC、元数据与故障恢复兼容必须实测 | 备份 fsimage/edits 与配置；验证 QJM/ZKFC、切主、读写校验、块报告与旧客户端接入 |
+| YARN / MapReduce | JVM、容器执行器、调度和历史服务均在升级范围内 | 实际提交 MR/Spark/Flink 作业；验证队列/ACL、日志、容器隔离及 NodeManager 重启恢复 |
+| Hive / Tez | 上游配套 Hadoop 版本与本仓库新组合不同；不能宣称自动兼容 | 以实际保留版本验证元数据访问、DDL/DML、Tez 作业及身份传递；失败再升级或退出对应配置 |
+| HBase / Metrics | 在线 HBase 与 Metrics 内嵌 HBase 是不同依赖树 | 分别验证 WAL、恢复、权限与 JDK；不能用服务器升级替换内嵌库就算完成 |
+| Spark / Flink / 湖仓 | 只升级 HDFS 服务端不会移除客户端进程中的旧 Hadoop 依赖 | 对分发包及插件 classpath 扫描；验证 RPC、token、HDFS/S3 读写；避免盲目覆盖 shaded JAR |
+| S3A / AWS SDK | 3.5.0 release tag 的 POM 仍指定 SDK v2 2.35.4 | 不为了升级版本号强塞最新 SDK；重新验收 TLS、multipart、凭据续期、拒绝访问与重启读取 |
+| 文件系统入口 | 3.5 移除 WASB，改用 ABFS | 清点 URI 与历史配置；存在 wasb/wasbs 数据路径时制定转换与读写回归 |
+| Bigtop / Ambari | 现有 3.6 BOM 和服务定义不等于已适配 Hadoop 3.5 | 独立维护构建补丁和服务适配，保留许可证、源码及兼容 identity 证据 |
+
+SDK 数值来自 [3.5.0 tag 的项目 POM](https://raw.githubusercontent.com/apache/hadoop/rel/release-3.5.0/hadoop-project/pom.xml)，是源码依赖基线，不代替最终 effective POM、依赖树与交付 SBOM。Hadoop 服务器与每个引擎客户端可采用经验证的不同版本；同样不能仅凭协议互通而接受仍含未处置高危依赖的客户端。[S23]
+
+### 可执行的验证与发布顺序
+
+1. **建立风险台账**：收集现有 3.4.3 安装清单、JDK/OS 版本和扫描报告；在 CI 的实际 RPM 解包目录生成 CycloneDX/SPDX SBOM，包含 native 与嵌套 JAR。扫描数据库日期和工具版本随证据冻结，不在本地下载大型 RPM。
+2. **只构建必要候选**：建立 3.5.0 / JDK 17 独立配方，源码 tag/SHA、补丁和依赖均锁定；保留旧包。版本和构建输入变化意味着必须新构建 Hadoop；其他包仅在构建或兼容输入变化时重建。
+3. **先小后大回归**：干净 openEuler 安装及 native 检查 → HDFS/YARN/MR → HA/安全身份 → Spark/Flink 客户端 → 实际保留的 Hive/Tez/HBase → S3A 与湖仓专项。每步独立有界超时和日志，失败只重跑相关层。
+4. **比较安全收益**：输出新旧 SBOM 差异、已修复/残留/不适用 CVE；已确认可利用的 critical/high 项在发布前修复或具备明确缓解、负责人和期限，不用泛化忽略清单绕过。
+5. **试点再晋级**：校验真实数据与恢复时长、旧客户端兼容和回退演练；通过后独立 RC/晋级 PR，核验 RPM/checksum/metadata，再更新冻结矩阵。当前文档不触发构建或发布。
+
+回退需依据 3.5 的版本化升级文档，区分 upgrade、rollback、downgrade；在完成回退演练前不 finalize。备份不是自动回滚保证，不能用旧 RPM 直接覆盖新版本数据目录。实施前核对旧/新元数据、客户端和 JDK 的组合支持范围；若存在已确认可利用漏洞，3.4.3 回退只能是有时限、隔离且有补救措施的应急方案。[S24]
 
 ## 3. 为什么不能所有组件都选最大版本号
 
@@ -164,3 +210,8 @@ CI 只对改变构建输入的包重新构建。测试脚本变动复用已验�
 - **S18 Metrics**：[独立源码仓库](https://github.com/apache/ambari-metrics)、[3.0.0 POM](https://raw.githubusercontent.com/apache/ambari-metrics/release-3.0.0/pom.xml)。不据 GitHub Releases 空列表推断 ASF 无其他发行。
 - **S19 AWS SDK**：[官方版本](https://github.com/aws/aws-sdk-java-v2/releases)。组件最新版本不覆盖 Hadoop 配套约束。
 - **S20 环境**：[openEuler 发行](https://www.openeuler.org/en/download/)、[Python 维护状态](https://devguide.python.org/versions/)。
+
+- **S21 Hadoop 3.5 安全与运行时变更**：[3.5.0 概览](https://hadoop.apache.org/docs/r3.5.0/)。
+- **S22 Hadoop 自身 CVE**：[官方公告及影响范围](https://hadoop.apache.org/cve_list.html)。
+- **S23 Hadoop 3.5 配套依赖**：[正式 tag 的 POM](https://raw.githubusercontent.com/apache/hadoop/rel/release-3.5.0/hadoop-project/pom.xml)。
+- **S24 Hadoop 升级边界**：[3.5.0 HDFS rolling upgrade](https://hadoop.apache.org/docs/r3.5.0/hadoop-project-dist/hadoop-hdfs/HdfsRollingUpgrade.html)。
