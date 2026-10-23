@@ -18,7 +18,7 @@ flowchart TB
   end
   subgraph Lake[湖仓与查询：待验证]
     I[Iceberg 1.12.0]
-    P[Polaris 1.8.0 · Java 待核验]
+    P[Polaris 1.8.0 · Java 21]
     T[Trino 484 · Java 25]
     UI[Superset 6.1.0 · Python]
     F --> I
@@ -80,7 +80,7 @@ flowchart TB
 | Kafka 4.3.1 broker/controller | Java 17 / 21 / 25；官方推荐最新 LTS 25 | **25** | Kafka JVM 与 Flink Kafka 客户端 JVM 独立；客户端 Java 17 不必跟随 broker 切 25 |
 | Trino 484 | Java 25，最低 25.0.1；建议最新补丁 | **25**，优先 Temurin | 插件构建与运行按 Trino SPI/工具链锁定；不强制切 Java 26 |
 | Hive 4.2.1 | 最低 Java 21 | **21** | 与 Hadoop 客户端支持范围有交集；Tez 容器及 Hadoop 3.5 集成单独验证 |
-| Polaris 1.8.0 | 本轮尚未确认正式 tag 的完整构建/运行要求 | **待核验，不默认填 17/21/25** | 进入构建前核对正式源码工具链、发行镜像与启动要求，镜像摘要独立锁定 |
+| Polaris 1.8.0 | 二进制要求 Java 21+；构建说明使用 Java 21 | **21** | 独立锁定 Gradle 工具链与镜像摘要；不由 Java 21+ 外推所有更高版本均已认证 |
 | Iceberg / Paimon / Hudi runtime | 由对应引擎、artifact 与插件约束共同决定 | 随实际宿主 JVM | 不为表格式虚构独立通用 JDK；构建 JDK 与目标字节码分别记录 |
 | Ambari 3.0.0 | 当前管理端以 Java 17 交付 | **17**，新组合待测 | 不据管理端版本推断所有服务必须同一 JDK |
 | HBase 2.6.7 / Tez / ZooKeeper | 精确所选 tag 的范围需专项复核 | **待专项冻结** | 不根据 Hadoop 已切 17 就宣称这些服务已支持；保留项必须通过验收 |
@@ -113,3 +113,5 @@ flowchart TB
 - [Trino 484 Java 25 与 Temurin 建议](https://trino.io/docs/current/installation/deployment.html)
 - [Hive 4.2.1 发行要求](https://hive.apache.org/general/downloads/)
 - [完整组件版本来源与 Hadoop 安全评估](component-version-assessment-20261023.md)
+
+- [Polaris 1.8 二进制 Java 21+ 要求](https://polaris.apache.org/releases/1.8.0/getting-started/binary-distribution/)
