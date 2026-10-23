@@ -1,5 +1,7 @@
 # Phase 1 版本矩阵设计
 
+> **下一代目标更新（2026-10-24）**：见[Hadoop 3.5.0 目标版本与 Java 矩阵图](target-version-matrix-20261024.md)。目标版本均待验证；下方已发布状态不因目标选型改变。
+
 > 2026-10-11 基线说明：本文保留历史设计讨论。当前 openEuler/RPM 版本、七节点配置、Runbook 与验收入口以 [Phase 1 交付设计](phase1-delivery-design.md) 为准；旧 Ubuntu/DEB 和候选版本指令不可用于当前 RC1 部署。
 
 ## 当前交付与回归矩阵（2026-10-22）
